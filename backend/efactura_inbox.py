@@ -72,6 +72,12 @@ def _xml_from_zip(content: bytes):
 
 async def store_message(meta: dict, xml: str, signature: str = "", source: str = "spv"):
     parsed = parse_ubl(xml)
+    dup = await db.efactura_inbox.find_one({"parsed.supplier_cif": parsed["supplier_cif"], "parsed.supplier_name": parsed["supplier_name"],
+                                            "parsed.series_number": parsed["series_number"]}, {"_id": 1})
+    if dup:
+        if source == "import":
+            raise HTTPException(409, f"Factura {parsed['series_number']} de la {parsed['supplier_name']} există deja în lista e-Factura primite")
+        return
     doc = {**meta, "source": source, "xml": xml, "signature_xml": signature, "parsed": parsed, "status": "parsed", "received_at": iso()}
     if meta.get("message_id"):
         await db.efactura_inbox.update_one({"message_id": meta["message_id"]}, {"$setOnInsert": doc}, upsert=True)
@@ -119,7 +125,7 @@ async def find_duplicate_nir(parsed: dict, supplier):
     target = norm_no(parsed["series_number"])
     async for n in db.nirs.find({"supplier_id": str(supplier["_id"])}):
         no = norm_no(n.get("invoice_no"))
-        if no and (no == target or (len(no) >= 3 and target.endswith(no)) or (len(target) >= 3 and no.endswith(target))):
+        if no and (no == target or (len(re.sub(r"\D", "", no)) >= 3 and re.sub(r"\D", "", no) == re.sub(r"\D", "", target))):
             return n
     return None
 

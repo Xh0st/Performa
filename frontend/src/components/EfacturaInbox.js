@@ -25,7 +25,7 @@ function Detail({ id, onClose, onDone }) {
     const v = val(l.idx);
     return { idx: l.idx, product_id: v.startsWith("__") ? null : v, create: v === "__new", skip: v === "__skip" };
   }) });
-  const done = m.status !== "parsed";
+  const done = m.status !== "parsed" || !!result;
   const create = async () => {
     try {
       const r = await api.post(`/efactura/inbox/${id}/create-nir`, body());

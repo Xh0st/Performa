@@ -28,7 +28,15 @@ def build_ubl(inv: dict) -> str:
     """UBL 2.1 Invoice conform CIUS-RO (RO e-Factura)."""
     cur = inv.get("currency", "RON")
     t = inv["totals"]
-    vat_rate = inv["lines"][0].get("vat_rate", 21) if inv["lines"] else 21
+    groups = {}
+    for ln in inv["lines"]:
+        g = groups.setdefault(float(ln.get("vat_rate", 21)), [0.0, 0.0])
+        g[0] += ln["net"]
+        g[1] += ln["vat"]
+    subtotals = "".join(
+        f"<cac:TaxSubtotal><cbc:TaxableAmount currencyID=\"{cur}\">{n:.2f}</cbc:TaxableAmount><cbc:TaxAmount currencyID=\"{cur}\">{v:.2f}</cbc:TaxAmount>"
+        f"<cac:TaxCategory><cbc:ID>{'S' if rate else 'Z'}</cbc:ID><cbc:Percent>{rate:.2f}</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>"
+        f"</cac:TaxCategory></cac:TaxSubtotal>" for rate, (n, v) in sorted(groups.items()))
     lines_xml = ""
     for i, ln in enumerate(inv["lines"], 1):
         unit = "HUR" if ln["type"] == "labor" else "H87"
@@ -57,10 +65,7 @@ def build_ubl(inv: dict) -> str:
         f"<cbc:Note>Comanda de lucru {x(inv.get('work_order_number', ''))}</cbc:Note>"
         f"<cbc:DocumentCurrencyCode>{cur}</cbc:DocumentCurrencyCode>"
         f"{_party('AccountingSupplierParty', seller, True)}{_party('AccountingCustomerParty', inv['buyer'], False)}{payment}"
-        f"<cac:TaxTotal><cbc:TaxAmount currencyID=\"{cur}\">{t['vat']:.2f}</cbc:TaxAmount><cac:TaxSubtotal>"
-        f"<cbc:TaxableAmount currencyID=\"{cur}\">{t['net']:.2f}</cbc:TaxableAmount><cbc:TaxAmount currencyID=\"{cur}\">{t['vat']:.2f}</cbc:TaxAmount>"
-        f"<cac:TaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>{vat_rate:.2f}</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>"
-        f"</cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>"
+        f"<cac:TaxTotal><cbc:TaxAmount currencyID=\"{cur}\">{t['vat']:.2f}</cbc:TaxAmount>{subtotals}</cac:TaxTotal>"
         f"<cac:LegalMonetaryTotal><cbc:LineExtensionAmount currencyID=\"{cur}\">{t['net']:.2f}</cbc:LineExtensionAmount>"
         f"<cbc:TaxExclusiveAmount currencyID=\"{cur}\">{t['net']:.2f}</cbc:TaxExclusiveAmount>"
         f"<cbc:TaxInclusiveAmount currencyID=\"{cur}\">{t['gross']:.2f}</cbc:TaxInclusiveAmount>"

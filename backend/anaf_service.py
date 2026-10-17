@@ -158,6 +158,9 @@ def validate_ubl(inv: dict, xml: str):
             errs.append(f"{lbl} lipsă sau placeholder")
     if not re.fullmatch(r"RO-[A-Z]{1,2}", s.get("county_code") or ""):
         errs.append("Cod județ emitent invalid (format ISO 3166-2, ex. RO-B)")
+    iban = (s.get("iban") or "").replace(" ", "").upper()
+    if iban and not re.fullmatch(r"RO\d{2}[A-Z]{4}[A-Z0-9]{16}", iban):
+        errs.append("IBAN emitent invalid sau placeholder (format RO + 22 caractere)")
     if b.get("cui"):
         if not re.fullmatch(r"(RO)?\d{2,10}", b["cui"].upper().replace(" ", "")):
             errs.append("CIF destinatar invalid")
@@ -209,7 +212,7 @@ async def send_invoice(inv: dict):
     xml = build_ubl(inv)
     errs = validate_ubl(inv, xml)
     if errs:
-        await _set_ef(inv["_id"], {"status": "invalid", "errors": errs}, "Validare internă eșuată")
+        await _set_ef(inv["_id"], {"status": "invalid", "errors": errs, "upload_index": None, "env": env}, "Validare internă eșuată")
         await log("upload", False, "; ".join(errs), str(inv["_id"]), env)
         return
     if env == "simulare":
@@ -228,11 +231,11 @@ async def send_invoice(inv: dict):
             await log("upload", True, f"index {idx}", str(inv["_id"]), env)
         else:
             errs = _errors_from_xml(r.text) or [r.text[:500]]
-            await _set_ef(inv["_id"], {"status": "error", "errors": errs, "env": env}, "Respins la încărcare")
+            await _set_ef(inv["_id"], {"status": "error", "errors": errs, "env": env, "upload_index": None}, "Respins la încărcare")
             await log("upload", False, "; ".join(errs), str(inv["_id"]), env)
     except (HTTPException, ET.ParseError, httpx.HTTPError) as e:
         msg = getattr(e, "detail", str(e))
-        await _set_ef(inv["_id"], {"status": "error", "errors": [msg], "env": env}, "Eroare comunicare ANAF")
+        await _set_ef(inv["_id"], {"status": "error", "errors": [msg], "env": env, "upload_index": None}, "Eroare comunicare ANAF")
         await log("upload", False, msg, str(inv["_id"]), env)
 
 

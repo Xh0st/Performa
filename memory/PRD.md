@@ -29,7 +29,15 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Utilizatori & audit log, setări companie (date firmă placeholder, tarife, serii, elevatoare)
 
 ## MOCKED
-- ANAF SPV upload/status, trimitere devize pe email/SMS/WhatsApp
+- Trimiterea devizelor pe email/SMS/WhatsApp
+- e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
+
+## RO e-Factura (2026-10-17)
+- Administrare › eFactura / Setări API: OAuth 2.0 ANAF (Client ID/Secret criptat Fernet, Redirect URI, state CSRF), comutare Simulare/Test/Producție (api.anaf.ro/test|prod), status conexiune, jurnal, auto-trimitere
+- Facturi: validare internă CIUS-RO (CIF, UN/ECE, TVA, totaluri, IBAN) + validare publică ANAF, upload, index_incarcare, stareMesaj, recipisă ZIP, erori ANAF; TaxSubtotal per cotă TVA
+- Stocuri › Facturi e-Factura primite: sincronizare SPV (listaMesajeFactura + descarcare), import XML, parsare UBL, mapare articole (memorată), NIR din XML, detectare duplicat + Overwrite/Link fără mișcări duplicate
+- CRON (.emergent/crons.yml): refresh token zilnic, polling stare la 15 min, inbox orar
+- Documentație: /app/docs/EFACTURA.md
 
 ## Backlog
 - P0: date reale firmă în Setări (acum placeholder), certificat/OAuth ANAF real

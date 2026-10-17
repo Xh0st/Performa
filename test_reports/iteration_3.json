@@ -1,0 +1,51 @@
+{
+  "summary": "Tested the full RO e-Factura feature, backend and frontend. Backend: 22/22 pytest pass (config/env switch, secret hidden, OAuth authorize URL, invalid-state callback redirect, cron 401/200/400, Test-without-OAuth submit -> error 'SPV neautorizat', Simulare submit -> pending -> refresh ok, cron status poll -> ok, placeholder seller -> status invalid, invalid XML 400, non-UBL 400, sync in simulare 400). UI: the sidebar link, the /efactura page and its status texts for all 3 environments, the saved-secret placeholder, Connect disabled in Simulare, Refresh/Disconnect disabled, the logs table, and the Connect redirect to logincert.anaf.ro (intercepted, URL has client_id, redirect_uri, state) all work. Invoice panel: validate, Test-mode error, Simulare submit (index shown), refresh to 'Validată ANAF' work. Auto-send on a newly issued fiscal invoice works (SRV 000070 went to pending, then ok via cron). Inbox: importing ICR-2026-7781 auto-maps BU-HC-040 and defaults SKF to '+ Creează articol nou'. It created NIR-2026-00010: BU-HC-040 stock 10->14, SKF product created with stock 2, supplier 'Furnizor Nou Demo SRL' created. For F-1000 the duplicate alert shows and Overwrite updates NIR-2026-00001 (FU-OL-001 10->12 @27.5, FU-AE-002 unchanged 10 @45). Stock changes by the delta only, NIR-2026-00001 moves stay at 1 per product, the NIR is efactura_linked and the row shows 'Legată (overwrite)'. All core requirements pass; only minor UX and robustness issues remain.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "efactura.build_ubl", "issue": "TaxTotal has a single TaxSubtotal that uses the FIRST line's VAT rate on the whole net. If an invoice mixes VAT rates (e.g. 21% + 11%/9%), the XML is wrong under CIUS-RO/EN16931 (BR-CO-14 / BR-S-08) and ANAF will reject it (nok). Group the lines by vat_rate and emit one TaxSubtotal per rate. validate_ubl does not catch this."},
+      {"endpoint": "anaf_service.validate_ubl", "issue": "The seller IBAN is not validated. Settings currently has iban='RO[IBAN]' (shown in red on /efactura), yet internal validation returns OK, and the IBAN goes into PaymentMeans/PayeeFinancialAccount. Add a placeholder '[' check and an IBAN format check."},
+      {"endpoint": "anaf_service.send_invoice (error path)", "issue": "On error/invalid status the old upload_index from an earlier submit is kept, and env is overwritten. The panel then shows 'EROARE STRUCTURĂ · index 4401901396 · test', an index that belongs to an earlier simulare submit. Clear upload_index when status becomes error/invalid."},
+      {"endpoint": "PUT /api/efactura/config", "issue": "A saved client_secret can never be cleared: an empty or null value is ignored. The 'Deconectare' action does not remove it either. Consider an explicit clear option."},
+      {"endpoint": "POST /api/efactura/inbox/upload", "issue": "Importing the same XML twice creates a second inbox row (no dedup on supplier CIF + series/number or on a content hash). If the NIR is already linked to the first message, the second one is a dead end: create-nir returns 409 and link returns 400 'NIR-ul este deja legat...', and the UI has no 'force' option. Warn or reject at import time."},
+      {"endpoint": "efactura_inbox.find_duplicate_nir", "issue": "The suffix match (len>=3, endswith) can give false positives, e.g. NIR invoice_no '100' matches 'F-1100' from the same supplier. Consider exact normalized equality, or series + number parsed separately."},
+      {"endpoint": "routes_efactura.schedule_auto_send", "issue": "asyncio.create_task is called without keeping a reference, so the task can be garbage-collected before it finishes. Its exceptions are also swallowed silently. Keep a reference set, or use BackgroundTasks."},
+      {"endpoint": "legacy data", "issue": "2 fiscal invoices had the legacy status 'in_processing'. poll_pending/refresh ignore it ('pending' only), so they could never progress. During testing they were moved to 'ok'. Consider migrating legacy 'in_processing' to 'pending' or to a resend state."},
+      {"endpoint": "Simulare check_status", "issue": "Simulation sets status ok but stores no receipt file, so efactura-receipt-button never appears in simulare and the ZIP download path is untested. Optionally store a dummy ZIP for training."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "EfacturaInbox Detail after Overwrite", "issue": "After a successful Overwrite, the inbox-duplicate-alert with the Overwrite button stays visible and the mapping selects stay enabled. `done` comes from the stale m.status, and detail is not refetched. The user can click Overwrite again. Re-fetch detail, or set a local done state after link().", "selector": "[data-testid=inbox-overwrite-button]", "priority": "MEDIUM"},
+      {"component": "EfacturaSettings oauth toast", "issue": "/efactura?oauth=error shows the error toast twice. The effect runs twice (StrictMode / setSp). Pass a toast id (toast.error(msg,{id:'oauth'})) or use a ref guard.", "selector": "[data-sonner-toast]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/efactura company data", "issues": ["Address city 'Bacau' with county_code 'RO-B' (Bucharest) is inconsistent seed data. ANAF checks county codes for RO-B (sector) and other counties, so this should be fixed in Settings."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_efactura.py", "/app/test_reports/pytest/pytest_efactura.xml", "/app/tests/ef_snapshot.py", "/app/tests/ef_autosend_dup.py"],
+  "action_items": [
+    "build_ubl: emit one TaxSubtotal per VAT rate (mixed-rate invoices currently produce invalid UBL)",
+    "validate_ubl: validate the seller IBAN (placeholder/format)",
+    "EfacturaInbox: hide the duplicate alert / Overwrite button and disable the selects after a successful link (refetch detail)",
+    "Clear upload_index when the e-Factura status becomes error/invalid",
+    "Inbox import: detect duplicate messages (same supplier + series/number) at upload",
+    "Dedupe the oauth result toast",
+    "Keep a reference to the auto-send task (avoid GC) and log its exceptions"
+  ],
+  "critical_code_review_comments": [
+    "Mixed-VAT TaxSubtotal bug in efactura.build_ubl (see above). This is the most impactful issue for real ANAF submissions.",
+    "validate_ubl uses a hardcoded unit mapping (HUR/H87) and then checks it against UNECE_UNITS, so the check can never fail. Products with other units (LTR, KGM) are always sent as H87.",
+    "link_overwrite builds old = {product_id: line}. If a manual NIR has two lines with the same product, one is silently dropped, and stock/lot deltas will be wrong.",
+    "The OAuth state is only cleared on success. An invalid callback leaves it reusable until the 15-minute expiry. Acceptable, but consider clearing it on any callback.",
+    "Pytest note: config is global (singleton doc), so e-Factura tests must run with -n 0 (no xdist). Parallel workers race on the environment setting."
+  ],
+  "updated_files": ["/app/backend/tests/test_efactura.py (new)", "/app/tests/ef_snapshot.py (new helper)", "/app/tests/ef_autosend_dup.py (new one-off)", "/app/tests/explore_ef.py, /app/tests/explore_ef2.py (exploration helpers)"],
+  "success_rate": {"backend": "100% (22/22 pytest)", "frontend": "95% (all flows work; 1 medium + 1 low UI issue)"},
+  "seed_data_creation": "Data changes made during testing: invoices SRV 000068 (6ad3d750afe314ce5bd6dfa2) and SRV 000069 (6ad3e0ca352d37604d8ab2e4) moved from legacy 'in_processing' to 'ok' (simulare). New fiscal invoice SRV 000070 (6ad3f145906e6fa9a4ed77b5) issued from WO CL-2026-00074 via auto-send (now ok; WO is facturata; stock consumed). Inbox: ICR-2026-7781 imported -> NIR-2026-00010, new product SKF-VKPC81230, new supplier 'Furnizor Nou Demo SRL', BU-HC-040 stock 10->14. F-1000 linked (overwrite) to NIR-2026-00001 (FU-OL-001 stock 10->12, avg 27.5). A second F-1000 import was deleted from the DB. Temporary TEST_PH/TEST_CRON invoice clones were deleted. efactura_config reset: environment=simulare, auto_send=false, client_id='', client_secret/oauth_state unset (via DB).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run e-Factura tests with: pytest /app/backend/tests/test_efactura.py -n 0. They need -n 0, use pymongo to clone invoices for re-runnable submit tests, and the fixture resets config to simulare at the end. The F-1000 inbox message (6ad3efeb9fc25883cd27c1fa) is already linked, and ICR-2026-7781 (6ad3f104906e6fa9a4ed77a6) has a NIR, so re-testing inbox flows needs DB cleanup or new XMLs with different numbers. No finalized WO is left for testing auto-send (CL-2026-00074 is now invoiced).",
+  "test_credentials": "andrei.melek@gmail.com / Admin2026! (works, bcrypt $2b$, HttpOnly Secure SameSite=None cookies). WEBHOOK_CRON_SECRET from backend/.env works for /api/cron/efactura/*."
+}

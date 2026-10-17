@@ -211,8 +211,16 @@ async def cron(job: str, request: Request, background: BackgroundTasks):
     return {"ok": True}
 
 
+_tasks = set()
+
+
 def schedule_auto_send(inv: dict):
     async def go():
-        if (await ef.get_cfg()).get("auto_send"):
-            await ef.send_invoice(inv)
-    asyncio.create_task(go())
+        try:
+            if (await ef.get_cfg()).get("auto_send"):
+                await ef.send_invoice(inv)
+        except Exception as e:  # noqa: BLE001
+            await ef.log("auto-send", False, str(e), str(inv["_id"]))
+    task = asyncio.create_task(go())
+    _tasks.add(task)
+    task.add_done_callback(_tasks.discard)
