@@ -1,0 +1,85 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --background: 220 14% 96%;
+        --foreground: 222 47% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 11%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 47% 11%;
+        --primary: 23 100% 44%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 220 14% 92%;
+        --secondary-foreground: 222 47% 11%;
+        --muted: 220 14% 93%;
+        --muted-foreground: 215 16% 42%;
+        --accent: 220 14% 90%;
+        --accent-foreground: 222 47% 11%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 214 24% 86%;
+        --input: 214 24% 82%;
+        --ring: 23 100% 44%;
+        --radius: 0.25rem;
+        --cyan: 186 100% 38%;
+    }
+    .dark {
+        --background: 220 35% 7%;
+        --foreground: 210 40% 98%;
+        --card: 218 38% 12%;
+        --card-foreground: 210 40% 98%;
+        --popover: 218 38% 12%;
+        --popover-foreground: 210 40% 98%;
+        --primary: 23 100% 46%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 218 30% 17%;
+        --secondary-foreground: 210 40% 98%;
+        --muted: 218 30% 15%;
+        --muted-foreground: 215 20% 65%;
+        --accent: 218 30% 19%;
+        --accent-foreground: 210 40% 98%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 215 32% 20%;
+        --input: 215 32% 24%;
+        --ring: 23 100% 46%;
+        --cyan: 186 100% 50%;
+    }
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground font-sans antialiased;
+    }
+    ::selection {
+        background: hsl(var(--primary) / 0.35);
+    }
+}
+
+.eyebrow {
+    @apply text-[11px] font-bold tracking-[0.2em] uppercase text-muted-foreground;
+}
+.grid-bg {
+    background-image: linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
+        linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 32px 32px;
+}
+.fade-up {
+    animation: fadeUp 0.35s ease-out both;
+}
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.print-doc { font-family: "IBM Plex Sans", sans-serif; }
+@media print {
+    .no-print { display: none !important; }
+    body { background: white !important; }
+    .print-doc { box-shadow: none !important; margin: 0 !important; }
+}
+
+[data-debug-wrapper="true"] { display: contents !important; }
