@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from core import db, ser, oid, iso, require, audit, get_or_404
+from vehicle_catalog import MAKES, decode_vin
 
 router = APIRouter(prefix="/api")
 
@@ -126,6 +127,18 @@ async def attach_owner(vs):
         d = ser(v)
         d["client_name"] = owners.get(v.get("client_id"), "")
         out.append(d)
+    return out
+
+
+@router.get("/vehicle-catalog")
+async def vehicle_catalog(user=Depends(require("vehicles"))):
+    return {"makes": MAKES}
+
+
+@router.get("/vin/decode/{vin}")
+async def vin_decode(vin: str, user=Depends(require("vehicles"))):
+    out = await decode_vin(vin)
+    out["exists"] = bool(await db.vehicles.find_one({"vin": out["vin"]}, {"_id": 1}))
     return out
 
 

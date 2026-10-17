@@ -4,6 +4,9 @@ import { useApi } from "@/lib/api";
 import { money, num, date, dt } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 
+const f2 = (v) => money(v, "").trim();
+const addr = (...parts) => parts.filter(Boolean).join(", ") || "—";
+
 const S = {
   th: "border border-slate-400 bg-slate-100 px-2 py-1 text-left text-[11px] font-semibold uppercase",
   td: "border border-slate-300 px-2 py-1 text-[12px]",
@@ -16,7 +19,7 @@ function Header({ s, title, number, dateStr }) {
       <div className="text-[12px] leading-5">
         <div className="text-base font-bold">{s.name}</div>
         <div>CUI: {s.cui} · Reg. Com.: {s.reg_com}</div>
-        <div>{s.address}, {s.city}</div>
+        <div>{addr(s.address, s.city)}</div>
         <div>IBAN: {s.iban} · {s.bank}</div>
         {s.rar_authorization && <div>Autorizație RAR: {s.rar_authorization}</div>}
       </div>
@@ -48,7 +51,7 @@ function Lines({ lines }) {
         const net = l.net ?? l.qty * l.unit_price * (1 - (l.discount || 0) / 100);
         return (
           <tr key={l.id || i}><td className={S.td}>{i + 1}</td><td className={S.td}>{l.description}</td><td className={S.td}>{l.code}</td><td className={S.td}>{l.unit}</td>
-            <td className={S.tdr}>{num(l.qty)}</td><td className={S.tdr}>{num(l.unit_price)}</td><td className={S.tdr}>{num(net)}</td><td className={S.tdr}>{num(l.vat ?? net * (l.vat_rate / 100))}</td></tr>
+            <td className={S.tdr}>{num(l.qty)}</td><td className={S.tdr}>{f2(l.unit_price)}</td><td className={S.tdr}>{f2(net)}</td><td className={S.tdr}>{f2(l.vat ?? net * (l.vat_rate / 100))}</td></tr>
         );
       })}</tbody>
     </table>
@@ -72,7 +75,7 @@ function Reception({ s, w }) {
       <Header s={s} title="Notă de recepție / PV predare-primire" number={w.number} dateStr={dt(r.at || w.created_at)} />
       <div className="grid grid-cols-2 gap-6 text-[12px]">
         <div><b>Client:</b> {w.client_name}<br /><b>Telefon:</b> {w.client_phone}</div>
-        <div><b>Vehicul:</b> {w.vehicle.make} {w.vehicle.model} ({w.vehicle.year})<br /><b>Nr. înmatriculare:</b> {w.vehicle.plate}<br /><b>VIN:</b> <span className="font-mono">{w.vehicle.vin}</span><br />
+        <div><b>Vehicul:</b> {w.vehicle.make} {w.vehicle.model}{w.vehicle.year ? ` (${w.vehicle.year})` : ""}<br /><b>Nr. înmatriculare:</b> {w.vehicle.plate}<br /><b>VIN:</b> <span className="font-mono">{w.vehicle.vin}</span><br />
           <b>Km la intrare:</b> {num(w.mileage_in, 0)} · <b>Combustibil:</b> {r.fuel_level}</div>
       </div>
       <h3 className="mt-5 text-sm font-bold uppercase">Fișă intrare vehicul / constatare</h3>
@@ -115,7 +118,7 @@ function Invoice({ inv }) {
     <>
       <Header s={s} title={inv.type === "fiscal" ? "Factură" : "Factură proformă"} number={`${inv.series} ${inv.number}`} dateStr={date(inv.issue_date)} />
       <div className="mb-4 grid grid-cols-2 gap-6 text-[12px]">
-        <div><div className="font-bold uppercase">Cumpărător</div>{b.name}<br />{b.cui ? `CUI: ${b.cui}` : `CNP: ${b.cnp}`} {b.reg_com && `· Reg. Com.: ${b.reg_com}`}<br />{b.address}, {b.city}</div>
+        <div><div className="font-bold uppercase">Cumpărător</div>{b.name}<br />{b.cui ? `CUI: ${b.cui}` : `CNP: ${b.cnp}`} {b.reg_com && `· Reg. Com.: ${b.reg_com}`}<br />{addr(b.address, b.city)}</div>
         <div><b>Scadență:</b> {date(inv.due_date)}<br /><b>Comandă lucru:</b> {inv.work_order_number}<br /><b>Vehicul:</b> {inv.vehicle}<br /><b>Km:</b> {num(inv.mileage, 0)}<br /><b>Monedă:</b> {inv.currency}</div>
       </div>
       <Lines lines={inv.lines} />
@@ -144,7 +147,7 @@ function NirDoc({ s, n }) {
       <div className="mb-4 text-[12px]"><b>Furnizor:</b> {n.supplier_name} · <b>Factură:</b> {n.invoice_no || "—"} · <b>Aviz:</b> {n.aviz_no || "—"} · <b>Gestiune:</b> {n.warehouse}</div>
       <table className="w-full border-collapse"><thead><tr>{["Nr.", "Cod", "Denumire", "UM", "Cant.", "Preț achiziție", "Valoare", "TVA"].map((h) => <th key={h} className={S.th}>{h}</th>)}</tr></thead>
         <tbody>{n.lines.map((l, i) => <tr key={i}><td className={S.td}>{i + 1}</td><td className={S.td}>{l.code}</td><td className={S.td}>{l.name}</td><td className={S.td}>{l.unit}</td>
-          <td className={S.tdr}>{num(l.qty)}</td><td className={S.tdr}>{num(l.unit_cost)}</td><td className={S.tdr}>{num(l.value)}</td><td className={S.tdr}>{num(l.vat)}</td></tr>)}</tbody></table>
+          <td className={S.tdr}>{num(l.qty)}</td><td className={S.tdr}>{f2(l.unit_cost)}</td><td className={S.tdr}>{f2(l.value)}</td><td className={S.tdr}>{f2(l.vat)}</td></tr>)}</tbody></table>
       <Totals t={{ net: n.total, vat: n.total_vat, gross: n.total + n.total_vat }} />
       <Sign labels={["Comisia de recepție", "Gestionar"]} />
     </>
@@ -157,10 +160,10 @@ function RegisterDoc({ s, r }) {
       <Header s={s} title="Registru de casă" number={r.day} dateStr={date(r.day)} />
       <table className="w-full border-collapse"><thead><tr>{["Nr. document", "Explicație", "Încasări", "Plăți"].map((h) => <th key={h} className={S.th}>{h}</th>)}</tr></thead>
         <tbody>
-          <tr><td className={S.td} colSpan={2}><b>Sold inițial</b></td><td className={S.tdr}>{num(r.opening)}</td><td className={S.tdr} /></tr>
-          {r.entries.map((e) => <tr key={e.id}><td className={S.td}>{e.doc_number}</td><td className={S.td}>Încasare {e.invoice_ref} — {e.client_name}</td><td className={S.tdr}>{num(e.amount)}</td><td className={S.tdr}>0,00</td></tr>)}
-          <tr><td className={S.td} colSpan={2}><b>Total rulaj zi</b></td><td className={S.tdr}>{num(r.total_in)}</td><td className={S.tdr}>{num(r.total_out)}</td></tr>
-          <tr><td className={S.td} colSpan={2}><b>Sold final</b></td><td className={S.tdr}>{num(r.closing)}</td><td className={S.tdr} /></tr>
+          <tr><td className={S.td} colSpan={2}><b>Sold inițial</b></td><td className={S.tdr}>{f2(r.opening)}</td><td className={S.tdr} /></tr>
+          {r.entries.map((e) => <tr key={e.id}><td className={S.td}>{e.doc_number}</td><td className={S.td}>Încasare {e.invoice_ref} — {e.client_name}</td><td className={S.tdr}>{f2(e.amount)}</td><td className={S.tdr}>0,00</td></tr>)}
+          <tr><td className={S.td} colSpan={2}><b>Total rulaj zi</b></td><td className={S.tdr}>{f2(r.total_in)}</td><td className={S.tdr}>{f2(r.total_out)}</td></tr>
+          <tr><td className={S.td} colSpan={2}><b>Sold final</b></td><td className={S.tdr}>{f2(r.closing)}</td><td className={S.tdr} /></tr>
         </tbody></table>
       <Sign labels={["Casier", "Compartiment financiar-contabil"]} />
     </>

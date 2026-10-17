@@ -1,0 +1,52 @@
+{
+  "summary": "First full E2E run of the ERP Service Auto core (backend pytest with 26 tests + Playwright UI for all 16 requested flows). Found one CRITICAL bug: POST /api/work-orders/{id}/quotes always returned 500 because of a MongoDB update conflict ($push quotes + $set quotes.$[o].status in one update). Testing agent FIXED it in routes_service.py.create_quote by splitting it into two updates. After the fix the whole lifecycle works in API and UI: reception (5 photos + signature) -> CL-2026-NNNNN -> labor/part lines (rate from settings, VAT 21%) -> quote v1/v2 (supersede) -> send email (simulated) -> approve with signature (in-app + public /approve/{token}) -> timer start (In lucru) -> Finalizata blocked before QC -> QC passed -> Finalizata -> fiscal invoice (FIFO COGS correct: 10@40+2@60=520, stock decreased) -> XML CIUS-RO download -> SPV submit/refresh (mocked) -> partial/full payment CH-xxxxxx, overpay rejected -> cash register -> close WO. RBAC, login/logout, dashboard KPIs + charts, CRM validations, vehicles, kanban drag&drop, stock/NIR/avg cost/low filter, mechanics clock in/out + month filter, users CRUD + audit, settings, all 6 print pages, AI OBD streaming (Gemini) and RO/EN + dark/light toggles all pass. Remaining issue: brute-force lockout does not work behind the ingress.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/work-orders/{wid}/quotes", "issue": "FIXED BY TESTING AGENT. Returned 500 every time: pymongo WriteError 'Updating the path quotes.$[o].status would create a conflict at quotes' ($push + $set with array_filters on the same array in one update_one). Split into two updates (supersede first, then push).", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/auth/login", "issue": "Brute-force lockout can be bypassed. The identifier is f'{request.client.host}:{email}' and request.client.host is the ingress pod IP, which changes between requests (10.79.138.2 / 10.79.138.5 seen), so failed attempts get split across several keys and 6+ bad logins never return 429. Use the first IP in X-Forwarded-For (or key on email only).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PUT /api/users/{uid}", "issue": "Email in the body is ignored (cannot change a user's email) and is not checked for uniqueness. No 404 for an unknown uid."},
+      {"endpoint": "POST /api/work-orders/{wid}/lines", "issue": "Part lines take vat_rate from settings instead of the product's own vat_rate. There is no stock-availability check, so consume_fifo can drive stock_qty negative."},
+      {"endpoint": "GET /api/work-orders?q=", "issue": "q is passed to $regex without re.escape (regex injection / crash on input like '(')."},
+      {"endpoint": "apply_decision (quote approve)", "issue": "Approving an older quote while the WO is in_lucru/asteapta_piese/finalizata sets the status back to 'aprobata'."},
+      {"endpoint": "Settings seed", "issue": "Company data is still placeholders ([Denumire Service Auto] SRL, RO[CUI], J[XX]/[nr]/[an], RO[IBAN]). These appear on every print document and in the e-Factura XML. Real ANAF validation would reject the CUI."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AiAssistant answer", "issue": "The Gemini markdown answer is shown as raw text (###, ** visible). Render it with react-markdown or similar.", "selector": "[data-testid='ai-answer']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Print invoice / cash register", "issues": ["Line prices and amounts are not formatted consistently (e.g. '180', '270', '56,7', '100' next to '27.984,88'). Use money/2-decimal formatting.", "Buyer block shows a stray ',' when the address and city are empty."]},
+      {"screen": "Client detail / reception print", "issues": ["Address shows ', (RO-B)' when empty. The vehicle shows 'VW Golf ()' / 'Dacia Logan ·' when the year is missing."]},
+      {"screen": "Work orders kanban (1920px)", "issues": ["Only about 7 columns fit, so the last column needs horizontal scroll. Acceptable, but no scroll hint is shown."]},
+      {"screen": "NIR dialog, reception promised date, cash day, mechanics month", "issues": ["These use the browser's native date/month inputs instead of a shadcn Calendar/date picker."]},
+      {"screen": "Mobile vehicles table (390px)", "issues": ["Columns are squeezed and text wraps heavily. Consider a card layout or horizontal scroll."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_erp_core.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Fix brute-force lockout identifier: use the X-Forwarded-For client IP (first entry) or the email alone, so 5 failed attempts give 429.",
+    "Render AI answers as markdown in AiAssistant.js.",
+    "Format numbers in PrintDoc (invoice lines, cash register amounts) with the money helper and remove the stray comma for empty addresses.",
+    "Optional: escape regex in /work-orders q, use the product's vat_rate for part lines, guard against negative stock, block status regression on approving an old quote, allow email update with a uniqueness check in PUT /users."
+  ],
+  "critical_code_review_comments": [
+    "routes_service.create_quote: the mixed $push/$set on the 'quotes' path is a hard Mongo conflict (fixed).",
+    "routes_auth.login: request.client.host behind the K8s ingress is not the real client IP.",
+    "routes_stock.consume_fifo: no transaction. Concurrent invoices can double-consume lots. Consider find_one_and_update per lot or a Mongo transaction.",
+    "routes_finance.create_payment: read-then-write on paid_amount with no atomic guard. Two concurrent payments could overpay. Use a conditional update ($expr paid_amount + amount <= gross).",
+    "Fiscal invoice numbering via counters is fine, but the invoice is inserted after FIFO consumption. If the insert fails, stock is consumed without an invoice.",
+    "PUT /settings accepts an arbitrary dict with no Pydantic validation (vat_rate could be set to a string)."
+  ],
+  "updated_files": ["/app/backend/routes_service.py (create_quote Mongo conflict fix)", "/app/backend/tests/test_erp_core.py (new)"],
+  "success_rate": {"backend": "96% (25/26 after fix; brute-force lockout failing)", "frontend": "100% of requested flows pass (after quote fix)"},
+  "test_credentials": "From /app/memory/test_credentials.md: admin@serviceauto.ro / Admin2026!; demo users password Demo2026! (works). bcrypt hashes start with $2b$. httpOnly secure samesite=none cookies are set. CORS echoes the explicit origin with credentials=true. seed_admin updates the admin hash if the password changed.",
+  "seed_data_creation": "Created TEST_ clients/vehicles/WOs/invoices/payments/products/NIRs/users during tests and then deleted all of them via mongosh. Side effects: the invoice/receipt/NIR/WO counters advanced (numbering gaps: SRV000066-67, CH-000018-20, CL-2026-00075..77, NIR-2026-00005..09 removed). Labor rates restored to their original values.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run backend tests with: cd /app/backend && REACT_APP_BACKEND_URL=<url> python -m pytest tests/test_erp_core.py -n 0 (MUST use -n 0, because the tests share module-level STATE across classes and xdist loadscope splits them). Signature pads are canvases: draw with page.mouse down/move/up. Photo inputs: set_input_files on [data-testid=reception-photo-{k}-input] with a buffer. In the NIR dialog, suppliers load lazily, so wait for options before selecting. Kanban drag_to works on [data-testid=kanban-card-{number}] -> [data-testid=kanban-col-{status}].",
+  "rca of the issue": "Quote 500: MongoDB rejects one update that both $push-es to 'quotes' and $set-s 'quotes.$[o].status' (error code 40, path conflict). Reproduce: POST /api/work-orders/{id}/quotes on any WO with lines. Fix: two sequential update_one calls. Lockout bypass: the login_attempts identifier uses the proxy IP, which rotates across ingress pods (verified in the DB: the same email was split across 10.79.138.2 and 10.79.138.5 with counts 4+2). Fix: derive the IP from the X-Forwarded-For header."
+}

@@ -74,11 +74,13 @@ def oid(s: str) -> ObjectId:
     return ObjectId(s)
 
 
-async def get_or_404(coll, id_: str):
-    doc = await db[coll].find_one({"_id": oid(id_)})
-    if not doc:
+async def get_or_404(coll, id_: str) -> dict:
+    """Internal helper: raw Mongo doc for server-side use; endpoints must wrap with ser()."""
+    found = await db[coll].find_one({"_id": oid(id_)})
+    if not found:
         raise HTTPException(404, "Not found")
-    return doc
+    raw: dict = dict(found)
+    return raw
 
 
 def permissions_for(role: str):

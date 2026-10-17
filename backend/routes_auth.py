@@ -33,7 +33,8 @@ def user_out(u: dict):
 @router.post("/auth/login")
 async def login(body: LoginIn, request: Request, response: Response):
     email = body.email.strip().lower()
-    ident = f"{request.client.host}:{email}"
+    ip = (request.headers.get("x-forwarded-for") or request.client.host).split(",")[0].strip()
+    ident = f"{ip}:{email}"
     att = await db.login_attempts.find_one({"identifier": ident})
     if att and att.get("count", 0) >= 5:
         if att["locked_until"] > iso():

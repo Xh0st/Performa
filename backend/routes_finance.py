@@ -131,15 +131,18 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
     due = round(inv["totals"]["gross"] - inv.get("paid_amount", 0), 2)
     if body.amount <= 0 or body.amount > due + 0.001:
         raise HTTPException(400, f"Suma trebuie să fie între 0 și {due:.2f} RON")
+    paid = round(inv.get("paid_amount", 0) + body.amount, 2)
+    status = "paid" if paid >= inv["totals"]["gross"] - 0.001 else "partial"
+    upd = await db.invoices.update_one({"_id": inv["_id"], "paid_amount": inv.get("paid_amount", 0)},
+                                       {"$set": {"paid_amount": paid, "status": status}})
+    if upd.modified_count == 0:
+        raise HTTPException(409, "Factura a fost modificată între timp. Reîncercați.")
     doc_type, prefix = DOC_BY_METHOD[body.method]
     seq = await next_seq(f"pay_{doc_type}")
     p = {"invoice_id": body.invoice_id, "invoice_ref": f"{inv['series']}{inv['number']}", "client_name": inv["buyer"]["name"],
          "amount": round(body.amount, 2), "method": body.method, "doc_type": doc_type, "doc_number": f"{prefix}-{seq:06d}",
          "reference": body.reference, "date": iso(), "cashier": user["name"]}
     r = await db.payments.insert_one(p)
-    paid = round(inv.get("paid_amount", 0) + body.amount, 2)
-    status = "paid" if paid >= inv["totals"]["gross"] - 0.001 else "partial"
-    await db.invoices.update_one({"_id": inv["_id"]}, {"$set": {"paid_amount": paid, "status": status}})
     await audit(user, "create", "payment", str(r.inserted_id), p["doc_number"])
     return ser(await db.payments.find_one({"_id": r.inserted_id}))
 

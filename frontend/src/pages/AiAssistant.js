@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Sparkles, Stethoscope, Send } from "lucide-react";
+import Markdown from "react-markdown";
 import { API_URL, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { dt } from "@/lib/format";
@@ -71,8 +72,8 @@ export default function AiAssistant() {
             <div className="flex-1" />
             <Button data-testid="ai-advisor-ask-button" disabled={busy || !msg.trim()} onClick={() => ask()}><Send className="mr-1 h-4 w-4" />{busy ? tr("Analizează…", "Analysing…") : tr("Întreabă", "Ask")}</Button>
           </div>
-          <div data-testid="ai-answer" className="mt-4 min-h-[200px] whitespace-pre-wrap rounded border border-purple-500/30 bg-purple-500/5 p-4 text-sm leading-relaxed">
-            {answer || <span className="text-muted-foreground">{tr("Răspunsul AI va apărea aici în timp real.", "The AI answer will stream here.")}</span>}
+          <div data-testid="ai-answer" className="ai-md mt-4 min-h-[200px] rounded border border-purple-500/30 bg-purple-500/5 p-4 text-sm leading-relaxed">
+            {answer ? <Markdown>{answer}</Markdown> : <span className="text-muted-foreground">{tr("Răspunsul AI va apărea aici în timp real.", "The AI answer will stream here.")}</span>}
           </div>
         </Panel>
         <Panel title={tr("Istoric", "History")}>

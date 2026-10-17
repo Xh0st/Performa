@@ -1,3 +1,4 @@
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
@@ -160,7 +161,7 @@ async def list_work_orders(status: str = "", q: str = "", active: bool = False, 
     elif active:
         flt["status"] = {"$nin": list(LOCKED)}
     if q:
-        flt["number"] = {"$regex": q, "$options": "i"}
+        flt["number"] = {"$regex": re.escape(q), "$options": "i"}
     proj = LIGHT | {"quotes": 0}
     return await enrich(await db.work_orders.find(flt, proj).sort("created_at", -1).to_list(1000))
 
@@ -268,7 +269,7 @@ async def build_line(body: LineIn):
         if body.product_id:
             p = await get_or_404("products", body.product_id)
             ln.update(code=p["code"], description=body.description or p["name"], unit=p.get("unit", "buc"),
-                      unit_cost=p.get("avg_cost", 0))
+                      unit_cost=p.get("avg_cost", 0), vat_rate=p.get("vat_rate", ln["vat_rate"]))
             ln["unit_price"] = body.unit_price if body.unit_price is not None else p["sale_price"]
         else:
             ln["unit_price"] = body.unit_price or 0
@@ -322,8 +323,10 @@ async def create_quote(wid: str, body: QuoteIn, user=Depends(require("workorders
     q = {"version": version, "number": f"DV-{w['number'][3:]}-v{version}", "lines": lines, "totals": totals,
          "status": "draft", "token": secrets.token_urlsafe(16), "notes": body.notes, "created_at": iso(),
          "created_by": user["name"], "valid_until": (now() + timedelta(days=body.valid_days)).date().isoformat(), "sent": []}
-    await db.work_orders.update_one({"_id": w["_id"]}, {"$push": {"quotes": q}, "$set": {"quotes.$[o].status": "superseded"}},
-                                    array_filters=[{"o.status": {"$in": ["draft", "sent"]}}])
+    if w.get("quotes"):
+        await db.work_orders.update_one({"_id": w["_id"]}, {"$set": {"quotes.$[o].status": "superseded"}},
+                                        array_filters=[{"o.status": {"$in": ["draft", "sent"]}}])
+    await db.work_orders.update_one({"_id": w["_id"]}, {"$push": {"quotes": q}})
     if w["status"] in ("noua", "diagnosticare"):
         await db.work_orders.update_one({"_id": w["_id"]}, {"$set": {"status": "asteapta_oferta"}, "$push": {
             "status_history": {"status": "asteapta_oferta", "at": iso(), "by": user["name"], "note": f"Deviz v{version}"}}})
@@ -377,7 +380,7 @@ async def apply_decision(w: dict, version: int, body: DecisionIn, via: str, by: 
     await db.work_orders.update_one({"_id": w["_id"], "quotes.version": version}, {"$set": {
         "quotes.$.status": st, "quotes.$.decision": {"signature": body.signature, "name": body.name or by,
                                                      "reason": body.reason, "via": via, "at": iso()}}})
-    if body.approved and w["status"] not in LOCKED:
+    if body.approved and w["status"] in ("noua", "diagnosticare", "asteapta_oferta"):
         await db.work_orders.update_one({"_id": w["_id"]}, {"$set": {"status": "aprobata", "approved_quote": version}, "$push": {
             "status_history": {"status": "aprobata", "at": iso(), "by": by, "note": f"Deviz v{version} aprobat ({via})"}}})
 

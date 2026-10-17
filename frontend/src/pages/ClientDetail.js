@@ -35,7 +35,7 @@ export default function ClientDetail() {
             {c.type === "pj" ? (<><Info label="CUI" value={c.cui} mono /><Info label="Reg. Com." value={c.reg_com} mono /><Info label={tr("Reprezentant", "Representative")} value={c.representative} /></>)
               : <Info label="CNP" value={c.cnp} mono />}
             <Info label={tr("Telefon", "Phone")} value={c.phone} mono /><Info label="Email" value={c.email} />
-            <Info label={tr("Adresă", "Address")} value={`${c.address}, ${c.city} (${c.county})`} />
+            <Info label={tr("Adresă", "Address")} value={[c.address, c.city].filter(Boolean).join(", ") + (c.county ? ` (${c.county})` : "")} />
             <Info label="GDPR" value={c.gdpr_consent ? tr("Acord dat", "Consented") : tr("Fără acord", "No consent")} />
             {c.is_fleet && <Info label={tr("Limită buget", "Budget limit")} value={money(c.budget_limit)} mono />}
           </div>
