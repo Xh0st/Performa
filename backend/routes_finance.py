@@ -65,6 +65,9 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
         await db.work_orders.update_one({"_id": w["_id"]}, {"$set": {"status": "facturata", "invoice_id": str(r.inserted_id), "invoiced_at": iso()},
                                                             "$push": {"status_history": {"status": "facturata", "at": iso(), "by": user["name"], "note": f"Factura {inv['series']}{inv['number']}"}}})
     await audit(user, "create", "invoice", str(r.inserted_id), f"{inv['series']}{inv['number']}")
+    if body.type == "fiscal":
+        from routes_efactura import schedule_auto_send
+        schedule_auto_send(await db.invoices.find_one({"_id": r.inserted_id}))
     return ser(await db.invoices.find_one({"_id": r.inserted_id}, {"efactura.xml": 0}))
 
 
@@ -72,6 +75,7 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
 async def get_invoice(iid: str, user=Depends(require("invoices"))):
     inv = ser(await get_or_404("invoices", iid))
     inv.get("efactura", {}).pop("xml", None)
+    inv["efactura"]["has_receipt"] = bool(await db.efactura_files.find_one({"invoice_id": iid}, {"_id": 1}))
     inv["payments"] = [ser(p) for p in await db.payments.find({"invoice_id": iid}).sort("date", 1).to_list(200)]
     return inv
 
@@ -86,32 +90,6 @@ async def efactura_xml(iid: str, user=Depends(require("invoices"))):
         await db.invoices.update_one({"_id": inv["_id"]}, {"$set": {"efactura.status": "generated"}, "$push": {"efactura.history": {"event": "XML generat", "at": iso()}}})
     return Response(content=xml, media_type="application/xml",
                     headers={"Content-Disposition": f'attachment; filename="efactura_{inv["series"]}{inv["number"]}.xml"'})
-
-
-@router.post("/invoices/{iid}/efactura/submit")
-async def efactura_submit(iid: str, user=Depends(require("invoices"))):
-    inv = await get_or_404("invoices", iid)
-    if inv["type"] != "fiscal":
-        raise HTTPException(400, "Doar facturile fiscale se transmit în SPV")
-    if inv["efactura"]["status"] in ("in_processing", "ok"):
-        raise HTTPException(400, "Factura a fost deja transmisă")
-    # MOCKED: ANAF SPV upload simulated (no OAuth certificate configured)
-    idx = str(random.randint(4000000000, 4999999999))
-    await db.invoices.update_one({"_id": inv["_id"]}, {"$set": {"efactura.status": "in_processing", "efactura.upload_index": idx, "efactura.xml": build_ubl(inv)},
-                                                       "$push": {"efactura.history": {"event": f"Transmis SPV (SIMULAT) index {idx}", "at": iso()}}})
-    await audit(user, "efactura_submit", "invoice", iid, idx)
-    return await get_invoice(iid, user)
-
-
-@router.post("/invoices/{iid}/efactura/refresh")
-async def efactura_refresh(iid: str, user=Depends(require("invoices"))):
-    inv = await get_or_404("invoices", iid)
-    if inv["efactura"]["status"] != "in_processing":
-        raise HTTPException(400, "Factura nu este în prelucrare")
-    did = str(random.randint(3000000000, 3999999999))
-    await db.invoices.update_one({"_id": inv["_id"]}, {"$set": {"efactura.status": "ok", "efactura.download_id": did},
-                                                       "$push": {"efactura.history": {"event": f"Validată ANAF (SIMULAT) – recipisă {did}", "at": iso()}}})
-    return await get_invoice(iid, user)
 
 
 class PaymentIn(BaseModel):

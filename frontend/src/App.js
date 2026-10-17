@@ -21,6 +21,7 @@ import Cash from "@/pages/Cash";
 import AiAssistant from "@/pages/AiAssistant";
 import Users from "@/pages/Users";
 import SettingsPage from "@/pages/Settings";
+import EfacturaSettings from "@/pages/EfacturaSettings";
 import PublicQuote from "@/pages/PublicQuote";
 import PrintDoc from "@/pages/PrintDoc";
 
@@ -72,6 +73,7 @@ function App() {
               <Route path="/ai" element={g("ai", <AiAssistant />)} />
               <Route path="/users" element={g("users", <Users />)} />
               <Route path="/settings" element={g("settings", <SettingsPage />)} />
+              <Route path="/efactura" element={g("settings", <EfacturaSettings />)} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

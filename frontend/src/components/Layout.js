@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardPlus, Wrench, Users, Car, HardHat, Boxes, FileText, Wallet, Sparkles, Settings, ShieldCheck,
-  Menu, Sun, Moon, LogOut, Plus,
+  Menu, Sun, Moon, LogOut, Plus, FileCode2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
@@ -28,6 +28,7 @@ const NAV = [
   { group: ["Administrare", "Administration"], items: [
     ["/users", "users", ShieldCheck, "Utilizatori & audit", "Users & audit", "users"],
     ["/settings", "settings", Settings, "Setări companie", "Company settings", "settings"],
+    ["/efactura", "settings", FileCode2, "eFactura / Setări API", "e-Invoice / API settings", "efactura"],
   ]},
 ];
 

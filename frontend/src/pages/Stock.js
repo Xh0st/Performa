@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PageHeader, Panel, Loading, Field, NativeSelect, Empty } from "@/components/common";
+import EfacturaInbox from "@/components/EfacturaInbox";
 
 const P_EMPTY = { code: "", name: "", oe_code: "", aftermarket_code: "", brand: "", category: "piese", unit: "buc", location: "", warehouse: "Depozit Central", sale_price: 0, min_stock: 0, vat_rate: 21, warranty_months: 24 };
 
@@ -156,6 +157,7 @@ export default function Stock() {
           <TabsTrigger value="products" data-testid="stock-tab-products">{tr("Produse", "Products")}</TabsTrigger>
           <TabsTrigger value="nir" data-testid="stock-tab-nir">NIR</TabsTrigger>
           <TabsTrigger value="suppliers" data-testid="stock-tab-suppliers">{tr("Furnizori", "Suppliers")}</TabsTrigger>
+          <TabsTrigger value="einbox" data-testid="stock-tab-efactura">{tr("Facturi e-Factura primite", "Received e-Invoices")}</TabsTrigger>
         </TabsList>
         <TabsContent value="products">
           <Panel>
@@ -210,6 +212,7 @@ export default function Stock() {
             )}
           </Panel>
         </TabsContent>
+        <TabsContent value="einbox"><EfacturaInbox onNirChange={() => { reload(); reloadN(); reloadS(); }} /></TabsContent>
         <TabsContent value="suppliers">
           <Panel>
             <SupplierForm onSaved={reloadS} />

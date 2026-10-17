@@ -23,6 +23,10 @@ export const EF_STATUS = {
   not_sent: ["Netransmisă", "Not sent", "bg-slate-500/10 text-slate-400 border-slate-500/30"],
   generated: ["XML generat", "XML generated", "bg-blue-500/10 text-blue-500 border-blue-500/30"],
   in_processing: ["În prelucrare", "Processing", "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"],
+  pending: ["În prelucrare ANAF", "Pending ANAF", "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"],
+  nok: ["Respinsă ANAF", "Rejected by ANAF", "bg-rose-500/10 text-rose-500 border-rose-500/30"],
+  error: ["Eroare structură", "Structure error", "bg-rose-500/10 text-rose-500 border-rose-500/30"],
+  invalid: ["Validare internă eșuată", "Internal validation failed", "bg-rose-500/10 text-rose-500 border-rose-500/30"],
   ok: ["Validată ANAF", "ANAF validated", "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"],
 };
 

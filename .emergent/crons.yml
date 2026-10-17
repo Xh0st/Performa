@@ -1,0 +1,22 @@
+crons:
+  - name: efactura-tokens
+    description: "Reîmprospătează token-ul OAuth ANAF e-Factura înainte de expirare (zilnic 03:00 UTC)"
+    cron: "0 3 * * *"
+    endpoint: "{{BASE_URL}}/api/cron/efactura/tokens"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true
+  - name: efactura-status
+    description: "Interoghează starea facturilor trimise în SPV și descarcă recipisele (la 15 minute)"
+    cron: "*/15 * * * *"
+    endpoint: "{{BASE_URL}}/api/cron/efactura/status"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true
+  - name: efactura-inbox
+    description: "Sincronizează facturile primite de la furnizori din SPV ANAF (la fiecare oră)"
+    cron: "0 * * * *"
+    endpoint: "{{BASE_URL}}/api/cron/efactura/inbox"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true

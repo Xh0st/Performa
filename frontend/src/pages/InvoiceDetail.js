@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Printer, FileCode2, Send, RefreshCw, Wallet } from "lucide-react";
+import { Printer, Wallet } from "lucide-react";
+import EfacturaPanel from "@/components/EfacturaPanel";
 import { api, errMsg, useApi, downloadFile } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { useAuth } from "@/context/AuthContext";
@@ -56,23 +57,6 @@ export default function InvoiceDetail() {
   const [pay, setPay] = useState(false);
   if (!inv) return <Loading />;
   const fiscal = inv.type === "fiscal";
-  const ef = inv.efactura || {};
-  const act = async (path, msg) => {
-    try {
-      setData((await api.post(`/invoices/${id}/efactura/${path}`)).data);
-      toast.success(msg);
-    } catch (e) {
-      toast.error(errMsg(e));
-    }
-  };
-  const xml = async () => {
-    try {
-      await downloadFile(`/invoices/${id}/efactura/xml`, `efactura_${inv.series}${inv.number}.xml`);
-      reload();
-    } catch (e) {
-      toast.error(errMsg(e));
-    }
-  };
 
   return (
     <div data-testid="invoice-detail-page">
@@ -106,18 +90,7 @@ export default function InvoiceDetail() {
           </div>
         </Panel>
         <div className="space-y-4">
-          {fiscal && (
-            <Panel title="e-Factura ANAF" testid="efactura-panel">
-              <div className="mb-3 flex items-center justify-between"><Badge map={EF_STATUS} value={ef.status} testid="efactura-status" />{ef.upload_index && <span className="font-mono text-xs">idx {ef.upload_index}</span>}</div>
-              <div className="grid gap-2">
-                <Button variant="outline" size="sm" data-testid="efactura-download-xml-button" onClick={xml}><FileCode2 className="mr-1 h-4 w-4" />{tr("Descarcă XML UBL (CIUS-RO)", "Download UBL XML (CIUS-RO)")}</Button>
-                <Button size="sm" data-testid="efactura-submit-button" disabled={["in_processing", "ok"].includes(ef.status)} onClick={() => act("submit", tr("Transmis în SPV (SIMULAT)", "Sent to SPV (SIMULATED)"))}><Send className="mr-1 h-4 w-4" />{tr("Transmite în SPV", "Send to SPV")}</Button>
-                <Button variant="outline" size="sm" data-testid="efactura-refresh-button" disabled={ef.status !== "in_processing"} onClick={() => act("refresh", tr("Status actualizat", "Status updated"))}><RefreshCw className="mr-1 h-4 w-4" />{tr("Verifică stare / recipisă", "Check status / receipt")}</Button>
-              </div>
-              <p className="mt-3 rounded border border-yellow-500/30 bg-yellow-500/10 p-2 text-[11px] text-yellow-600 dark:text-yellow-400">{tr("Transmiterea în SPV este SIMULATĂ până la configurarea certificatului digital / OAuth ANAF.", "SPV transmission is SIMULATED until the ANAF digital certificate / OAuth is configured.")}</p>
-              <div className="mt-3 space-y-1">{(ef.history || []).map((h, i) => <div key={i} className="text-[11px]"><span className="font-mono text-muted-foreground">{dt(h.at)}</span> · {h.event}</div>)}</div>
-            </Panel>
-          )}
+          {fiscal && <EfacturaPanel inv={inv} setData={setData} reload={reload} />}
           {fiscal && (
             <Panel title={tr("Încasări", "Payments")}>
               {inv.payments.map((p) => (
