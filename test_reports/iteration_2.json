@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only test of the Parts/Labor split on Work Order detail (CL-2026-00067 active, CL-2026-00065 invoiced), at 1920px and 390px. Everything works: the old 'Lucrări & piese' tab is gone. Piese(n)/Manoperă(n) tab counts and the totals bar (VAT 21%) update correctly after add and delete. A stock product gets the sale price as default (520). A free item needs a description (button disabled without one). Labor uses Settings rates (electrician 200, senior 180) and the calc shows '1,5 h × 200 = 300,00 RON'. Parts and labor rows each show only in their own table. The invoiced WO shows tables with no forms or delete buttons. RO/EN toggle works. Quote creation (2 lines, 600,16), QC, Time, Reception and History tabs all still work. Found 3 mobile layout issues and one missing translation.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "WorkOrderDetail TabsList (mobile 390px)", "issue": "TabsList uses flex-wrap, but the shadcn TabsList has a fixed height (h-9). The second row of tabs (Control calitate / Pontaj / Recepție / Istoric) spills out and overlaps the 'Piese & consumabile' section header. Fix: add h-auto to TabsList className (or make it scroll horizontally: overflow-x-auto + flex-nowrap).", "selector": "[role=tablist]", "priority": "MEDIUM"},
+      {"component": "LaborForm add button (mobile)", "issue": "At 390px the 'Adaugă manoperă' button sits in a single grid column. Its text overflows past the button edge. Fix: col-span-2 on mobile (e.g. 'col-span-2 lg:col-span-1') or w-full.", "selector": "[data-testid=add-labor-button]", "priority": "LOW"},
+      {"component": "parts-table (mobile)", "issue": "The table shrinks to fit 390px instead of scrolling. The code 'BU-HC-040' wraps onto 3 lines and '4 buc' / '79,00 RON' also wrap, so it looks cramped. Fix: add min-w-[640px] to the table or whitespace-nowrap to the cells (overflow-x-auto wrapper already exists). labor-table scrolls fine.", "selector": "[data-testid=parts-table]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Parts table header", "issues": ["Header 'Cod' is hardcoded and not translated (EN shows 'COD'; should be 'Code'). 'Disc.' is also hardcoded but works in both languages."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix TabsList overflow/overlap on mobile (add h-auto with flex-wrap, or use horizontal scroll)",
+    "Make add-labor-button full width (col-span-2) on mobile",
+    "Give parts-table a min width / nowrap so it scrolls horizontally on mobile",
+    "Translate 'Cod' header: tr('Cod','Code')"
+  ],
+  "critical_code_review_comments": [
+    "Console warning: a <span> inside <option> (hydration warning). It comes from the visual-editor instrumentation wrapping {p.code} · {p.name} in the product select. Not caused by app code; to avoid it, build the option label as a single template string.",
+    "LineSections.js is well split (PartsSection/LaborSection/TotalsBar). /mechanics and /settings are fetched again in LaborSection and in DetailsPanel, so the requests are duplicated. Minor."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "95% (all functional checks pass; 3 mobile layout issues)"},
+  "seed_data_creation": "Added 2 parts + 1 labor line on CL-2026-00067 and deleted them all again (totals back to 600,16). Created quote DV-2026-00067-v1 (draft) on CL-2026-00067 during regression testing; it was not removed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Active WO used: 6ad30affff3439dd9e54f0bf (CL-2026-00067). Invoiced WO used: 6ad30affff3439dd9e54f0bb (CL-2026-00065). Labor rates: mecanic_junior 120, mecanic_senior 180, electrician 200, tinichigiu 170, vopsitor 170, diagnoza 220. Desktop layout is clean; recheck the mobile tabs and labor button after the fix."
+}

@@ -84,7 +84,7 @@ function PartForm({ onAdd }) {
         <div className="col-span-2 pb-2 text-xs text-muted-foreground lg:col-span-2">
           {prod && <>{tr("Raft", "Shelf")} <span className="font-mono">{prod.location || "—"}</span> · OE <span className="font-mono">{prod.oe_code || "—"}</span> · {tr("preț listă", "list price")} <span className="font-mono">{money(prod.sale_price)}</span></>}
         </div>
-        <Button data-testid="add-part-button" onClick={submit} disabled={!f.product_id && !f.description}><Plus className="mr-1 h-4 w-4" />{tr("Adaugă piesă", "Add part")}</Button>
+        <Button data-testid="add-part-button" className="col-span-2 lg:col-span-1" onClick={submit} disabled={!f.product_id && !f.description}><Plus className="mr-1 h-4 w-4" />{tr("Adaugă piesă", "Add part")}</Button>
       </div>
     </div>
   );
@@ -101,9 +101,9 @@ export function PartsSection({ wo, onChange, locked }) {
       {!locked && <PartForm onAdd={add} />}
       {!lines.length ? <Empty text={tr("Nicio piesă adăugată.", "No parts added.")} /> : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm" data-testid="parts-table">
+          <table className="w-full min-w-[640px] whitespace-nowrap text-sm" data-testid="parts-table">
             <thead><tr className="border-b">
-              <th className={TH}>Cod</th><th className={TH}>{tr("Denumire", "Name")}</th><th className={TH}>{tr("Tip", "Type")}</th><th className={THR}>{tr("Cant.", "Qty")}</th>
+              <th className={TH}>{tr("Cod", "Code")}</th><th className={TH}>{tr("Denumire", "Name")}</th><th className={TH}>{tr("Tip", "Type")}</th><th className={THR}>{tr("Cant.", "Qty")}</th>
               <th className={THR}>{tr("Preț unitar", "Unit price")}</th><th className={THR}>Disc.</th><th className={THR}>{tr("Valoare", "Net")}</th><th className="w-10" />
             </tr></thead>
             <tbody>
@@ -160,7 +160,7 @@ function LaborForm({ onAdd, mechanics, rates }) {
         <div className="col-span-2 pb-2 text-sm lg:col-span-2">
           {tr("Valoare", "Amount")}: <span className="font-mono font-semibold" data-testid="labor-calc">{num(f.qty)} h × {num(rate)} = {money((Number(f.qty) || 0) * rate)}</span>
         </div>
-        <Button data-testid="add-labor-button" onClick={submit} disabled={!f.description || !(Number(f.qty) > 0)}><Plus className="mr-1 h-4 w-4" />{tr("Adaugă manoperă", "Add labor")}</Button>
+        <Button data-testid="add-labor-button" className="col-span-2 lg:col-span-1" onClick={submit} disabled={!f.description || !(Number(f.qty) > 0)}><Plus className="mr-1 h-4 w-4" />{tr("Adaugă manoperă", "Add labor")}</Button>
       </div>
     </div>
   );

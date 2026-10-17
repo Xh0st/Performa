@@ -19,7 +19,7 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - CRM PF/PJ cu validare CNP, CUI obligatoriu, flotă/limită buget, GDPR; istoric reparații/facturi
 - Parc auto + istoric; VIN auto-decode (NHTSA vPIC + WMI local + coduri model VAG), marcă/model din listă (35 mărci) cu opțiune „Altul”
 - Recepție wizard: 5 poze opționale (modificat 2026-10-17 la cererea clientului), semnătură canvas obligatorie, accesorii, daune, elevator → CL-YYYY-NNNNN
-- Comenzi de lucru: kanban drag&drop, reguli status (Finalizată doar după CC, Facturată automat, Închisă după facturare), linii piese/manoperă (tarif × ore normate, sursă normă), mecanici alocați
+- Comenzi de lucru: kanban drag&drop, reguli status (Finalizată doar după CC, Facturată automat, Închisă după facturare), piese și manoperă separate (tab-uri distincte, formulare dedicate, bară totaluri; 2026-10-17), mecanici alocați
 - Devize versionate, trimitere email/SMS/WhatsApp (SIMULAT), aprobare semnată în service sau link public
 - Control calitate (7 puncte + semnătură mecanic + șef service), pontaj automat pe lucrare, pontaj prezență
 - Magazie: produse OE/aftermarket/raft, NIR cu loturi, cost mediu, consum FIFO la facturare, mișcări stoc

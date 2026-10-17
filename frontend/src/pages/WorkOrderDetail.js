@@ -123,7 +123,7 @@ export default function WorkOrderDetail() {
         <div className="min-w-0">
         <TotalsBar wo={wo} />
         <Tabs defaultValue="parts">
-          <TabsList className="flex-wrap">
+          <TabsList className="h-auto flex-wrap justify-start">
             <TabsTrigger value="parts" data-testid="wo-tab-parts">{tr("Piese", "Parts")} ({wo.lines.filter((l) => l.type !== "labor").length})</TabsTrigger>
             <TabsTrigger value="labor" data-testid="wo-tab-labor">{tr("Manoperă", "Labor")} ({wo.lines.filter((l) => l.type === "labor").length})</TabsTrigger>
             <TabsTrigger value="quotes" data-testid="wo-tab-quotes">{tr("Devize", "Quotes")} ({wo.quotes?.length || 0})</TabsTrigger>
