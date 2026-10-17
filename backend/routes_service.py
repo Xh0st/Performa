@@ -9,7 +9,6 @@ from core import (db, ser, oid, iso, now, require, audit, get_or_404, next_seq, 
 
 router = APIRouter(prefix="/api")
 LIGHT = {"reception.photos": 0, "reception.signature": 0, "qc.mechanic_signature": 0, "qc.chief_signature": 0}
-PHOTO_KEYS = ["front", "back", "left", "right", "interior"]
 QC_ITEMS = ["frane", "directie", "suspensie", "lumini", "niveluri", "anvelope", "test_drive"]
 LOCKED = ("facturata", "inchisa")
 
@@ -168,9 +167,6 @@ async def list_work_orders(status: str = "", q: str = "", active: bool = False, 
 
 @router.post("/work-orders")
 async def create_work_order(body: ReceptionIn, user=Depends(require("reception"))):
-    missing = [k for k in PHOTO_KEYS if not body.photos.get(k)]
-    if missing:
-        raise HTTPException(400, f"Fotografii obligatorii lipsă: {', '.join(missing)}")
     if not body.signature:
         raise HTTPException(400, "Semnătura clientului este obligatorie")
     await get_or_404("clients", body.client_id)

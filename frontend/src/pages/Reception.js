@@ -46,7 +46,7 @@ export default function Reception() {
   const valid = [
     f.client_id && f.vehicle_id,
     f.mileage_in && f.complaint,
-    PHOTOS.every(([k]) => f.photos[k]),
+    true,
     !!f.signature,
   ];
 
@@ -131,7 +131,7 @@ export default function Reception() {
         )}
         {step === 2 && (
           <div>
-            <p className="mb-4 text-sm text-muted-foreground">{tr("Toate cele 5 fotografii sunt obligatorii.", "All 5 photos are mandatory.")}</p>
+            <p className="mb-4 text-sm text-muted-foreground">{tr("Fotografiile sunt opționale — recomandate pentru documentarea stării vehiculului.", "Photos are optional — recommended to document the vehicle condition.")}</p>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               {PHOTOS.map(([k, ro, en]) => <PhotoSlot key={k} testid={`reception-photo-${k}`} label={tr(ro, en)} value={f.photos[k]} onChange={(v) => setF({ ...f, photos: { ...f.photos, [k]: v } })} />)}
             </div>

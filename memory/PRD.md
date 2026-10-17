@@ -18,7 +18,7 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Dashboard KPI timp real + grafice venit/profit/încasări, statusuri, productivitate mecanici, expirări ITP/RCA
 - CRM PF/PJ cu validare CNP, CUI obligatoriu, flotă/limită buget, GDPR; istoric reparații/facturi
 - Parc auto + istoric; VIN auto-decode (NHTSA vPIC + WMI local + coduri model VAG), marcă/model din listă (35 mărci) cu opțiune „Altul”
-- Recepție wizard: 5 poze obligatorii, semnătură canvas, accesorii, daune, elevator → CL-YYYY-NNNNN
+- Recepție wizard: 5 poze opționale (modificat 2026-10-17 la cererea clientului), semnătură canvas obligatorie, accesorii, daune, elevator → CL-YYYY-NNNNN
 - Comenzi de lucru: kanban drag&drop, reguli status (Finalizată doar după CC, Facturată automat, Închisă după facturare), linii piese/manoperă (tarif × ore normate, sursă normă), mecanici alocați
 - Devize versionate, trimitere email/SMS/WhatsApp (SIMULAT), aprobare semnată în service sau link public
 - Control calitate (7 puncte + semnătură mecanic + șef service), pontaj automat pe lucrare, pontaj prezență
