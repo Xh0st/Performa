@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader, Panel, Loading, StatusBadge, STATUS, NativeSelect, Field } from "@/components/common";
-import LinesTab from "@/components/wo/LinesTab";
+import { PartsSection, LaborSection, TotalsBar } from "@/components/wo/LineSections";
 import QuotesTab from "@/components/wo/QuotesTab";
 import QcTab from "@/components/wo/QcTab";
 import TimeTab from "@/components/wo/TimeTab";
@@ -120,16 +120,20 @@ export default function WorkOrderDetail() {
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-        <Tabs defaultValue="lines">
+        <div className="min-w-0">
+        <TotalsBar wo={wo} />
+        <Tabs defaultValue="parts">
           <TabsList className="flex-wrap">
-            <TabsTrigger value="lines" data-testid="wo-tab-lines">{tr("Lucrări & piese", "Jobs & parts")}</TabsTrigger>
+            <TabsTrigger value="parts" data-testid="wo-tab-parts">{tr("Piese", "Parts")} ({wo.lines.filter((l) => l.type !== "labor").length})</TabsTrigger>
+            <TabsTrigger value="labor" data-testid="wo-tab-labor">{tr("Manoperă", "Labor")} ({wo.lines.filter((l) => l.type === "labor").length})</TabsTrigger>
             <TabsTrigger value="quotes" data-testid="wo-tab-quotes">{tr("Devize", "Quotes")} ({wo.quotes?.length || 0})</TabsTrigger>
             <TabsTrigger value="qc" data-testid="wo-tab-qc">{tr("Control calitate", "Quality control")}</TabsTrigger>
             <TabsTrigger value="time" data-testid="wo-tab-time">{tr("Pontaj", "Time")}</TabsTrigger>
             <TabsTrigger value="reception" data-testid="wo-tab-reception">{tr("Recepție", "Reception")}</TabsTrigger>
             <TabsTrigger value="history" data-testid="wo-tab-history">{tr("Istoric", "History")}</TabsTrigger>
           </TabsList>
-          <TabsContent value="lines"><Panel><LinesTab wo={wo} onChange={setData} locked={locked} /></Panel></TabsContent>
+          <TabsContent value="parts"><Panel><PartsSection wo={wo} onChange={setData} locked={locked} /></Panel></TabsContent>
+          <TabsContent value="labor"><Panel><LaborSection wo={wo} onChange={setData} locked={locked} /></Panel></TabsContent>
           <TabsContent value="quotes"><Panel><QuotesTab wo={wo} onChange={reload} /></Panel></TabsContent>
           <TabsContent value="qc"><Panel><QcTab key={wo.qc?.at || "new"} wo={wo} onChange={setData} locked={locked} /></Panel></TabsContent>
           <TabsContent value="time"><Panel><TimeTab wo={wo} onChange={setData} /></Panel></TabsContent>
@@ -164,6 +168,7 @@ export default function WorkOrderDetail() {
             </Panel>
           </TabsContent>
         </Tabs>
+        </div>
         <DetailsPanel wo={wo} onChange={setData} locked={locked} />
       </div>
     </div>
