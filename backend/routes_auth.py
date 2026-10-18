@@ -118,7 +118,7 @@ async def create_user(body: UserIn, user=Depends(require("users"))):
     if not body.password or len(body.password) < 8:
         raise HTTPException(400, "Parola trebuie să aibă minim 8 caractere")
     email = body.email.strip().lower()
-    if await raw_db.users.find_one({"email": email, "tenant_id": user["tenant_id"]}):
+    if await raw_db.users.find_one({"email": email}):
         raise HTTPException(400, "Email deja existent")
     doc = {"email": email, "name": body.name, "role": body.role, "active": body.active,
            "password_hash": hash_password(body.password), "tenant_id": user["tenant_id"],
@@ -141,6 +141,8 @@ async def update_user(uid: str, body: UserIn, user=Depends(require("users"))):
     target = await raw_db.users.find_one({"_id": oid(uid), "tenant_id": user["tenant_id"]})
     if not target:
         raise HTTPException(404, "Not found")
+    if target.get("platform_role") and user.get("platform_role") != "SUPERADMIN":
+        raise HTTPException(403, "Contul Superadmin poate fi administrat doar de Superadmin")
     await raw_db.users.update_one({"_id": oid(uid)}, {"$set": upd})
     await audit(user, "update", "user", uid, body.email)
     return user_out(await raw_db.users.find_one({"_id": oid(uid)}))
@@ -150,7 +152,12 @@ async def update_user(uid: str, body: UserIn, user=Depends(require("users"))):
 async def delete_user(uid: str, user=Depends(require("users"))):
     if uid == user["id"]:
         raise HTTPException(400, "Nu vă puteți șterge propriul cont")
-    await raw_db.users.delete_one({"_id": oid(uid), "tenant_id": user["tenant_id"]})
+    target = await raw_db.users.find_one({"_id": oid(uid), "tenant_id": user["tenant_id"]})
+    if not target:
+        raise HTTPException(404, "Not found")
+    if target.get("platform_role") and user.get("platform_role") != "SUPERADMIN":
+        raise HTTPException(403, "Contul Superadmin poate fi administrat doar de Superadmin")
+    await raw_db.users.delete_one({"_id": oid(uid)})
     await audit(user, "delete", "user", uid)
     return {"ok": True}
 
@@ -163,7 +170,9 @@ async def read_settings(user=Depends(get_current_user)):
 @router.put("/settings")
 async def write_settings(body: dict, user=Depends(require("settings"))):
     body.pop("_id", None)
-    await db.settings.update_one({"_id": "company"}, {"$set": body}, upsert=True)
+    body.pop("tenant_id", None)
+    body.pop("branch_id", None)
+    await db.settings.update_one({"kind": "company"}, {"$set": body, "$setOnInsert": {"kind": "company"}}, upsert=True)
     await audit(user, "update", "settings", "company")
     return await get_settings()
 

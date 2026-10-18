@@ -251,7 +251,16 @@ def require_superadmin():
 
 
 async def next_seq(name: str) -> int:
-    r = await db.counters.find_one_and_update({"_id": name}, {"$inc": {"seq": 1}}, upsert=True, return_document=True)
+    scope = current_scope()
+    if not scope:
+        raise HTTPException(503, "Context tenant lipsă")
+    key = f"{scope['tenant_id']}:{scope['branch_id']}:{name}"
+    r = await raw_db.counters.find_one_and_update(
+        {"_id": key},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True,
+    )
     return r["seq"]
 
 
@@ -261,7 +270,7 @@ async def audit(user: dict, action: str, entity: str, entity_id: str = "", detai
 
 
 async def get_settings() -> dict:
-    s = await db.settings.find_one({"_id": "company"})
+    s = await db.settings.find_one({"kind": "company"})
     return {k: v for k, v in (s or {}).items() if k != "_id"}
 
 

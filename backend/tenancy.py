@@ -36,6 +36,12 @@ async def migrate_demo_tenant() -> None:
             {"tenant_id": {"$exists": False}},
             {"$set": {"tenant_id": DEMO_TENANT_ID, "branch_id": DEMO_BRANCH_ID}},
         )
+    await raw_db.settings.update_many({"kind": {"$exists": False}}, {"$set": {"kind": "company"}})
+    await raw_db.rar_autopass_config.update_many({"kind": {"$exists": False}}, {"$set": {"kind": "rar_autopass"}})
+    await raw_db.efactura_config.update_many({"kind": {"$exists": False}}, {"$set": {"kind": "efactura"}})
+    for counter in await raw_db.counters.find({"_id": {"$not": {"$regex": ":"}}}).to_list(1000):
+        scoped_key = f"{DEMO_TENANT_ID}:{DEMO_BRANCH_ID}:{counter['_id']}"
+        await raw_db.counters.update_one({"_id": scoped_key}, {"$setOnInsert": {"seq": counter.get("seq", 0)}}, upsert=True)
     await raw_db.users.update_many(
         {"tenant_id": {"$exists": False}},
         {"$set": {

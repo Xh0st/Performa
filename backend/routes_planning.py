@@ -6,7 +6,8 @@ from typing import List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from core import db, get_or_404, get_settings, iso, now, oid, require, ser
+from core import db, raw_db, get_or_404, get_settings, iso, now, oid, require, ser
+from tenant_context import set_scope
 
 
 router = APIRouter(prefix="/api")
@@ -255,6 +256,13 @@ async def send_reminders() -> None:
         })
 
 
+async def send_reminders_all_tenants() -> None:
+    branches = await raw_db.branches.find({"status": "ACTIVE"}).to_list(5000)
+    for branch in branches:
+        set_scope({"tenant_id": branch["tenant_id"], "branch_id": branch["_id"], "system_scope": True})
+        await send_reminders()
+
+
 @router.post("/cron/appointments/reminders")
 async def appointment_reminder_cron(request: Request, background: BackgroundTasks):
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
@@ -267,5 +275,5 @@ async def appointment_reminder_cron(request: Request, background: BackgroundTask
         return {"ok": True, "duplicate": True}
     if run_id:
         await db.cron_runs.insert_one({"_id": run_id, "job": "appointment-reminders", "at": iso()})
-    background.add_task(send_reminders)
+    background.add_task(send_reminders_all_tenants)
     return {"ok": True}

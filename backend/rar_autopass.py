@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 async def get_config() -> dict:
-    doc = await db.rar_autopass_config.find_one({"_id": CONFIG_ID})
+    doc = await db.rar_autopass_config.find_one({"kind": "rar_autopass"})
     cfg = {key: value for key, value in (doc or {}).items() if key != "_id"}
     cfg.setdefault("branch_name", DEFAULT_BRANCH)
     cfg.setdefault("authorization_code", "")
@@ -64,8 +64,8 @@ async def save_config(values: dict) -> dict:
     if values.get("api_token"):
         update["api_token"] = enc(values["api_token"].strip())
     await db.rar_autopass_config.update_one(
-        {"_id": CONFIG_ID},
-        {"$set": update, "$setOnInsert": {"created_at": iso()}},
+        {"kind": "rar_autopass"},
+        {"$set": update, "$setOnInsert": {"created_at": iso(), "kind": "rar_autopass"}},
         upsert=True,
     )
     return await get_config()

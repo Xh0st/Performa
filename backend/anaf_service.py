@@ -36,7 +36,7 @@ def cif_digits(cui: str) -> str:
 
 
 async def get_cfg() -> dict:
-    doc = await db.efactura_config.find_one({"_id": "main"})
+    doc = await db.efactura_config.find_one({"kind": "efactura"})
     cfg = {k: v for k, v in (doc or {}).items() if k != "_id"}
     cfg.setdefault("environment", "simulare")
     cfg.setdefault("redirect_uri", f"{os.environ['FRONTEND_URL'].split(',')[0].strip()}/api/efactura/oauth/callback")
@@ -44,7 +44,7 @@ async def get_cfg() -> dict:
 
 
 async def save_cfg(upd: dict):
-    await db.efactura_config.update_one({"_id": "main"}, {"$set": upd}, upsert=True)
+    await db.efactura_config.update_one({"kind": "efactura"}, {"$set": upd, "$setOnInsert": {"kind": "efactura"}}, upsert=True)
 
 
 def public_cfg(cfg: dict, company: dict) -> dict:

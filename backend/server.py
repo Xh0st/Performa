@@ -60,15 +60,25 @@ async def startup():
     set_scope({"tenant_id": DEMO_TENANT_ID, "branch_id": DEMO_BRANCH_ID})
     await raw_db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
-    await db.vehicles.create_index("vin", unique=True)
-    await db.products.create_index("code", unique=True)
+    for collection, index_name in [
+        (raw_db.vehicles, "vin_1"),
+        (raw_db.products, "code_1"),
+        (raw_db.efactura_inbox, "message_id_1"),
+        (raw_db.rar_autopass_outbox, "idempotency_key_1"),
+    ]:
+        try:
+            await collection.drop_index(index_name)
+        except Exception:
+            pass
+    await db.vehicles.create_index([("tenant_id", 1), ("branch_id", 1), ("vin", 1)], unique=True)
+    await db.products.create_index([("tenant_id", 1), ("branch_id", 1), ("code", 1)], unique=True)
     await db.work_orders.create_index("status")
     await db.work_orders.create_index("quotes.token")
     await db.time_entries.create_index([("mechanic_id", 1), ("start", -1)])
     await db.payments.create_index("date")
-    await db.efactura_inbox.create_index("message_id", unique=True, partialFilterExpression={"message_id": {"$type": "string"}})
+    await db.efactura_inbox.create_index([("tenant_id", 1), ("branch_id", 1), ("message_id", 1)], unique=True, partialFilterExpression={"message_id": {"$type": "string"}})
     await db.efactura_logs.create_index("at")
-    await db.rar_autopass_outbox.create_index("idempotency_key", unique=True)
+    await db.rar_autopass_outbox.create_index([("tenant_id", 1), ("branch_id", 1), ("idempotency_key", 1)], unique=True)
     await db.rar_autopass_outbox.create_index("work_order_id")
     await db.rar_autopass_logs.create_index("at")
     await db.warranty_certificates.create_index("invoice_id", unique=True)

@@ -11,8 +11,9 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
     localStorage.setItem("erp_token", data.token);
-    setUser(data.user);
-    return data.user;
+    const refreshed = await api.get("/auth/me");
+    setUser(refreshed.data);
+    return refreshed.data;
   };
   const logout = async () => {
     await api.post("/auth/logout").catch(() => {});
@@ -24,6 +25,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem("erp_token", data.token);
     const refreshed = await api.get("/auth/me");
     setUser(refreshed.data);
+    window.location.reload();
     return refreshed.data;
   };
   const can = (m) => !!user && user.permissions?.includes(m);

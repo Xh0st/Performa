@@ -6,9 +6,11 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
+import { errMsg } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ROLE_LABELS } from "@/components/common";
+import { toast } from "sonner";
 
 const NAV = [
   { group: ["Operațional", "Operations"], items: [
@@ -103,10 +105,10 @@ export default function Layout() {
           <div className="flex-1" />
           {user?.branches?.length > 1 && (
             <select
-              className="hidden h-9 max-w-48 rounded border bg-background px-2 text-sm md:block"
+              className="h-9 max-w-32 rounded border bg-background px-2 text-sm md:max-w-48"
               data-testid="active-branch-selector"
               value={user.active_branch_id}
-              onChange={(event) => switchBranch(event.target.value)}
+              onChange={(event) => switchBranch(event.target.value).catch((error) => toast.error(errMsg(error)))}
             >
               {user.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select>

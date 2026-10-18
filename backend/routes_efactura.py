@@ -6,7 +6,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
-from core import db, ser, iso, require, audit, get_or_404, get_settings
+from core import db, raw_db, ser, iso, require, audit, get_or_404, get_settings
+from tenant_context import set_scope
 from efactura import build_ubl
 import anaf_service as ef
 import efactura_inbox as inbox
@@ -203,6 +204,13 @@ async def _run_job(job: str):
         await ef.log(f"cron-{job}", False, str(e.detail))
 
 
+async def _run_job_all_tenants(job: str):
+    branches = await raw_db.branches.find({"status": "ACTIVE"}).to_list(5000)
+    for branch in branches:
+        set_scope({"tenant_id": branch["tenant_id"], "branch_id": branch["_id"], "system_scope": True})
+        await _run_job(job)
+
+
 @router.post("/cron/efactura/{job}")
 async def cron(job: str, request: Request, background: BackgroundTasks):
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
@@ -216,7 +224,7 @@ async def cron(job: str, request: Request, background: BackgroundTasks):
         return {"ok": True, "duplicate": True}
     if run_id:
         await db.cron_runs.insert_one({"_id": run_id, "job": job, "at": iso()})
-    background.add_task(_run_job, job)
+    background.add_task(_run_job_all_tenants, job)
     return {"ok": True}
 
 
