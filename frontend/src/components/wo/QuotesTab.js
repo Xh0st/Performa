@@ -6,6 +6,7 @@ import { useLang } from "@/lib/prefs";
 import { money, dt, date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge, Empty, Field } from "@/components/common";
 import SignaturePad from "@/components/SignaturePad";
@@ -23,6 +24,7 @@ export default function QuotesTab({ wo, onChange }) {
   const [approve, setApprove] = useState(null);
   const [sig, setSig] = useState("");
   const [name, setName] = useState("");
+  const [paperApproved, setPaperApproved] = useState(false);
   const quotes = [...(wo.quotes || [])].reverse();
   const link = (q) => `${window.location.origin}/approve/${q.token}`;
 
@@ -38,7 +40,7 @@ export default function QuotesTab({ wo, onChange }) {
   const create = () => run(() => api.post(`/work-orders/${wo.id}/quotes`, { valid_days: 7 }), tr("Deviz generat", "Quote generated"));
   const send = (q, channel) => run(() => api.post(`/work-orders/${wo.id}/quotes/${q.version}/send`, { channel, link: link(q) }),
     tr(`Trimis prin ${channel} (SIMULAT)`, `Sent via ${channel} (SIMULATED)`));
-  const decide = (q, approved) => run(() => api.post(`/work-orders/${wo.id}/quotes/${q.version}/decision`, { approved, signature: approved ? sig : "", name }),
+  const decide = (q, approved) => run(() => api.post(`/work-orders/${wo.id}/quotes/${q.version}/decision`, { approved, signature: approved ? sig : "", paper_approved: approved && paperApproved, name }),
     approved ? tr("Deviz aprobat", "Quote approved") : tr("Deviz respins", "Quote rejected")).then(() => setApprove(null));
 
   return (
@@ -71,7 +73,7 @@ export default function QuotesTab({ wo, onChange }) {
                   <Button size="sm" variant="outline" data-testid={`quote-v${q.version}-send-email`} onClick={() => send(q, "email")}><Mail className="mr-1 h-3 w-3" />Email</Button>
                   <Button size="sm" variant="outline" data-testid={`quote-v${q.version}-send-sms`} onClick={() => send(q, "sms")}><Phone className="mr-1 h-3 w-3" />SMS</Button>
                   <Button size="sm" variant="outline" data-testid={`quote-v${q.version}-send-whatsapp`} onClick={() => send(q, "whatsapp")}><MessageSquare className="mr-1 h-3 w-3" />WhatsApp</Button>
-                  <Button size="sm" data-testid={`quote-version-approve-button-${q.version}`} onClick={() => { setApprove(q); setSig(""); setName(wo.client_name); }}><Check className="mr-1 h-3 w-3" />{tr("Aprobă", "Approve")}</Button>
+                  <Button size="sm" data-testid={`quote-version-approve-button-${q.version}`} onClick={() => { setApprove(q); setSig(""); setName(wo.client_name); setPaperApproved(false); }}><Check className="mr-1 h-3 w-3" />{tr("Aprobă", "Approve")}</Button>
                   <Button size="sm" variant="destructive" data-testid={`quote-v${q.version}-reject`} onClick={() => decide(q, false)}><X className="mr-1 h-3 w-3" />{tr("Respinge", "Reject")}</Button>
                 </>
               )}
@@ -85,7 +87,11 @@ export default function QuotesTab({ wo, onChange }) {
           <Field label={tr("Nume client", "Customer name")}><Input data-testid="quote-approve-name-input" value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <div className="eyebrow mt-2">{tr("Semnătură client", "Customer signature")}</div>
           <SignaturePad testid="quote-approve-signature" value="" onChange={setSig} />
-          <DialogFooter><Button data-testid="quote-approve-confirm-button" disabled={!sig} onClick={() => decide(approve, true)}>{tr("Confirmă aprobarea", "Confirm approval")}</Button></DialogFooter>
+          <label className="mt-3 flex items-center gap-2 text-sm" data-testid="quote-paper-approval-label">
+            <Checkbox data-testid="quote-paper-approval-checkbox" checked={paperApproved} onCheckedChange={setPaperApproved} />
+            {tr("Aprobat client (deviz semnat pe hârtie)", "Approved by customer (quote signed on paper)")}
+          </label>
+          <DialogFooter><Button data-testid="quote-approve-confirm-button" disabled={!sig && !paperApproved} onClick={() => decide(approve, true)}>{tr("Confirmă aprobarea", "Confirm approval")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

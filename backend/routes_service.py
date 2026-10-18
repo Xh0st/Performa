@@ -456,6 +456,7 @@ async def send_quote(wid: str, version: int, body: SendIn, user=Depends(require(
 class DecisionIn(BaseModel):
     approved: bool
     signature: str = ""
+    paper_approved: bool = False
     name: str = ""
     reason: str = ""
 
@@ -466,11 +467,13 @@ async def apply_decision(w: dict, version: int, body: DecisionIn, via: str, by: 
         raise HTTPException(404, "Deviz inexistent")
     if q["status"] not in ("draft", "sent"):
         raise HTTPException(400, "Devizul nu mai poate fi aprobat/respins")
-    if body.approved and not body.signature:
-        raise HTTPException(400, "Semnătura este obligatorie pentru aprobare")
+    if body.paper_approved and via != "service":
+        raise HTTPException(403, "Aprobarea pe hârtie se înregistrează doar la recepție")
+    if body.approved and not body.signature and not body.paper_approved:
+        raise HTTPException(400, "Semnătura sau confirmarea aprobării pe hârtie este obligatorie")
     st = "approved" if body.approved else "rejected"
     await db.work_orders.update_one({"_id": w["_id"], "quotes.version": version}, {"$set": {
-        "quotes.$.status": st, "quotes.$.decision": {"signature": body.signature, "name": body.name or by,
+        "quotes.$.status": st, "quotes.$.decision": {"signature": body.signature, "paper_approved": body.paper_approved, "name": body.name or by,
                                                      "reason": body.reason, "via": via, "at": iso()}}})
     if body.approved and w["status"] in ("noua", "diagnosticare", "asteapta_oferta"):
         await db.work_orders.update_one({"_id": w["_id"]}, {"$set": {"status": "aprobata", "approved_quote": version}, "$push": {
