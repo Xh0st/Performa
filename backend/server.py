@@ -65,6 +65,9 @@ async def startup():
     await db.rar_autopass_outbox.create_index("idempotency_key", unique=True)
     await db.rar_autopass_outbox.create_index("work_order_id")
     await db.rar_autopass_logs.create_index("at")
+    await db.warranty_certificates.create_index("invoice_id", unique=True)
+    await db.warranty_certificates.create_index("vehicle_id")
+    await db.warranty_claims.create_index("invoice_id")
     await seed_admin()
     await seed_demo()
 

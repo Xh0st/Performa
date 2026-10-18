@@ -94,6 +94,7 @@ export default function WorkOrderDetail() {
       <PageHeader eyebrow={`${wo.client_name} · ${wo.vehicle.make} ${wo.vehicle.model} · ${wo.vehicle.plate}`} title={wo.number} testid="wo-number"
         actions={<>
           <StatusBadge status={wo.status} testid="wo-status-badge" />
+          {wo.is_warranty && <span className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-semibold uppercase text-amber-700 dark:text-amber-300" data-testid="warranty-work-order-badge">{tr("Garanție", "Warranty")}</span>}
           <Button variant="outline" size="sm" data-testid="print-reception-button" onClick={() => window.open(`/print/reception/${id}`, "_blank")}><Printer className="mr-1 h-4 w-4" />{tr("Notă recepție / PV", "Reception note")}</Button>
           {can("invoices") && !locked && <Button variant="outline" size="sm" data-testid="create-proforma-button" onClick={() => invoice("proforma")}><FileText className="mr-1 h-4 w-4" />{tr("Proformă", "Proforma")}</Button>}
           {can("invoices") && wo.status === "finalizata" && <Button size="sm" data-testid="create-invoice-button" onClick={() => invoice("fiscal")}><Receipt className="mr-1 h-4 w-4" />{tr("Emite factură", "Issue invoice")}</Button>}

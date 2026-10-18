@@ -1,0 +1,52 @@
+{
+  "summary": "Tested the Warranty module (backend + UI) using real API flows. New pytest suite test_warranty.py has 31 tests: 26 pass, 5 fail. What works: (1) a fiscal invoice auto-creates exactly 1 certificate, and a proforma creates none. Part lines get the product's warranty_months (12 and the default 24 verified); labor gets 3 months; valid_to is computed with relativedelta. GET /invoices/{id} shows only {id, number, issued_date}, and null for a proforma. (2) The PDF returns 200 application/pdf with Content-Disposition attachment filename=GAR-YYYY-NNNNNN.pdf. It is 1 A4 page, diacritics render correctly (checked visually), the table is readable, and '&'/'<' in descriptions do not break it. It returns 404 when there is no certificate. (3) /warranties correctly separates active/expired/all; expiry was simulated in the DB. (4) Claims: qty 0, negative, or > invoiced, unknown or expired lines, an empty description, empty lines and an invoice without a certificate all return 400 and create no WO. A valid claim creates a DG-* claim plus exactly 1 GAR-* WO (is_warranty, status noua, unit_price 0 on every line, correct client/vehicle, part+labor types). (5) PUT validates all 3 enums (400), returns 404 for a missing or bad id, persists the changes and keeps the invoice_id/work_order_id links. (6) The original WO shows warranty_alerts while coverage is active, and the alert disappears after expiry. RBAC: 401 without a token, 403 for mecanic. UI: the certificate button appears in InvoiceDetail and is absent on the proforma; PDF download works from the invoice and from /warranties; the WO alert banner shows; the claim dialog works end to end (invoice select, coverage lines, checkbox auto-fills qty, Save disabled until valid, toast); the edit dialog persists changes; on mobile at 390px the document width is 390 (no outer overflow), the claims table scrolls inside its own container, and the dialog fits the screen.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/warranties/invoices/{id} and /certificate (require('invoices'))", "issue": "The roles receptioner and magazioner have 'warranties' but not 'invoices'. The claim dialog (/invoices?type=fiscal + /warranties/invoices/{id}) and the certificate download return 403 for them, so these roles can see the page but cannot open a claim or download the PDF. Verified with magazie@: GET /warranties is 200, but /warranties/invoices/{id} is 403.", "priority": "HIGH"},
+      {"endpoint": "POST /api/warranty-claims", "issue": "Claimed qty is not cumulative. (a) The same source_line_id repeated in one request passes (2+2 on a line invoiced with qty 2 returns 200). (b) Repeated claims on the same line are accepted indefinitely (1 + 2 > 2 returns 200). Each one creates a new zero-cost WO.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PUT /api/warranty-claims/{id}", "issue": "supplier_return_id is not checked (a nonexistent ObjectId is accepted). There is no cross-validation either: technical_result=conform + resolution=admis_rambursat is accepted, and so is supplier_return_status=acceptat without a supplier_return_id. The claim can still be edited after it is closed (resolution final). There is no status history."},
+      {"endpoint": "warranty_service.create_certificate", "issue": "Runs after the invoice insert with no try/except. int(None) or a non-numeric warranty_months on a product raises a 500 after the invoice is already saved, leaving an invoice without a certificate. warranty_months=0 (a product with no warranty) is forced to 1 month by max(1, ...). There is no unique index on warranty_certificates.invoice_id."},
+      {"endpoint": "POST /api/invoices/{id}/storno", "issue": "A full or partial credit note does not cancel or reduce the certificate coverage; the credited lines stay active and can be claimed."},
+      {"endpoint": "Warranty WO (is_warranty)", "issue": "Nothing blocks editing prices or lines, or issuing a fiscal invoice on the GAR WO. A fiscal invoice on it would create a NEW certificate. Its numbering uses the work_order counter with a GAR- prefix, which can be confused with the certificate numbers (also GAR-YYYY-...)."},
+      {"endpoint": "warranty_pdf", "issue": "<b> does not render bold: registerFontFamily is missing for WarrantyRoboto. Dates are ISO (2027-10-18), not dd.mm.yyyy. The table has no quantity or product code column, and there is no seller CUI or client address."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Warranties ClaimDialog", "issue": "The invoice select lists every fiscal invoice (including credit notes and invoices with no certificate); choosing one without a certificate silently shows nothing (404 with no message).", "selector": "[data-testid=warranty-invoice-select]", "priority": "MEDIUM"},
+      {"component": "Warranties certificates panel", "issue": "The title says 'Certificate active' but the list loads status= (all). Expired certificates have no active/expired badge, only '0 acoperiri active'.", "selector": "[data-testid=warranty-certificates-panel]", "priority": "LOW"},
+      {"component": "WorkOrderDetail / WorkOrders", "issue": "The warranty WO has no visual 'Garanție' marker (is_warranty / warranty_claim_number are not used in the frontend), and there is no link from the claim to the WO.", "selector": "[data-testid=work-order-warranty-alert]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Claim as receptioner/magazioner", "issue": "403 on /invoices and /warranties/invoices/{id}, so the dialog stays empty and the PDF download fails.", "affected_selectors": ["[data-testid=warranty-invoice-select]", "[data-testid^=download-warranty-]"]}
+    ],
+    "design_issues": [
+      {"screen": "/warranties", "issues": ["The claims table only shows Claim/Invoice/WO/Resolution; technical_result and supplier return status are not visible without opening edit", "Native <select> (NativeSelect) instead of shadcn Select in the dialogs"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_warranty.py", "/app/backend/tests/warranty_fixtures.py", "/app/test_reports/pytest/pytest_warranty.xml"],
+  "action_items": [
+    "Give receptioner/magazioner access: allow require('warranties') (or invoices OR warranties) on /warranties/invoices/{id}[/certificate] and add an invoice selection endpoint that lists only invoices with a certificate (e.g. built from GET /warranties)",
+    "POST /warranty-claims: aggregate qty per source_line_id in the request and subtract qty already claimed in existing (non-rejected) claims",
+    "PUT /warranty-claims: check that supplier_return_id exists in supplier_returns; add cross-validation (conform -> resolution respins/in_analiza; acceptat/trimis -> supplier_return_id required); lock after a final resolution",
+    "create_certificate: int(months or 24), allow 0 = no warranty, try/except so invoicing never fails; add a unique index on invoice_id",
+    "Storno: mark credited lines as not covered in the certificate",
+    "Warranty WO: show a 'Garanție' badge in WorkOrderDetail/WorkOrders, lock prices to 0, do not issue a certificate or charge a fiscal invoice on is_warranty",
+    "ClaimDialog: filter invoices to those that have a certificate; show an explicit message when there is no certificate"
+  ],
+  "critical_code_review_comments": [
+    "routes_warranty.create_claim: line 100 is a single ~600-character line (and line 104 too); hard to maintain",
+    "warranty_service: __import__('bson').ObjectId inline; there is a 'from core import oid' already available",
+    "Claim creation is not transactional: it consumes 2 counters and inserts the WO before the claim; if the insert fails, the WO stays orphaned",
+    "list_warranties loads up to 2000 certificates and filters in Python; there is no index on vehicle_id/invoice_id (used by warranty_alerts and lookups)"
+  ],
+  "updated_files": ["/app/backend/tests/test_warranty.py", "/app/backend/tests/warranty_fixtures.py"],
+  "success_rate": {"backend": "84% (26/31)", "frontend": "~90% (all main flows OK; RBAC role gap and UX gaps)"},
+  "test_credentials": "andrei.melek@gmail.com (admin), mecanic@ and magazie@ (demo) work with the credentials in /app/memory/test_credentials.md. Passwords are not included in this report. The login_attempts records created by my first runs (a credential parsing bug in the fixture) were deleted. The receptie@/mecanic@ entries at 19:10-19:11 belong to someone else and were left untouched.",
+  "seed_data_creation": "None persistent. All TEST data (supplier, 2 products, NIR, stock lots/moves, client, vehicle, original WO, proforma + fiscal invoice, certificate, claims, GAR WOs, rar_outbox, audit) deleted with residue 0 (warranty_certificates=0, warranty_claims=0, is_warranty WO=0, same as the initial state). Counters restored: invoice=79, nir=13, proforma=3, warranty_certificate=1, warranty_claim=1. work_order was set to 97 because someone else created CL-2026-00097 during the test; it was 96 initially. efactura auto_send=False was restored.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/test_warranty.py -n 0 (module fixture with full cleanup + counter restore). UI fixture: python tests/warranty_fixtures.py setup|teardown (state in /tmp/warranty_state.json; TEST_Client Garanție <TAG>, lines g_p1 (12 months, qty 2), g_p2 (24 months), g_lab (labor 3 months)). Expiry is simulated by setting lines.N.valid_to='2020-01-01' in the DB. The container clock is 2026-10-18. The 5 failing tests are real bugs (duplicate/cumulative overclaim, supplier_return_id, conform+admis, magazioner 403)."
+}

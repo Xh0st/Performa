@@ -2,6 +2,8 @@ from datetime import date
 
 from dateutil.relativedelta import relativedelta
 
+from bson import ObjectId
+
 from core import db, iso, next_seq
 
 
@@ -13,24 +15,28 @@ async def create_certificate(invoice: dict, work_order: dict, settings: dict) ->
     issue_date = date.fromisoformat(invoice["issue_date"])
     product_ids = {line.get("product_id") for line in invoice.get("lines", []) if line.get("product_id")}
     products = {
-        str(item["_id"]): item
-        for item in await db.products.find({"_id": {"$in": [
-            __import__("bson").ObjectId(product_id) for product_id in product_ids
-        ]}}).to_list(1000)
+        str(item["_id"]): item for item in await db.products.find({"_id": {"$in": [ObjectId(product_id) for product_id in product_ids]}}).to_list(1000)
     }
     lines = []
     for line in invoice.get("lines", []):
         if line.get("type") not in ("part", "consumable", "labor"):
             continue
-        months = 3 if line["type"] == "labor" else products.get(line.get("product_id"), {}).get("warranty_months", 24)
-        valid_to = issue_date + relativedelta(months=max(1, int(months)))
+        raw_months = 3 if line["type"] == "labor" else products.get(line.get("product_id"), {}).get("warranty_months", 24)
+        try:
+            months = int(raw_months if raw_months is not None else 24)
+        except (TypeError, ValueError):
+            months = 24
+        if months <= 0:
+            continue
+        valid_to = issue_date + relativedelta(months=months)
         lines.append({
             "source_line_id": line["id"],
             "label": "Manoperă" if line["type"] == "labor" else "Piesă",
             "description": line["description"],
+            "code": line.get("code", ""),
             "product_id": line.get("product_id", ""),
             "qty": line.get("qty", 0),
-            "warranty_months": max(1, int(months)),
+            "warranty_months": months,
             "valid_from": issue_date.isoformat(),
             "valid_to": valid_to.isoformat(),
         })
@@ -48,6 +54,8 @@ async def create_certificate(invoice: dict, work_order: dict, settings: dict) ->
         "vehicle_label": invoice["vehicle"],
         "vehicle_id": work_order["vehicle_id"],
         "seller_name": settings.get("name", ""),
+        "seller_cui": settings.get("cui", ""),
+        "client_address": invoice["buyer"].get("address", ""),
         "issued_date": issue_date.isoformat(),
         "lines": lines,
         "created_at": iso(),

@@ -68,7 +68,7 @@ export default function InvoiceDetail() {
         actions={<>
           {fiscal && <Badge map={PAY_STATUS} value={inv.status} testid="invoice-pay-status" />}
           <Button variant="outline" size="sm" data-testid="print-invoice-button" onClick={() => window.open(`/print/invoice/${id}`, "_blank")}><Printer className="mr-1 h-4 w-4" />{tr("Tipărește", "Print")}</Button>
-          {inv.warranty_certificate && <Button variant="outline" size="sm" data-testid="download-warranty-certificate-button" onClick={() => downloadFile(`/warranties/invoices/${id}/certificate`, `${inv.warranty_certificate.number}.pdf`)}><FileBadge className="mr-1 h-4 w-4" />{tr("Certificat garanție", "Warranty certificate")}</Button>}
+          {inv.warranty_certificate && can("warranties") && <Button variant="outline" size="sm" data-testid="download-warranty-certificate-button" onClick={() => downloadFile(`/warranties/invoices/${id}/certificate`, `${inv.warranty_certificate.number}.pdf`)}><FileBadge className="mr-1 h-4 w-4" />{tr("Certificat garanție", "Warranty certificate")}</Button>}
           {canStorno && <Button variant="outline" size="sm" data-testid="storno-invoice-button" onClick={() => setStorno(true)}><Undo2 className="mr-1 h-4 w-4" />{tr("Stornează", "Credit")}</Button>}
           {fiscal && !isCn && can("payments") && inv.status !== "paid" && <Button size="sm" data-testid="record-payment-button" onClick={() => setPay(true)}><Wallet className="mr-1 h-4 w-4" />{tr("Încasează", "Collect")}</Button>}
         </>} />

@@ -34,6 +34,8 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
     if body.type == "fiscal":
         if w["status"] != "finalizata":
             raise HTTPException(400, "Doar comenzile finalizate (după control calitate) pot fi facturate fiscal")
+        if w.get("is_warranty"):
+            raise HTTPException(400, "Comenzile de garanție nu se facturează clientului")
         if not w.get("qc", {}).get("passed"):
             raise HTTPException(400, "Controlul calității final trebuie promovat înainte de facturare")
         if w.get("invoice_id"):
@@ -76,7 +78,15 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
         rar_work_order = await db.work_orders.find_one({"_id": w["_id"]})
         rar_invoice = await db.invoices.find_one({"_id": r.inserted_id})
         await queue_submission_safely(rar_work_order, rar_invoice, "invoice_issued")
-        await create_certificate(rar_invoice, w, s)
+        try:
+            await create_certificate(rar_invoice, w, s)
+        except Exception as exc:  # noqa: BLE001
+            await db.warranty_logs.insert_one({
+                "invoice_id": str(r.inserted_id),
+                "event": "certificate_error",
+                "message": str(exc)[:1500],
+                "at": iso(),
+            })
         schedule_auto_send(await db.invoices.find_one({"_id": r.inserted_id}))
     return ser(await db.invoices.find_one({"_id": r.inserted_id}, {"efactura.xml": 0}))
 
@@ -176,6 +186,16 @@ async def storno_invoice(iid: str, body: StornoIn, user=Depends(require("invoice
     await db.invoices.update_one({"_id": inv["_id"]}, {"$set": {"credited_amount": credited_amount, "storno_status": "total" if full else "partial",
                                                                   "status": "paid" if settled else inv["status"]},
                                                          "$push": {"credit_notes": {"id": str(r.inserted_id), "ref": ref, "gross": totals["gross"], "at": iso()}}})
+    certificate = await db.warranty_certificates.find_one({"invoice_id": iid})
+    if certificate:
+        credited_lines = {line["original_line_id"]: abs(line["qty"]) for line in lines}
+        for coverage in certificate.get("lines", []):
+            if coverage["source_line_id"] in credited_lines:
+                coverage["qty"] = max(0, coverage["qty"] - credited_lines[coverage["source_line_id"]])
+                coverage["credited_qty"] = coverage.get("credited_qty", 0) + credited_lines[coverage["source_line_id"]]
+                if coverage["qty"] <= 0:
+                    coverage["valid_to"] = "1900-01-01"
+        await db.warranty_certificates.update_one({"_id": certificate["_id"]}, {"$set": {"lines": certificate["lines"]}})
     await audit(user, "storno", "invoice", iid, f"{ref} storno {orig_ref}")
     from routes_efactura import schedule_auto_send
     schedule_auto_send(await db.invoices.find_one({"_id": r.inserted_id}))

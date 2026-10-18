@@ -58,6 +58,17 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   export PDF A4 landscape, CSV și Excel; PDF-ul include font Unicode pentru diacritice
 - Teste de regresie: 54 teste trecute, cu 2 skip-uri RBAC; build frontend reușit
 
+## Garanții piese și manoperă (2026-10-18)
+- Factura fiscală generează automat, o singură dată, certificatul PDF de garanție;
+  piesele folosesc perioada produsului (implicit 24 luni), iar manopera are 3 luni
+- Certificatul include factura, client, vehicul, CUI emitent, cod/articol, cantitate,
+  perioadă și dată de valabilitate; se descarcă din factură sau din Garanții
+- Dosarul de reclamație validează acoperirea și cantitatea cumulată, apoi creează o comandă
+  GW distinctă cu preț zero pentru client; rezultatul tehnic, returul furnizor și soluția sunt trasabile
+- Stornarea reduce acoperirea liniilor creditate; comenzile GW nu pot fi facturate fiscal
+- Alertele de acoperire activă sunt afișate pe comanda vehiculului; certificatele au index unic pe factură
+- Teste garanții + regresii: 85 teste trecute, cu 2 skip-uri RBAC; PDF-ul a fost verificat vizual
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
@@ -75,10 +86,10 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 
 ## Backlog
 - P0: date reale firmă în Setări (acum placeholder), certificat/OAuth ANAF real
-- P1: contract API RAR AutoPass, endpointuri oficiale, token și validare Sandbox; Garanții & reclamații, Notificări reale (ITP/RCA), Portal client complet, Achiziții furnizori + comparare prețuri, Rapoarte executive (TVA, producție, marjă, retenție), Flotă cu aprobări multiple
+- P1: contract API RAR AutoPass, endpointuri oficiale, token și validare Sandbox; Notificări reale (ITP/RCA), Portal client complet, Achiziții furnizori + comparare prețuri, Rapoarte executive (TVA, producție, marjă, retenție), Flotă cu aprobări multiple
 - P2: multi-company/warehouse/currency complet, AI stock forecast & retention, aplicație mobilă mecanic, backup, LIFO
 
 ## Next tasks
 - Obțineți documentația contractuală RAR, endpointurile Test/Producție și tokenul de acces
 - Validați un payload într-un mediu RAR Sandbox înainte de activarea transportului extern
-- Garanții piese/manoperă și dosare de reclamație; rapoarte executive de eficiență, marjă și retenție
+- Rapoarte executive de eficiență, marjă, timp de staționare și retenție/flotă

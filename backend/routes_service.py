@@ -306,6 +306,8 @@ async def build_line(body: LineIn):
 @router.post("/work-orders/{wid}/lines")
 async def add_line(wid: str, body: LineIn, user=Depends(require("workorders"))):
     w = await load_wo(wid)
+    if w.get("is_warranty"):
+        raise HTTPException(400, "Liniile comenzii de garanție sunt fixate la preț zero")
     if w["status"] in LOCKED:
         raise HTTPException(400, "Comanda facturată nu mai poate fi modificată")
     ln = await build_line(body)
@@ -319,6 +321,8 @@ async def add_line(wid: str, body: LineIn, user=Depends(require("workorders"))):
 @router.delete("/work-orders/{wid}/lines/{lid}")
 async def delete_line(wid: str, lid: str, user=Depends(require("workorders"))):
     w = await load_wo(wid)
+    if w.get("is_warranty"):
+        raise HTTPException(400, "Liniile comenzii de garanție sunt fixate la preț zero")
     if w["status"] in LOCKED:
         raise HTTPException(400, "Comanda facturată nu mai poate fi modificată")
     await db.work_orders.update_one({"_id": w["_id"]}, {"$pull": {"lines": {"id": lid}}})

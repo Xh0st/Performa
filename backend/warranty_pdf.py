@@ -7,6 +7,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
@@ -14,6 +15,12 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 FONT_DIR = Path(font_roboto.__file__).parent / "files"
 pdfmetrics.registerFont(TTFont("WarrantyRoboto", str(FONT_DIR / "Roboto-Regular.ttf")))
 pdfmetrics.registerFont(TTFont("WarrantyRobotoBold", str(FONT_DIR / "Roboto-Bold.ttf")))
+registerFontFamily("WarrantyRoboto", normal="WarrantyRoboto", bold="WarrantyRobotoBold")
+
+
+def ro_date(value: str) -> str:
+    parts = value.split("-")
+    return ".".join(reversed(parts)) if len(parts) == 3 else value
 
 
 def build_certificate(certificate: dict) -> bytes:
@@ -60,18 +67,20 @@ def build_certificate(certificate: dict) -> bytes:
     lines = certificate.get("lines", [])
     table_data = [[
         Paragraph("Tip", header),
-        Paragraph("Articol / operațiune", header),
+        Paragraph("Cod · Articol / operațiune", header),
+        Paragraph("Cant.", header),
         Paragraph("Perioadă", header),
         Paragraph("Valabil până la", header),
     ]]
     for line in lines:
         table_data.append([
             Paragraph(line["label"], cell),
-            Paragraph(line["description"], cell),
+            Paragraph(f"{line.get('code', '')} · {line['description']}", cell),
+            Paragraph(str(line.get("qty", "")), cell),
             Paragraph(f"{line['warranty_months']} luni", cell),
-            Paragraph(line["valid_to"], cell),
+            Paragraph(ro_date(line["valid_to"]), cell),
         ])
-    table = Table(table_data, colWidths=[26 * mm, 76 * mm, 28 * mm, 34 * mm], repeatRows=1)
+    table = Table(table_data, colWidths=[19 * mm, 65 * mm, 16 * mm, 28 * mm, 34 * mm], repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
         ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#94a3b8")),
@@ -84,8 +93,9 @@ def build_certificate(certificate: dict) -> bytes:
         Paragraph("CERTIFICAT DE GARANȚIE", title_style),
         Spacer(1, 5 * mm),
         Paragraph(f"Nr. certificat: <b>{certificate['number']}</b>", normal),
-        Paragraph(f"Factura: <b>{certificate['invoice_ref']}</b> · Emis la: {certificate['issued_date']}", normal),
+        Paragraph(f"Factura: <b>{certificate['invoice_ref']}</b> · Emis la: {ro_date(certificate['issued_date'])}", normal),
         Paragraph(f"Client: <b>{certificate['client_name']}</b>", normal),
+        Paragraph(f"Adresă client: {certificate.get('client_address', '—')}", normal),
         Paragraph(f"Vehicul: {certificate['vehicle_label']}", normal),
         Spacer(1, 5 * mm),
         table,
@@ -97,7 +107,7 @@ def build_certificate(certificate: dict) -> bytes:
             normal,
         ),
         Spacer(1, 9 * mm),
-        Paragraph(f"Unitate emitentă: {certificate['seller_name']}", normal),
+        Paragraph(f"Unitate emitentă: {certificate['seller_name']} · CUI {certificate.get('seller_cui', '—')}", normal),
         Paragraph("Reprezentant autorizat: ______________________________", normal),
     ]
     document.build(story)

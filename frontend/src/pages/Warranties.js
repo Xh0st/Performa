@@ -3,6 +3,7 @@ import { FileDown, Plus, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { api, downloadFile, errMsg, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
+import { Link } from "react-router-dom";
 import { date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,7 +27,7 @@ const STATUS = {
 
 function ClaimDialog({ open, onOpenChange, onSaved }) {
   const { tr } = useLang();
-  const { data: invoices } = useApi(open ? "/invoices?type=fiscal" : null, [open]);
+  const { data: invoices } = useApi(open ? "/warranties/invoices" : null, [open]);
   const [invoiceId, setInvoiceId] = useState("");
   const { data: certificate } = useApi(invoiceId ? `/warranties/invoices/${invoiceId}` : null, [invoiceId]);
   const [description, setDescription] = useState("");
@@ -205,7 +206,7 @@ export default function Warranties() {
           className="min-w-0"
         >
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm" data-testid="warranty-claims-table"><thead><tr className="border-b text-left text-xs uppercase text-muted-foreground"><th className="px-2 py-2">{tr("Dosar", "Claim")}</th><th>{tr("Factură", "Invoice")}</th><th>{tr("Comandă", "Work order")}</th><th>{tr("Soluție", "Resolution")}</th><th /></tr></thead><tbody>{claims.map((claim) => <tr key={claim.id} className="border-b"><td className="px-2 py-2 font-mono">{claim.number}</td><td>{claim.invoice_ref}</td><td className="font-mono">{claim.work_order_number}</td><td>{STATUS[claim.resolution]}</td><td><Button variant="ghost" size="icon" data-testid={`edit-warranty-claim-${claim.number}`} onClick={() => edit(claim)}><Wrench className="h-4 w-4" /></Button></td></tr>)}</tbody></table>
+            <table className="w-full min-w-[850px] text-sm" data-testid="warranty-claims-table"><thead><tr className="border-b text-left text-xs uppercase text-muted-foreground"><th className="px-2 py-2">{tr("Dosar", "Claim")}</th><th>{tr("Factură", "Invoice")}</th><th>{tr("Comandă", "Work order")}</th><th>{tr("Tehnic", "Technical")}</th><th>{tr("Retur", "Return")}</th><th>{tr("Soluție", "Resolution")}</th><th /></tr></thead><tbody>{claims.map((claim) => <tr key={claim.id} className="border-b"><td className="px-2 py-2 font-mono">{claim.number}</td><td>{claim.invoice_ref}</td><td className="font-mono"><Link className="text-primary" to={`/work-orders/${claim.work_order_id}`}>{claim.work_order_number}</Link></td><td>{STATUS[claim.technical_result]}</td><td>{STATUS[claim.supplier_return_status]}</td><td>{STATUS[claim.resolution]}</td><td><Button variant="ghost" size="icon" data-testid={`edit-warranty-claim-${claim.number}`} onClick={() => edit(claim)}><Wrench className="h-4 w-4" /></Button></td></tr>)}</tbody></table>
           </div>
           {!claims.length && <div className="py-6 text-center text-sm text-muted-foreground" data-testid="warranty-claims-empty">{tr("Nu există dosare deschise.", "No open claims.")}</div>}
         </Panel>
