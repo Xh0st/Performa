@@ -4,8 +4,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from core import (db, ser, oid, iso, now, require, audit, get_or_404, next_seq, get_settings, calc_totals,
+from core import (db, raw_db, ser, oid, iso, now, require, audit, get_or_404, next_seq, get_settings, calc_totals,
                   WO_STATUSES)
+from tenant_context import set_scope
 
 router = APIRouter(prefix="/api")
 LIGHT = {"reception.photos": 0, "reception.signature": 0, "qc.mechanic_signature": 0, "qc.chief_signature": 0}
@@ -580,9 +581,10 @@ async def quote_decision(wid: str, version: int, body: DecisionIn, user=Depends(
 
 @router.get("/public/quotes/{token}")
 async def public_quote(token: str):
-    w = await db.work_orders.find_one({"quotes.token": token}, {"quotes": 1, "number": 1, "client_id": 1, "vehicle_id": 1})
+    w = await raw_db.work_orders.find_one({"quotes.token": token}, {"quotes": 1, "number": 1, "client_id": 1, "vehicle_id": 1, "tenant_id": 1, "branch_id": 1})
     if not w:
         raise HTTPException(404, "Deviz inexistent")
+    set_scope({"tenant_id": w["tenant_id"], "branch_id": w["branch_id"], "public_scope": True})
     q = next(x for x in w["quotes"] if x["token"] == token)
     c = await db.clients.find_one({"_id": oid(w["client_id"])})
     v = await db.vehicles.find_one({"_id": oid(w["vehicle_id"])})
@@ -593,9 +595,11 @@ async def public_quote(token: str):
 
 @router.post("/public/quotes/{token}/decision")
 async def public_decision(token: str, body: DecisionIn):
-    w = await db.work_orders.find_one({"quotes.token": token})
+    w = await raw_db.work_orders.find_one({"quotes.token": token})
     if not w:
         raise HTTPException(404, "Deviz inexistent")
+    set_scope({"tenant_id": w["tenant_id"], "branch_id": w["branch_id"], "public_scope": True})
+    w = await db.work_orders.find_one({"_id": w["_id"]})
     q = next(x for x in w["quotes"] if x["token"] == token)
     await apply_decision(w, q["version"], body, "portal client", body.name or "Client")
     return {"ok": True}

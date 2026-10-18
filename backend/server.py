@@ -2,7 +2,9 @@ import os
 import logging
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
-from core import db, client
+from core import db, raw_db, client
+from tenancy import migrate_demo_tenant
+from tenant_context import DEMO_BRANCH_ID, DEMO_TENANT_ID, set_scope
 from seed import seed_admin, seed_demo
 import routes_auth
 import routes_crm
@@ -16,6 +18,7 @@ import routes_rar
 import routes_planning
 import routes_reports
 import routes_warranty
+import routes_tenants
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 app = FastAPI(title="ERP Service Auto România")
@@ -33,6 +36,7 @@ for r in (
     routes_planning,
     routes_reports,
     routes_warranty,
+    routes_tenants,
 ):
     app.include_router(r.router)
 
@@ -52,7 +56,9 @@ async def health():
 
 @app.on_event("startup")
 async def startup():
-    await db.users.create_index("email", unique=True)
+    await migrate_demo_tenant()
+    set_scope({"tenant_id": DEMO_TENANT_ID, "branch_id": DEMO_BRANCH_ID})
+    await raw_db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
     await db.vehicles.create_index("vin", unique=True)
     await db.products.create_index("code", unique=True)
@@ -70,6 +76,7 @@ async def startup():
     await db.warranty_claims.create_index("invoice_id")
     await seed_admin()
     await seed_demo()
+    await migrate_demo_tenant()
 
 
 @app.on_event("shutdown")

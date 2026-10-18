@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardPlus, Wrench, Users, Car, HardHat, Boxes, FileText, Wallet, Sparkles, Settings, ShieldCheck,
-  Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck, CalendarDays, BookOpenCheck, ShieldPlus, ListChecks,
+  Building2, Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck, CalendarDays, BookOpenCheck, ShieldPlus, ListChecks,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
@@ -34,11 +34,12 @@ const NAV = [
     ["/efactura", "settings", FileCode2, "eFactura / Setări API", "e-Invoice / API settings", "efactura"],
     ["/rar-autopass", "settings", ClipboardCheck, "RAR AutoPass", "RAR AutoPass", "rar-autopass"],
     ["/closure-review", "settings", ListChecks, "Verificare închideri", "Closure review", "closure-review"],
+    ["/platform/tenants", "settings", Building2, "Tenants & licențe", "Tenants & licenses", "platform-tenants", true],
   ]},
 ];
 
 function SideNav({ onNav }) {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { tr } = useLang();
   return (
     <nav className="flex h-full flex-col gap-5 overflow-y-auto px-3 py-5">
@@ -60,7 +61,7 @@ function SideNav({ onNav }) {
         </div>
       </div>
       {NAV.map((g) => {
-        const items = g.items.filter((i) => can(i[1]));
+        const items = g.items.filter((i) => can(i[1]) && (!i[6] || user?.platform_role === "SUPERADMIN"));
         if (!items.length) return null;
         return (
           <div key={g.group[0]}>
@@ -81,7 +82,7 @@ function SideNav({ onNav }) {
 }
 
 export default function Layout() {
-  const { user, logout, can } = useAuth();
+  const { user, logout, switchBranch, can } = useAuth();
   const { lang, setLang, theme, setTheme, tr } = useLang();
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
@@ -100,6 +101,16 @@ export default function Layout() {
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen(true)} data-testid="mobile-menu-button"><Menu className="h-5 w-5" /></Button>
           <div className="hidden font-mono text-xs uppercase tracking-widest text-muted-foreground md:block">{new Date().toLocaleDateString(lang === "ro" ? "ro-RO" : "en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
           <div className="flex-1" />
+          {user?.branches?.length > 1 && (
+            <select
+              className="hidden h-9 max-w-48 rounded border bg-background px-2 text-sm md:block"
+              data-testid="active-branch-selector"
+              value={user.active_branch_id}
+              onChange={(event) => switchBranch(event.target.value)}
+            >
+              {user.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          )}
           {can("reception") && (
             <Button size="sm" onClick={() => nav("/reception")} data-testid="header-new-reception-button" className="active:scale-95">
               <Plus className="mr-1 h-4 w-4" /> {tr("Recepție nouă", "New reception")}

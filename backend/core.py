@@ -10,9 +10,10 @@ from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from fastapi import Request, HTTPException, Depends
 from motor.motor_asyncio import AsyncIOMotorClient
+from tenant_context import GLOBAL_COLLECTIONS, OPERATIONAL_COLLECTIONS, current_scope, set_scope
 
 client = AsyncIOMotorClient(os.environ["MONGO_URL"])
-db = client[os.environ["DB_NAME"]]
+raw_db = client[os.environ["DB_NAME"]]
 JWT_ALG = "HS256"
 
 ROLES = ["admin", "director", "sef_service", "consilier", "receptioner", "magazioner", "mecanic",
@@ -42,6 +43,104 @@ WO_STATUSES = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "in_lucru
                "finalizata", "facturata", "inchisa"]
 
 
+class TenantCollection:
+    def __init__(self, collection, name: str):
+        self.collection = collection
+        self.name = name
+
+    def _scope_filter(self, query: dict | None = None) -> dict:
+        if self.name in GLOBAL_COLLECTIONS:
+            return query or {}
+        scope = current_scope()
+        if not scope:
+            raise HTTPException(503, "Context tenant lipsă")
+        if scope.get("platform_role") == "SUPERADMIN" and scope.get("system_scope"):
+            return query or {}
+        tenant_filter = {"tenant_id": scope["tenant_id"], "branch_id": scope["branch_id"]}
+        if not query:
+            return tenant_filter
+        return {"$and": [tenant_filter, query]}
+
+    def _stamp(self, document: dict) -> dict:
+        if self.name in GLOBAL_COLLECTIONS:
+            return document
+        scope = current_scope()
+        if not scope:
+            raise HTTPException(503, "Context tenant lipsă")
+        stamped = dict(document)
+        stamped["tenant_id"] = scope["tenant_id"]
+        stamped["branch_id"] = scope["branch_id"]
+        return stamped
+
+    async def insert_one(self, document, *args, **kwargs):
+        return await self.collection.insert_one(self._stamp(document), *args, **kwargs)
+
+    async def insert_many(self, documents, *args, **kwargs):
+        return await self.collection.insert_many([self._stamp(item) for item in documents], *args, **kwargs)
+
+    def find(self, query=None, *args, **kwargs):
+        return self.collection.find(self._scope_filter(query), *args, **kwargs)
+
+    async def find_one(self, query=None, *args, **kwargs):
+        return await self.collection.find_one(self._scope_filter(query), *args, **kwargs)
+
+    async def count_documents(self, query=None, *args, **kwargs):
+        return await self.collection.count_documents(self._scope_filter(query), *args, **kwargs)
+
+    async def distinct(self, key, query=None, *args, **kwargs):
+        return await self.collection.distinct(key, self._scope_filter(query), *args, **kwargs)
+
+    async def update_one(self, query, update, *args, **kwargs):
+        if kwargs.get("upsert") and self.name not in GLOBAL_COLLECTIONS:
+            scope = current_scope()
+            update = dict(update)
+            update["$setOnInsert"] = {
+                **update.get("$setOnInsert", {}),
+                "tenant_id": scope["tenant_id"],
+                "branch_id": scope["branch_id"],
+            }
+        return await self.collection.update_one(self._scope_filter(query), update, *args, **kwargs)
+
+    async def update_many(self, query, update, *args, **kwargs):
+        return await self.collection.update_many(self._scope_filter(query), update, *args, **kwargs)
+
+    async def delete_one(self, query, *args, **kwargs):
+        return await self.collection.delete_one(self._scope_filter(query), *args, **kwargs)
+
+    async def delete_many(self, query, *args, **kwargs):
+        return await self.collection.delete_many(self._scope_filter(query), *args, **kwargs)
+
+    async def find_one_and_update(self, query, update, *args, **kwargs):
+        if kwargs.get("upsert") and self.name not in GLOBAL_COLLECTIONS:
+            scope = current_scope()
+            update = dict(update)
+            update["$setOnInsert"] = {
+                **update.get("$setOnInsert", {}),
+                "tenant_id": scope["tenant_id"],
+                "branch_id": scope["branch_id"],
+            }
+        return await self.collection.find_one_and_update(self._scope_filter(query), update, *args, **kwargs)
+
+    def aggregate(self, pipeline, *args, **kwargs):
+        if self.name in GLOBAL_COLLECTIONS:
+            return self.collection.aggregate(pipeline, *args, **kwargs)
+        return self.collection.aggregate([{"$match": self._scope_filter()}] + list(pipeline), *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self.collection, name)
+
+
+class TenantDatabase:
+    def __getitem__(self, name):
+        return TenantCollection(raw_db[name], name)
+
+    def __getattr__(self, name):
+        return TenantCollection(raw_db[name], name)
+
+
+db = TenantDatabase()
+
+
 def now():
     return datetime.now(timezone.utc)
 
@@ -58,8 +157,8 @@ def verify_password(p: str, h: str) -> bool:
     return bcrypt.checkpw(p.encode(), h.encode())
 
 
-def make_token(user_id: str, kind: str, minutes: int) -> str:
-    payload = {"sub": user_id, "type": kind, "exp": now() + timedelta(minutes=minutes)}
+def make_token(user_id: str, kind: str, minutes: int, tenant_id: str = "", branch_id: str = "") -> str:
+    payload = {"sub": user_id, "type": kind, "tenant_id": tenant_id, "branch_id": branch_id, "exp": now() + timedelta(minutes=minutes)}
     return jwt.encode(payload, os.environ["JWT_SECRET"], algorithm=JWT_ALG)
 
 
@@ -105,10 +204,32 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(401, "Invalid token")
     if payload.get("type") != "access":
         raise HTTPException(401, "Invalid token type")
-    user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+    user = await raw_db.users.find_one({"_id": ObjectId(payload["sub"])})
     if not user or not user.get("active", True):
         raise HTTPException(401, "User not found")
     u = ser(user)
+    u["platform_role"] = user.get("platform_role")
+    u["tenant_id"] = user.get("tenant_id", "")
+    u["active_branch_id"] = payload.get("branch_id") or user.get("active_branch_id", "")
+    if u["tenant_id"]:
+        u["branches"] = [
+            {"id": item["_id"], "name": item["branch_name"]}
+            for item in await raw_db.branches.find({
+                "tenant_id": u["tenant_id"],
+                "status": "ACTIVE",
+                "_id": {"$in": user.get("assigned_branch_ids", [])},
+            }).to_list(100)
+        ]
+    if u["tenant_id"] and u["active_branch_id"]:
+        if payload.get("tenant_id") != u["tenant_id"]:
+            raise HTTPException(401, "Context tenant invalid")
+        if u["active_branch_id"] not in user.get("assigned_branch_ids", []):
+            raise HTTPException(403, "Acces interzis la punctul de lucru")
+        set_scope({
+            "tenant_id": u["tenant_id"],
+            "branch_id": u["active_branch_id"],
+            "platform_role": user.get("platform_role"),
+        })
     u["permissions"] = permissions_for(u["role"])
     return u
 
@@ -117,6 +238,14 @@ def require(module: str):
     async def dep(user: dict = Depends(get_current_user)):
         if user["role"] not in MODULE_ROLES[module]:
             raise HTTPException(403, "Acces interzis pentru acest modul")
+        return user
+    return dep
+
+
+def require_superadmin():
+    async def dep(user: dict = Depends(get_current_user)):
+        if user.get("platform_role") != "SUPERADMIN":
+            raise HTTPException(403, "Acces rezervat Superadmin")
         return user
     return dep
 

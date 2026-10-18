@@ -4,7 +4,7 @@ from typing import Optional
 import jwt
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel
-from core import (db, ser, oid, iso, now, hash_password, verify_password, make_token, get_current_user, require,
+from core import (db, raw_db, ser, oid, iso, now, hash_password, verify_password, make_token, get_current_user, require,
                   permissions_for, audit, get_settings, ROLES, JWT_ALG)
 
 router = APIRouter(prefix="/api")
@@ -16,9 +16,12 @@ class LoginIn(BaseModel):
     password: str
 
 
-def set_cookies(response: Response, user_id: str):
-    access = make_token(user_id, "access", ACCESS_MIN)
-    refresh = make_token(user_id, "refresh", 60 * 24 * 7)
+def set_cookies(response: Response, user: dict):
+    user_id = str(user["_id"])
+    tenant_id = user.get("tenant_id", "")
+    branch_id = user.get("active_branch_id", "")
+    access = make_token(user_id, "access", ACCESS_MIN, tenant_id, branch_id)
+    refresh = make_token(user_id, "refresh", 60 * 24 * 7, tenant_id, branch_id)
     response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none", max_age=ACCESS_MIN * 60, path="/")
     response.set_cookie("refresh_token", refresh, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
     return access
@@ -47,7 +50,7 @@ async def login(body: LoginIn, request: Request, response: Response):
             {"$inc": {"count": 1}, "$set": {"locked_until": (now() + timedelta(minutes=15)).isoformat()}}, upsert=True)
         raise HTTPException(401, "Email sau parolă incorectă")
     await db.login_attempts.delete_many({"identifier": ident})
-    token = set_cookies(response, str(user["_id"]))
+    token = set_cookies(response, user)
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": iso()}})
     return {"user": user_out(user), "token": token}
 
@@ -75,7 +78,24 @@ async def refresh(request: Request, response: Response):
         raise HTTPException(401, "Invalid refresh token")
     if payload.get("type") != "refresh":
         raise HTTPException(401, "Invalid token type")
-    return {"token": set_cookies(response, payload["sub"])}
+    user = await raw_db.users.find_one({"_id": oid(payload["sub"])})
+    if not user:
+        raise HTTPException(401, "User not found")
+    return {"token": set_cookies(response, user)}
+
+
+class BranchSwitchIn(BaseModel):
+    branch_id: str
+
+
+@router.post("/auth/active-branch")
+async def switch_active_branch(body: BranchSwitchIn, response: Response, user=Depends(get_current_user)):
+    branch = await raw_db.branches.find_one({"_id": body.branch_id, "tenant_id": user["tenant_id"], "status": "ACTIVE"})
+    if not branch or body.branch_id not in (await raw_db.users.find_one({"_id": oid(user["id"])}))["assigned_branch_ids"]:
+        raise HTTPException(403, "Acces interzis la punctul de lucru")
+    await raw_db.users.update_one({"_id": oid(user["id"])}, {"$set": {"active_branch_id": body.branch_id}})
+    updated = await raw_db.users.find_one({"_id": oid(user["id"])})
+    return {"token": set_cookies(response, updated), "user": user_out(updated)}
 
 
 class UserIn(BaseModel):
@@ -88,7 +108,7 @@ class UserIn(BaseModel):
 
 @router.get("/users")
 async def list_users(user=Depends(require("users"))):
-    return [user_out(u) for u in await db.users.find().sort("name", 1).to_list(1000)]
+    return [user_out(u) for u in await raw_db.users.find({"tenant_id": user["tenant_id"]}).sort("name", 1).to_list(1000)]
 
 
 @router.post("/users")
@@ -98,11 +118,12 @@ async def create_user(body: UserIn, user=Depends(require("users"))):
     if not body.password or len(body.password) < 8:
         raise HTTPException(400, "Parola trebuie să aibă minim 8 caractere")
     email = body.email.strip().lower()
-    if await db.users.find_one({"email": email}):
+    if await raw_db.users.find_one({"email": email, "tenant_id": user["tenant_id"]}):
         raise HTTPException(400, "Email deja existent")
     doc = {"email": email, "name": body.name, "role": body.role, "active": body.active,
-           "password_hash": hash_password(body.password), "created_at": iso()}
-    r = await db.users.insert_one(doc)
+           "password_hash": hash_password(body.password), "tenant_id": user["tenant_id"],
+           "assigned_branch_ids": [user["active_branch_id"]], "active_branch_id": user["active_branch_id"], "created_at": iso()}
+    r = await raw_db.users.insert_one(doc)
     await audit(user, "create", "user", str(r.inserted_id), email)
     doc["_id"] = r.inserted_id
     return user_out(doc)
@@ -117,16 +138,19 @@ async def update_user(uid: str, body: UserIn, user=Depends(require("users"))):
         if len(body.password) < 8:
             raise HTTPException(400, "Parola trebuie să aibă minim 8 caractere")
         upd["password_hash"] = hash_password(body.password)
-    await db.users.update_one({"_id": oid(uid)}, {"$set": upd})
+    target = await raw_db.users.find_one({"_id": oid(uid), "tenant_id": user["tenant_id"]})
+    if not target:
+        raise HTTPException(404, "Not found")
+    await raw_db.users.update_one({"_id": oid(uid)}, {"$set": upd})
     await audit(user, "update", "user", uid, body.email)
-    return user_out(await db.users.find_one({"_id": oid(uid)}))
+    return user_out(await raw_db.users.find_one({"_id": oid(uid)}))
 
 
 @router.delete("/users/{uid}")
 async def delete_user(uid: str, user=Depends(require("users"))):
     if uid == user["id"]:
         raise HTTPException(400, "Nu vă puteți șterge propriul cont")
-    await db.users.delete_one({"_id": oid(uid)})
+    await raw_db.users.delete_one({"_id": oid(uid), "tenant_id": user["tenant_id"]})
     await audit(user, "delete", "user", uid)
     return {"ok": True}
 

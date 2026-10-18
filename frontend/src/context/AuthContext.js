@@ -19,8 +19,15 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("erp_token");
     setUser(false);
   };
+  const switchBranch = async (branchId) => {
+    const { data } = await api.post("/auth/active-branch", { branch_id: branchId });
+    localStorage.setItem("erp_token", data.token);
+    const refreshed = await api.get("/auth/me");
+    setUser(refreshed.data);
+    return refreshed.data;
+  };
   const can = (m) => !!user && user.permissions?.includes(m);
-  return <AuthCtx.Provider value={{ user, login, logout, can }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ user, login, logout, switchBranch, can }}>{children}</AuthCtx.Provider>;
 }
 
 export const useAuth = () => useContext(AuthCtx);
