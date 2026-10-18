@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg, useApi } from "@/lib/api";
@@ -61,7 +62,15 @@ export default function ClosureReview() {
                   const reason = REASONS[workOrder.closure_quote_rule.reason] || ["—", "—"];
                   return (
                     <tr key={workOrder.id} className="border-b border-border/50">
-                      <td className="px-2 py-2 font-mono">{workOrder.number}</td>
+                      <td className="px-2 py-2 font-mono">
+                        <Link
+                          className="text-primary underline-offset-4 hover:underline"
+                          data-testid={`closure-work-order-link-${workOrder.number}`}
+                          to={`/work-orders/${workOrder.id}`}
+                        >
+                          {workOrder.number}
+                        </Link>
+                      </td>
                       <td>{workOrder.client_name}</td>
                       <td>{tr(reason[0], reason[1])}</td>
                       <td className="font-mono text-xs">{dt(workOrder.finished_at || workOrder.invoiced_at)}</td>
