@@ -12,11 +12,22 @@ import routes_finance
 import routes_dashboard
 import routes_ai
 import routes_efactura
+import routes_rar
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 app = FastAPI(title="ERP Service Auto România")
 
-for r in (routes_auth, routes_crm, routes_service, routes_stock, routes_finance, routes_dashboard, routes_ai, routes_efactura):
+for r in (
+    routes_auth,
+    routes_crm,
+    routes_service,
+    routes_stock,
+    routes_finance,
+    routes_dashboard,
+    routes_ai,
+    routes_efactura,
+    routes_rar,
+):
     app.include_router(r.router)
 
 app.add_middleware(
@@ -45,6 +56,9 @@ async def startup():
     await db.payments.create_index("date")
     await db.efactura_inbox.create_index("message_id", unique=True, partialFilterExpression={"message_id": {"$type": "string"}})
     await db.efactura_logs.create_index("at")
+    await db.rar_autopass_outbox.create_index("idempotency_key", unique=True)
+    await db.rar_autopass_outbox.create_index("work_order_id")
+    await db.rar_autopass_logs.create_index("at")
     await seed_admin()
     await seed_demo()
 

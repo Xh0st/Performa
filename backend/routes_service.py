@@ -179,7 +179,8 @@ async def create_work_order(body: ReceptionIn, user=Depends(require("reception")
            "mileage_in": body.mileage_in, "complaint": body.complaint, "diagnosis": "", "mechanic_ids": [],
            "elevator": body.elevator, "promised_date": body.promised_date, "advisor": body.advisor or user["name"],
            "reception": {"fuel_level": body.fuel_level, "observations": body.observations, "accessories": body.accessories,
-                         "damages": body.damages, "photos": body.photos, "signature": body.signature, "at": iso(), "by": user["name"]},
+                         "damages": body.damages, "photos": body.photos, "odometer_photo": None,
+                         "signature": body.signature, "at": iso(), "by": user["name"]},
            "lines": [], "quotes": [], "qc": {}, "created_at": iso(), "created_by": user["id"],
            "status_history": [{"status": "noua", "at": iso(), "by": user["name"], "note": "Recepție vehicul"}]}
     r = await db.work_orders.insert_one(doc)
@@ -240,6 +241,13 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
         upd["closed_at"] = iso()
     await db.work_orders.update_one({"_id": w["_id"]}, {"$set": upd, "$push": {
         "status_history": {"status": st, "at": iso(), "by": user["name"], "note": body.note}}})
+    if st == "inchisa" and w.get("invoice_id"):
+        invoice = await db.invoices.find_one({"_id": oid(w["invoice_id"])})
+        if invoice:
+            from rar_autopass import queue_submission
+
+            closed = await db.work_orders.find_one({"_id": w["_id"]})
+            await queue_submission(closed, invoice, "work_order_closed")
     await audit(user, "status", "work_order", wid, st)
     return await get_work_order(wid, user)
 

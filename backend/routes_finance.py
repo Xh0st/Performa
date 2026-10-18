@@ -67,7 +67,10 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
                                                             "$push": {"status_history": {"status": "facturata", "at": iso(), "by": user["name"], "note": f"Factura {inv['series']}{inv['number']}"}}})
     await audit(user, "create", "invoice", str(r.inserted_id), f"{inv['series']}{inv['number']}")
     if body.type == "fiscal":
+        from rar_autopass import queue_submission
         from routes_efactura import schedule_auto_send
+
+        await queue_submission(w, await db.invoices.find_one({"_id": r.inserted_id}), "invoice_issued")
         schedule_auto_send(await db.invoices.find_one({"_id": r.inserted_id}))
     return ser(await db.invoices.find_one({"_id": r.inserted_id}, {"efactura.xml": 0}))
 
