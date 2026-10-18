@@ -105,7 +105,7 @@ export default function Layout() {
           <div className="flex-1" />
           {user?.branches?.length > 1 && (
             <select
-              className="h-9 max-w-28 rounded border bg-background px-2 text-sm md:max-w-48"
+              className="h-9 w-20 min-w-0 rounded border bg-background px-2 text-sm sm:w-auto sm:max-w-48"
               data-testid="active-branch-selector"
               value={user.active_branch_id}
               onChange={(event) => switchBranch(event.target.value).catch((error) => toast.error(errMsg(error)))}
@@ -114,14 +114,38 @@ export default function Layout() {
             </select>
           )}
           {can("reception") && (
-            <Button size="sm" onClick={() => nav("/reception")} data-testid="header-new-reception-button" className="hidden active:scale-95 sm:inline-flex">
-              <Plus className="mr-1 h-4 w-4" /> {tr("Recepție nouă", "New reception")}
+            <Button
+              size="sm"
+              onClick={() => nav("/reception")}
+              data-testid="header-new-reception-button"
+              className="h-9 w-9 p-0 active:scale-95 sm:w-auto sm:px-3"
+              aria-label={tr("Recepție nouă", "New reception")}
+              title={tr("Recepție nouă", "New reception")}
+            >
+              <Plus className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">{tr("Recepție nouă", "New reception")}</span>
             </Button>
           )}
-          <Button variant="outline" size="sm" className="hidden font-mono sm:inline-flex" data-testid="nav-language-toggle" onClick={() => setLang(lang === "ro" ? "en" : "ro")}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 w-9 p-0 font-mono sm:w-auto sm:px-3"
+            data-testid="nav-language-toggle"
+            onClick={() => setLang(lang === "ro" ? "en" : "ro")}
+            aria-label={tr("Schimbă limba", "Change language")}
+            title={tr("Schimbă limba", "Change language")}
+          >
             {lang === "ro" ? "RO" : "EN"}
           </Button>
-          <Button variant="outline" size="icon" className="hidden h-9 w-9 sm:inline-flex" data-testid="nav-theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            data-testid="nav-theme-toggle"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            aria-label={theme === "dark" ? tr("Activează tema luminoasă", "Use light theme") : tr("Activează tema întunecată", "Use dark theme")}
+            title={theme === "dark" ? tr("Activează tema luminoasă", "Use light theme") : tr("Activează tema întunecată", "Use dark theme")}
+          >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           <div className="hidden text-right sm:block">

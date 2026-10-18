@@ -95,6 +95,13 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Verificare: 57 teste multi-tenant trecute; curățarea a confirmat 0 date temporare rămase.
   Livrare testată de agent, în așteptarea confirmării de acceptanță a utilizatorului.
 
+## Corecție header mobil (2026-10-19)
+- Acțiunile principale din header sunt vizibile din nou pe ecrane mobile: deschidere meniu,
+  recepție nouă, schimbare limbă, schimbare temă și deconectare.
+- Acțiunea „Recepție nouă” se afișează ca icon compact pe mobil și cu etichetă pe ecrane mai mari;
+  selectorul de sucursală rămâne restrâns pentru a preveni overflow-ul.
+- Verificare la 390px: toate acțiunile au fost vizibile și funcționale, fără erori în consolă.
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
