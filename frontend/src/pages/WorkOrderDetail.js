@@ -22,10 +22,10 @@ function DetailsPanel({ wo, onChange, locked }) {
   const { tr } = useLang();
   const { data: mechanics } = useApi("/mechanics");
   const { data: settings } = useApi("/settings");
-  const [f, setF] = useState({ diagnosis: wo.diagnosis, elevator: wo.elevator, mechanic_ids: wo.mechanic_ids });
+  const [f, setF] = useState({ diagnosis: wo.diagnosis, elevator: wo.elevator, mechanic_ids: wo.mechanic_ids, closure_category: wo.closure_category || "" });
   useEffect(() => {
-    setF({ diagnosis: wo.diagnosis, elevator: wo.elevator, mechanic_ids: wo.mechanic_ids });
-  }, [wo.diagnosis, wo.elevator, wo.mechanic_ids]);
+    setF({ diagnosis: wo.diagnosis, elevator: wo.elevator, mechanic_ids: wo.mechanic_ids, closure_category: wo.closure_category || "" });
+  }, [wo.diagnosis, wo.elevator, wo.mechanic_ids, wo.closure_category]);
   const save = async () => {
     try {
       onChange((await api.put(`/work-orders/${wo.id}`, f)).data);
@@ -42,6 +42,14 @@ function DetailsPanel({ wo, onChange, locked }) {
         <Field label={tr("Elevator", "Lift")}>
           <NativeSelect data-testid="wo-elevator-select" value={f.elevator} disabled={locked} onChange={(e) => setF({ ...f, elevator: e.target.value })}>
             <option value="">—</option>{(settings?.elevators || []).map((x) => <option key={x}>{x}</option>)}
+          </NativeSelect>
+        </Field>
+        <Field label={tr("Excepție deviz", "Quote exception")}>
+          <NativeSelect data-testid="wo-closure-category-select" value={f.closure_category} disabled={locked} onChange={(e) => setF({ ...f, closure_category: e.target.value })}>
+            <option value="">{tr("— Regula standard —", "— Standard rule —")}</option>
+            <option value="fara_cost">{tr("Operațiune fără cost", "No-charge operation")}</option>
+            <option value="diagnoza">{tr("Diagnoză", "Diagnosis")}</option>
+            <option value="constatare">{tr("Constatare", "Assessment")}</option>
           </NativeSelect>
         </Field>
         <div>

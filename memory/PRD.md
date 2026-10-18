@@ -69,6 +69,15 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Alertele de acoperire activă sunt afișate pe comanda vehiculului; certificatele au index unic pe factură
 - Teste garanții + regresii: 85 teste trecute, cu 2 skip-uri RBAC; PDF-ul a fost verificat vizual
 
+## Reguli deviz pentru închidere (2026-10-18)
+- Un deviz în așteptare (`draft`/`sent`) blochează finalizarea și facturarea fiscală
+- Sunt permise excepții trasabile pentru: fără deviz generat, deviz respins, operațiune fără cost,
+  diagnoză, constatare și garanție; regula este stocată la finalizarea comenzii
+- Administrare › Verificare închideri listează comenzile finalizate/facturate/închise prin excepție,
+  inclusiv comenzile istorice, iar administratorul le poate marca revizuite
+- Validare manuală: deviz în așteptare blocat; fără deviz și deviz respins permise și revizuite;
+  build frontend reușit, listă mobilă fără overflow
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)

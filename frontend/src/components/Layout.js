@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardPlus, Wrench, Users, Car, HardHat, Boxes, FileText, Wallet, Sparkles, Settings, ShieldCheck,
-  Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck, CalendarDays, BookOpenCheck, ShieldPlus,
+  Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck, CalendarDays, BookOpenCheck, ShieldPlus, ListChecks,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
@@ -33,6 +33,7 @@ const NAV = [
     ["/settings", "settings", Settings, "Setări companie", "Company settings", "settings"],
     ["/efactura", "settings", FileCode2, "eFactura / Setări API", "e-Invoice / API settings", "efactura"],
     ["/rar-autopass", "settings", ClipboardCheck, "RAR AutoPass", "RAR AutoPass", "rar-autopass"],
+    ["/closure-review", "settings", ListChecks, "Verificare închideri", "Closure review", "closure-review"],
   ]},
 ];
 

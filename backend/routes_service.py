@@ -19,6 +19,7 @@ QC_ITEMS = [
     "proba_drum",
 ]
 LOCKED = ("facturata", "inchisa")
+CLOSURE_CATEGORIES = {"fara_cost", "diagnoza", "constatare"}
 
 
 # ---------- Mechanics ----------
@@ -222,11 +223,32 @@ class WOUpdate(BaseModel):
     mechanic_ids: Optional[List[str]] = None
     elevator: Optional[str] = None
     promised_date: Optional[str] = None
+    closure_category: Optional[str] = None
+
+
+def quote_closure_rule(work_order: dict) -> dict:
+    quotes = work_order.get("quotes", [])
+    if any(quote.get("status") == "approved" for quote in quotes):
+        return {"allowed": True, "reason": "deviz_aprobat", "review": False}
+    if any(quote.get("status") in {"draft", "sent"} for quote in quotes):
+        return {"allowed": False, "reason": "deviz_in_asteptare", "review": False}
+    if any(quote.get("status") == "rejected" for quote in quotes):
+        return {"allowed": True, "reason": "deviz_respins", "review": True}
+    if work_order.get("is_warranty"):
+        return {"allowed": True, "reason": "garantie", "review": False}
+    category = work_order.get("closure_category", "")
+    if category in CLOSURE_CATEGORIES:
+        return {"allowed": True, "reason": category, "review": True}
+    if not quotes:
+        return {"allowed": True, "reason": "fara_deviz_generat", "review": True}
+    return {"allowed": False, "reason": "deviz_neaprobat", "review": False}
 
 
 @router.put("/work-orders/{wid}")
 async def update_work_order(wid: str, body: WOUpdate, user=Depends(require("workorders"))):
     upd = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "closure_category" in upd and upd["closure_category"] not in CLOSURE_CATEGORIES | {""}:
+        raise HTTPException(400, "Categorie de închidere invalidă")
     await db.work_orders.update_one({"_id": oid(wid)}, {"$set": upd})
     return await get_work_order(wid, user)
 
@@ -248,9 +270,13 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
         raise HTTPException(400, "Doar comenzile facturate pot fi închise")
     if st == "finalizata" and not w.get("qc", {}).get("passed"):
         raise HTTPException(400, "Controlul de calitate trebuie promovat înainte de finalizare")
+    rule = quote_closure_rule(w)
+    if st == "finalizata" and not rule["allowed"]:
+        raise HTTPException(400, "Devizul este în așteptare; aprobați sau respingeți-l înainte de finalizare")
     upd = {"status": st}
     if st == "finalizata":
         upd["finished_at"] = iso()
+        upd["closure_quote_rule"] = rule
         await db.time_entries.update_many({"work_order_id": wid, "end": None}, {"$set": {"end": iso()}})
     if st == "inchisa":
         upd["closed_at"] = iso()
@@ -264,6 +290,34 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
             closed = await db.work_orders.find_one({"_id": w["_id"]})
             await queue_submission_safely(closed, invoice, "work_order_closed")
     await audit(user, "status", "work_order", wid, st)
+    return await get_work_order(wid, user)
+
+
+class ClosureReviewIn(BaseModel):
+    note: str = ""
+
+
+@router.get("/closure-exceptions/work-orders")
+async def closure_exceptions(user=Depends(require("settings"))):
+    rows = await db.work_orders.find({"status": {"$in": ["finalizata", "facturata", "inchisa"]}}).sort("finished_at", -1).to_list(2000)
+    flagged = []
+    for row in rows:
+        rule = row.get("closure_quote_rule") or quote_closure_rule(row)
+        if rule["review"]:
+            row["closure_quote_rule"] = rule
+            flagged.append(row)
+    return await enrich(flagged)
+
+
+@router.post("/work-orders/{wid}/closure-review")
+async def review_closure_exception(wid: str, body: ClosureReviewIn, user=Depends(require("settings"))):
+    work_order = await load_wo(wid)
+    rule = work_order.get("closure_quote_rule") or quote_closure_rule(work_order)
+    if not rule["review"]:
+        raise HTTPException(400, "Comanda nu necesită revizuire administrativă")
+    review = {"at": iso(), "by": user["name"], "note": body.note.strip()}
+    await db.work_orders.update_one({"_id": work_order["_id"]}, {"$set": {"closure_review": review}})
+    await audit(user, "review", "work_order_closure", wid, rule["reason"])
     return await get_work_order(wid, user)
 
 

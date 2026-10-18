@@ -26,6 +26,7 @@ import RarAutopassSettings from "@/pages/RarAutopassSettings";
 import PlanningCalendar from "@/pages/PlanningCalendar";
 import FinalInspectionReport from "@/pages/FinalInspectionReport";
 import Warranties from "@/pages/Warranties";
+import ClosureReview from "@/pages/ClosureReview";
 import PublicQuote from "@/pages/PublicQuote";
 import PrintDoc from "@/pages/PrintDoc";
 
@@ -82,6 +83,7 @@ function App() {
               <Route path="/planning" element={g("planning", <PlanningCalendar />)} />
               <Route path="/reports/final-inspections" element={g("reports", <FinalInspectionReport />)} />
               <Route path="/warranties" element={g("warranties", <Warranties />)} />
+              <Route path="/closure-review" element={g("settings", <ClosureReview />)} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

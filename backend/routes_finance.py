@@ -32,12 +32,16 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
     if not w.get("lines"):
         raise HTTPException(400, "Comanda nu are linii de facturat")
     if body.type == "fiscal":
+        from routes_service import quote_closure_rule
+
         if w["status"] != "finalizata":
             raise HTTPException(400, "Doar comenzile finalizate (după control calitate) pot fi facturate fiscal")
         if w.get("is_warranty"):
             raise HTTPException(400, "Comenzile de garanție nu se facturează clientului")
         if not w.get("qc", {}).get("passed"):
             raise HTTPException(400, "Controlul calității final trebuie promovat înainte de facturare")
+        if not quote_closure_rule(w)["allowed"]:
+            raise HTTPException(400, "Devizul este în așteptare; aprobați sau respingeți-l înainte de facturare")
         if w.get("invoice_id"):
             raise HTTPException(400, "Comanda este deja facturată")
     s = await get_settings()
