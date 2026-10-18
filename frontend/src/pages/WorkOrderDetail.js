@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Printer, Receipt, FileText, ArrowRightLeft, Save, ShieldAlert } from "lucide-react";
+import { Printer, Receipt, FileText, ArrowRightLeft, Save, ScrollText, ShieldAlert } from "lucide-react";
 import { api, errMsg, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { dt, date, num } from "@/lib/format";
@@ -130,7 +130,7 @@ export default function WorkOrderDetail() {
           <StatusBadge status={wo.status} testid="wo-status-badge" />
           {wo.is_warranty && <span className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-semibold uppercase text-amber-700 dark:text-amber-300" data-testid="warranty-work-order-badge">{tr("Garanție", "Warranty")}</span>}
           <Button variant="outline" size="sm" data-testid="print-reception-button" onClick={() => window.open(`/print/reception/${id}`, "_blank")}><Printer className="mr-1 h-4 w-4" />{tr("Notă recepție / PV", "Reception note")}</Button>
-          {latestQuote && <Button variant="outline" size="sm" data-testid="open-latest-quote-button" onClick={() => window.open(`/print/quote/${id}?v=${latestQuote.version}`, "_blank")}><FileText className="mr-1 h-4 w-4" />{tr("Deviz", "Quote")} · v{latestQuote.version}</Button>}
+          {latestQuote && <Button variant="outline" size="sm" data-testid="open-latest-quote-button" onClick={() => window.open(`/print/quote/${id}?v=${latestQuote.version}`, "_blank")}><ScrollText className="mr-1 h-4 w-4" />{tr("Deviz", "Quote")}</Button>}
           {can("invoices") && !locked && <Button variant="outline" size="sm" data-testid="create-proforma-button" onClick={() => invoice("proforma")}><FileText className="mr-1 h-4 w-4" />{tr("Proformă", "Proforma")}</Button>}
           {can("invoices") && wo.status === "finalizata" && <Button size="sm" data-testid="create-invoice-button" onClick={() => invoice("fiscal")}><Receipt className="mr-1 h-4 w-4" />{tr("Emite factură", "Issue invoice")}</Button>}
           {wo.invoice_id && <Button size="sm" variant="outline" data-testid="open-invoice-button" asChild><Link to={`/invoices/${wo.invoice_id}`}>{tr("Vezi factura", "View invoice")}</Link></Button>}
