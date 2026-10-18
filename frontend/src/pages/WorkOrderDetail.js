@@ -18,27 +18,58 @@ import TimeTab from "@/components/wo/TimeTab";
 
 const PH = { front: ["Față", "Front"], back: ["Spate", "Rear"], left: ["Stânga", "Left"], right: ["Dreapta", "Right"], interior: ["Interior", "Interior"] };
 
-function DetailsPanel({ wo, onChange, locked }) {
+function DiagnosisPanel({ wo, onChange, locked }) {
   const { tr } = useLang();
-  const { data: mechanics } = useApi("/mechanics");
-  const { data: settings } = useApi("/settings");
-  const [f, setF] = useState({ diagnosis: wo.diagnosis, elevator: wo.elevator, mechanic_ids: wo.mechanic_ids, closure_category: wo.closure_category || "" });
-  useEffect(() => {
-    setF({ diagnosis: wo.diagnosis, elevator: wo.elevator, mechanic_ids: wo.mechanic_ids, closure_category: wo.closure_category || "" });
-  }, [wo.diagnosis, wo.elevator, wo.mechanic_ids, wo.closure_category]);
+  const [diagnosis, setDiagnosis] = useState(wo.diagnosis);
+  useEffect(() => setDiagnosis(wo.diagnosis), [wo.diagnosis]);
   const save = async () => {
     try {
-      onChange((await api.put(`/work-orders/${wo.id}`, f)).data);
-      toast.success(tr("Salvat", "Saved"));
+      onChange((await api.put(`/work-orders/${wo.id}`, { diagnosis })).data);
+      toast.success(tr("Diagnostic salvat", "Diagnosis saved"));
     } catch (e) {
       toast.error(errMsg(e));
     }
   };
   return (
-    <Panel title={tr("Diagnostic & alocare", "Diagnosis & assignment")}>
+    <Panel title={tr("Diagnostic", "Diagnosis")} testid="work-order-diagnosis-panel">
       <div className="space-y-3">
-        <Field label={tr("Solicitare client", "Complaint")}><div className="text-sm">{wo.complaint}</div></Field>
-        <Field label={tr("Constatare / diagnostic", "Findings / diagnosis")}><Textarea data-testid="wo-diagnosis-input" rows={3} value={f.diagnosis} disabled={locked} onChange={(e) => setF({ ...f, diagnosis: e.target.value })} /></Field>
+        <Field label={tr("Solicitare client", "Complaint")}>
+          <div className="text-sm">{wo.complaint}</div>
+        </Field>
+        <Field label={tr("Constatare / diagnostic", "Findings / diagnosis")}>
+          <Textarea
+            data-testid="wo-diagnosis-input"
+            rows={3}
+            value={diagnosis}
+            disabled={locked}
+            onChange={(e) => setDiagnosis(e.target.value)}
+          />
+        </Field>
+        {!locked && <Button size="sm" data-testid="wo-save-diagnosis-button" onClick={save}><Save className="mr-1 h-3 w-3" />{tr("Salvează diagnosticul", "Save diagnosis")}</Button>}
+      </div>
+    </Panel>
+  );
+}
+
+function AllocationPanel({ wo, onChange, locked }) {
+  const { tr } = useLang();
+  const { data: mechanics } = useApi("/mechanics");
+  const { data: settings } = useApi("/settings");
+  const [f, setF] = useState({ elevator: wo.elevator, mechanic_ids: wo.mechanic_ids, closure_category: wo.closure_category || "" });
+  useEffect(() => {
+    setF({ elevator: wo.elevator, mechanic_ids: wo.mechanic_ids, closure_category: wo.closure_category || "" });
+  }, [wo.elevator, wo.mechanic_ids, wo.closure_category]);
+  const save = async () => {
+    try {
+      onChange((await api.put(`/work-orders/${wo.id}`, f)).data);
+      toast.success(tr("Alocare salvată", "Assignment saved"));
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
+  };
+  return (
+    <Panel title={tr("Alocare", "Assignment")} testid="work-order-allocation-panel">
+      <div className="space-y-3">
         <Field label={tr("Elevator", "Lift")}>
           <NativeSelect data-testid="wo-elevator-select" value={f.elevator} disabled={locked} onChange={(e) => setF({ ...f, elevator: e.target.value })}>
             <option value="">—</option>{(settings?.elevators || []).map((x) => <option key={x}>{x}</option>)}
@@ -63,7 +94,7 @@ function DetailsPanel({ wo, onChange, locked }) {
             ))}
           </div>
         </div>
-        {!locked && <Button size="sm" data-testid="wo-save-details-button" onClick={save}><Save className="mr-1 h-3 w-3" />{tr("Salvează", "Save")}</Button>}
+        {!locked && <Button size="sm" data-testid="wo-save-allocation-button" onClick={save}><Save className="mr-1 h-3 w-3" />{tr("Salvează alocarea", "Save assignment")}</Button>}
       </div>
     </Panel>
   );
@@ -135,7 +166,7 @@ export default function WorkOrderDetail() {
       ) : null}
 
       <div className="min-w-0 space-y-4">
-        <DetailsPanel wo={wo} onChange={setData} locked={locked} />
+        <DiagnosisPanel wo={wo} onChange={setData} locked={locked} />
         <TotalsBar wo={wo} />
         <Tabs defaultValue="parts" className="min-w-0">
           <TabsList className="h-auto flex-wrap justify-start">
@@ -183,6 +214,7 @@ export default function WorkOrderDetail() {
             </Panel>
           </TabsContent>
         </Tabs>
+        <AllocationPanel wo={wo} onChange={setData} locked={locked} />
       </div>
     </div>
   );
