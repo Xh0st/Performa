@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardPlus, Wrench, Users, Car, HardHat, Boxes, FileText, Wallet, Sparkles, Settings, ShieldCheck,
-  Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck,
+  Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck, CalendarDays, BookOpenCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
@@ -18,6 +18,7 @@ const NAV = [
     ["/clients", "crm", Users, "Clienți CRM", "CRM Clients", "clients"],
     ["/vehicles", "vehicles", Car, "Parc auto", "Vehicles", "vehicles"],
     ["/mechanics", "mechanics", HardHat, "Mecanici & pontaj", "Mechanics & time", "mechanics"],
+    ["/planning", "planning", CalendarDays, "Planificare calendar", "Planning calendar", "planning"],
   ]},
   { group: ["Magazie", "Warehouse"], items: [["/stock", "stock", Boxes, "Stocuri & NIR", "Stock & GRN", "stock"]] },
   { group: ["Financiar", "Finance"], items: [
@@ -25,6 +26,7 @@ const NAV = [
     ["/cash", "payments", Wallet, "Încasări & casă", "Payments & cash", "cash"],
   ]},
   { group: ["Inteligență", "Intelligence"], items: [["/ai", "ai", Sparkles, "AI Advisor", "AI Advisor", "ai"]] },
+  { group: ["Rapoarte", "Reports"], items: [["/reports/final-inspections", "reports", BookOpenCheck, "Registru Inspecții Finale", "Final Inspections Register", "final-inspections"]] },
   { group: ["Administrare", "Administration"], items: [
     ["/users", "users", ShieldCheck, "Utilizatori & audit", "Users & audit", "users"],
     ["/settings", "settings", Settings, "Setări companie", "Company settings", "settings"],

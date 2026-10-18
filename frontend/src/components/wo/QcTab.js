@@ -8,9 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import SignaturePad from "@/components/SignaturePad";
 
-const ITEMS = [["frane", "Frâne", "Brakes"], ["directie", "Direcție", "Steering"], ["suspensie", "Suspensie", "Suspension"], ["lumini", "Lumini", "Lights"],
-  ["niveluri", "Niveluri lichide", "Fluid levels"], ["anvelope", "Anvelope / presiune", "Tyres / pressure"], ["test_drive", "Test drive", "Test drive"]];
-const OPTS = [["ok", "OK", "bg-emerald-500 text-white"], ["nok", "NOK", "bg-rose-500 text-white"], ["na", "N/A", "bg-slate-500 text-white"]];
+const ITEMS = [
+  ["noxe", "Noxe", "Emissions"],
+  ["frane", "Frâne", "Brakes"],
+  ["geometrie", "Geometrie", "Wheel alignment"],
+  ["faruri_geamuri_parbrize", "Faruri / geamuri / parbrize", "Lights / glass / windscreen"],
+  ["parametri_reglaje", "Parametri funcționali / reglaje", "Functional parameters / adjustments"],
+  ["etanșeitate", "Etanșeitate", "Leak tightness"],
+  ["proba_drum", "Probă drum", "Road test"],
+];
+const OPTS = [
+  ["C", "C", "bg-emerald-500 text-white"],
+  ["N", "N", "bg-rose-500 text-white"],
+  ["NA", "NA", "bg-slate-500 text-white"],
+];
 
 export default function QcTab({ wo, onChange, locked }) {
   const { tr } = useLang();

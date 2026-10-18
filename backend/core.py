@@ -31,6 +31,8 @@ MODULE_ROLES = {
     "invoices": MGMT + ["contabil", "casier", "consilier"],
     "payments": MGMT + ["contabil", "casier"],
     "ai": MGMT + ["consilier", "receptioner"] + TECH,
+    "planning": MGMT + ["consilier", "receptioner"],
+    "reports": MGMT + ["contabil", "consilier"],
     "settings": ["admin", "director"],
     "users": ["admin"],
 }

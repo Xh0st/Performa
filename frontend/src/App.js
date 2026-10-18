@@ -23,6 +23,8 @@ import Users from "@/pages/Users";
 import SettingsPage from "@/pages/Settings";
 import EfacturaSettings from "@/pages/EfacturaSettings";
 import RarAutopassSettings from "@/pages/RarAutopassSettings";
+import PlanningCalendar from "@/pages/PlanningCalendar";
+import FinalInspectionReport from "@/pages/FinalInspectionReport";
 import PublicQuote from "@/pages/PublicQuote";
 import PrintDoc from "@/pages/PrintDoc";
 
@@ -76,6 +78,8 @@ function App() {
               <Route path="/settings" element={g("settings", <SettingsPage />)} />
               <Route path="/efactura" element={g("settings", <EfacturaSettings />)} />
               <Route path="/rar-autopass" element={g("settings", <RarAutopassSettings />)} />
+              <Route path="/planning" element={g("planning", <PlanningCalendar />)} />
+              <Route path="/reports/final-inspections" element={g("reports", <FinalInspectionReport />)} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

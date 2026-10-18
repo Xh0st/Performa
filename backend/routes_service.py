@@ -9,7 +9,15 @@ from core import (db, ser, oid, iso, now, require, audit, get_or_404, next_seq, 
 
 router = APIRouter(prefix="/api")
 LIGHT = {"reception.photos": 0, "reception.signature": 0, "qc.mechanic_signature": 0, "qc.chief_signature": 0}
-QC_ITEMS = ["frane", "directie", "suspensie", "lumini", "niveluri", "anvelope", "test_drive"]
+QC_ITEMS = [
+    "noxe",
+    "frane",
+    "geometrie",
+    "faruri_geamuri_parbrize",
+    "parametri_reglaje",
+    "etanșeitate",
+    "proba_drum",
+]
 LOCKED = ("facturata", "inchisa")
 
 
@@ -429,9 +437,17 @@ class QCIn(BaseModel):
 @router.put("/work-orders/{wid}/qc")
 async def save_qc(wid: str, body: QCIn, user=Depends(require("workorders"))):
     w = await load_wo(wid)
-    complete = all(body.items.get(k) in ("ok", "na") for k in QC_ITEMS)
-    passed = complete and bool(body.mechanic_signature) and bool(body.chief_signature)
-    qc = body.model_dump() | {"passed": passed, "at": iso(), "by": user["name"]}
+    complete = all(body.items.get(key) in ("C", "N", "NA") for key in QC_ITEMS)
+    conforming = complete and all(body.items.get(key) in ("C", "NA") for key in QC_ITEMS)
+    if body.chief_signature and user["role"] not in ("admin", "director", "sef_service"):
+        raise HTTPException(403, "Inspecția finală este validată de șeful de service")
+    passed = conforming and bool(body.mechanic_signature) and bool(body.chief_signature)
+    qc = body.model_dump() | {
+        "passed": passed,
+        "at": iso(),
+        "by": user["name"],
+        "inspector_name": user["name"] if body.chief_signature else "",
+    }
     await db.work_orders.update_one({"_id": w["_id"]}, {"$set": {"qc": qc}})
     return await get_work_order(wid, user)
 

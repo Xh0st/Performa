@@ -13,6 +13,8 @@ import routes_dashboard
 import routes_ai
 import routes_efactura
 import routes_rar
+import routes_planning
+import routes_reports
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 app = FastAPI(title="ERP Service Auto România")
@@ -27,6 +29,8 @@ for r in (
     routes_ai,
     routes_efactura,
     routes_rar,
+    routes_planning,
+    routes_reports,
 ):
     app.include_router(r.router)
 
