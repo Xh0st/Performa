@@ -33,6 +33,7 @@ MODULE_ROLES = {
     "ai": MGMT + ["consilier", "receptioner"] + TECH,
     "planning": MGMT + ["consilier", "receptioner"],
     "reports": MGMT + ["contabil", "consilier"],
+    "warranties": MGMT + ["consilier", "receptioner", "contabil", "magazioner"],
     "settings": ["admin", "director"],
     "users": ["admin"],
 }

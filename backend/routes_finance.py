@@ -71,10 +71,12 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
     if body.type == "fiscal":
         from rar_autopass import queue_submission_safely
         from routes_efactura import schedule_auto_send
+        from warranty_service import create_certificate
 
         rar_work_order = await db.work_orders.find_one({"_id": w["_id"]})
         rar_invoice = await db.invoices.find_one({"_id": r.inserted_id})
         await queue_submission_safely(rar_work_order, rar_invoice, "invoice_issued")
+        await create_certificate(rar_invoice, w, s)
         schedule_auto_send(await db.invoices.find_one({"_id": r.inserted_id}))
     return ser(await db.invoices.find_one({"_id": r.inserted_id}, {"efactura.xml": 0}))
 
@@ -89,6 +91,11 @@ async def get_invoice(iid: str, user=Depends(require("invoices"))):
         credited = await credited_by_line(iid)
         for ln in inv["lines"]:
             ln["credited_qty"] = credited.get(ln.get("id"), 0)
+    certificate = await db.warranty_certificates.find_one(
+        {"invoice_id": iid},
+        {"number": 1, "issued_date": 1},
+    )
+    inv["warranty_certificate"] = ser(certificate) if certificate else None
     return inv
 
 

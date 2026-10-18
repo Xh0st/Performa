@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Printer, Receipt, FileText, ArrowRightLeft, Save } from "lucide-react";
+import { Printer, Receipt, FileText, ArrowRightLeft, Save, ShieldAlert } from "lucide-react";
 import { api, errMsg, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { dt, date, num } from "@/lib/format";
@@ -105,6 +105,7 @@ export default function WorkOrderDetail() {
           <div key={l} className="rounded border bg-card px-3 py-2"><div className="eyebrow">{l}</div><div className="font-mono text-sm">{v}</div></div>
         ))}
       </div>
+      {!!wo.warranty_alerts?.length && <div className="mb-4 flex items-center gap-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300" data-testid="work-order-warranty-alert"><ShieldAlert className="h-4 w-4" />{tr("Vehiculul are garanții active", "Vehicle has active warranties")}: {wo.warranty_alerts.map((item) => item.number).join(", ")}</div>}
 
       {!locked || wo.status === "facturata" ? (
         <div className="mb-4 flex flex-wrap items-end gap-2 rounded border bg-card p-3">

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardPlus, Wrench, Users, Car, HardHat, Boxes, FileText, Wallet, Sparkles, Settings, ShieldCheck,
-  Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck, CalendarDays, BookOpenCheck,
+  Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck, CalendarDays, BookOpenCheck, ShieldPlus,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
@@ -24,6 +24,7 @@ const NAV = [
   { group: ["Financiar", "Finance"], items: [
     ["/invoices", "invoices", FileText, "Facturi & e-Factura", "Invoices & e-Invoice", "invoices"],
     ["/cash", "payments", Wallet, "Încasări & casă", "Payments & cash", "cash"],
+    ["/warranties", "warranties", ShieldPlus, "Garanții & reclamații", "Warranties & claims", "warranties"],
   ]},
   { group: ["Inteligență", "Intelligence"], items: [["/ai", "ai", Sparkles, "AI Advisor", "AI Advisor", "ai"]] },
   { group: ["Rapoarte", "Reports"], items: [["/reports/final-inspections", "reports", BookOpenCheck, "Registru Inspecții Finale", "Final Inspections Register", "final-inspections"]] },

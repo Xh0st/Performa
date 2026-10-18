@@ -206,6 +206,13 @@ async def load_wo(wid: str):
 async def get_work_order(wid: str, user=Depends(require("workorders"))):
     w = (await enrich([await load_wo(wid)]))[0]
     w["time_entries"] = [ser(e) for e in await db.time_entries.find({"work_order_id": wid}).sort("start", -1).to_list(500)]
+    today = now().date().isoformat()
+    warranties = await db.warranty_certificates.find({"vehicle_id": w["vehicle_id"]}).to_list(100)
+    w["warranty_alerts"] = [
+        {"number": item["number"], "invoice_ref": item["invoice_ref"], "active_lines": len([line for line in item["lines"] if line["valid_to"] >= today])}
+        for item in warranties
+        if any(line["valid_to"] >= today for line in item["lines"])
+    ]
     return w
 
 
