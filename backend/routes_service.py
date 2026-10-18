@@ -19,6 +19,7 @@ QC_ITEMS = [
     "proba_drum",
 ]
 LOCKED = ("facturata", "inchisa")
+LINE_LOCKED = ("finalizata", "facturata", "inchisa")
 CLOSURE_CATEGORIES = {"fara_cost", "diagnoza", "constatare"}
 
 
@@ -348,6 +349,26 @@ class LineIn(BaseModel):
     mechanic_id: str = ""
 
 
+class LineUpdateIn(BaseModel):
+    description: Optional[str] = None
+    code: Optional[str] = None
+    qty: Optional[float] = None
+    unit_price: Optional[float] = None
+    discount: Optional[float] = None
+    mechanic_id: Optional[str] = None
+
+
+def validate_line_update(update: dict) -> None:
+    if "description" in update and not update["description"].strip():
+        raise HTTPException(400, "Descrierea este obligatorie")
+    if "qty" in update and update["qty"] <= 0:
+        raise HTTPException(400, "Cantitatea trebuie să fie mai mare decât zero")
+    if "unit_price" in update and update["unit_price"] < 0:
+        raise HTTPException(400, "Prețul unitar nu poate fi negativ")
+    if "discount" in update and not 0 <= update["discount"] <= 100:
+        raise HTTPException(400, "Discountul trebuie să fie între 0 și 100")
+
+
 async def build_line(body: LineIn):
     s = await get_settings()
     ln = {"id": secrets.token_hex(6), "type": body.type, "description": body.description, "qty": body.qty,
@@ -358,6 +379,7 @@ async def build_line(body: LineIn):
             p = await get_or_404("products", body.product_id)
             ln.update(code=p["code"], description=body.description or p["name"], unit=p.get("unit", "buc"),
                       unit_cost=p.get("avg_cost", 0), vat_rate=p.get("vat_rate", ln["vat_rate"]))
+            ln["source_warehouse"] = p.get("warehouse", "Depozit Central")
             ln["unit_price"] = body.unit_price if body.unit_price is not None else p["sale_price"]
         else:
             ln["unit_price"] = body.unit_price or 0
@@ -377,8 +399,8 @@ async def add_line(wid: str, body: LineIn, user=Depends(require("workorders"))):
     w = await load_wo(wid)
     if w.get("is_warranty"):
         raise HTTPException(400, "Liniile comenzii de garanție sunt fixate la preț zero")
-    if w["status"] in LOCKED:
-        raise HTTPException(400, "Comanda facturată nu mai poate fi modificată")
+    if w["status"] in LINE_LOCKED:
+        raise HTTPException(400, "Liniile sunt blocate după finalizarea comenzii")
     ln = await build_line(body)
     upd = {"$push": {"lines": ln}}
     if body.mechanic_id and body.mechanic_id not in w.get("mechanic_ids", []):
@@ -387,13 +409,40 @@ async def add_line(wid: str, body: LineIn, user=Depends(require("workorders"))):
     return await get_work_order(wid, user)
 
 
+@router.put("/work-orders/{wid}/lines/{lid}")
+async def update_line(wid: str, lid: str, body: LineUpdateIn, user=Depends(require("workorders"))):
+    work_order = await load_wo(wid)
+    if work_order.get("is_warranty"):
+        raise HTTPException(400, "Liniile comenzii de garanție sunt fixate la preț zero")
+    if work_order["status"] in LINE_LOCKED:
+        raise HTTPException(400, "Liniile sunt blocate după finalizarea comenzii")
+    line = next((item for item in work_order.get("lines", []) if item["id"] == lid), None)
+    if not line:
+        raise HTTPException(404, "Linie inexistentă")
+    update = body.model_dump(exclude_unset=True)
+    validate_line_update(update)
+    if "mechanic_id" in update and update["mechanic_id"]:
+        await get_or_404("mechanics", update["mechanic_id"])
+    set_fields = {f"lines.$.{key}": value for key, value in update.items()}
+    await db.work_orders.update_one(
+        {"_id": work_order["_id"], "lines.id": lid},
+        {"$set": set_fields},
+    )
+    if update.get("mechanic_id") and update["mechanic_id"] not in work_order.get("mechanic_ids", []):
+        await db.work_orders.update_one(
+            {"_id": work_order["_id"]},
+            {"$addToSet": {"mechanic_ids": update["mechanic_id"]}},
+        )
+    return await get_work_order(wid, user)
+
+
 @router.delete("/work-orders/{wid}/lines/{lid}")
 async def delete_line(wid: str, lid: str, user=Depends(require("workorders"))):
     w = await load_wo(wid)
     if w.get("is_warranty"):
         raise HTTPException(400, "Liniile comenzii de garanție sunt fixate la preț zero")
-    if w["status"] in LOCKED:
-        raise HTTPException(400, "Comanda facturată nu mai poate fi modificată")
+    if w["status"] in LINE_LOCKED:
+        raise HTTPException(400, "Liniile sunt blocate după finalizarea comenzii")
     await db.work_orders.update_one({"_id": w["_id"]}, {"$pull": {"lines": {"id": lid}}})
     return await get_work_order(wid, user)
 

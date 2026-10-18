@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Package, Wrench } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X, Package, Wrench } from "lucide-react";
 import { api, errMsg, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { money, num } from "@/lib/format";
@@ -31,7 +31,25 @@ function useLineActions(wo, onChange) {
       toast.error(errMsg(e));
     }
   };
-  return { add, del };
+  const update = async (lid, body) => {
+    try {
+      onChange((await api.put(`/work-orders/${wo.id}/lines/${lid}`, body)).data);
+      toast.success(tr("Poziție actualizată", "Line updated"));
+      return true;
+    } catch (e) {
+      toast.error(errMsg(e));
+      return false;
+    }
+  };
+  return { add, del, update };
+}
+
+function RowActions({ id, type, onSave, onCancel, onEdit, editing }) {
+  const { tr } = useLang();
+  if (editing) {
+    return <div className="flex justify-end gap-1"><Button variant="ghost" size="icon" data-testid={`save-${type}-row-${id}`} onClick={onSave}><Check className="h-4 w-4 text-emerald-500" /></Button><Button variant="ghost" size="icon" data-testid={`cancel-${type}-row-${id}`} onClick={onCancel}><X className="h-4 w-4" /></Button></div>;
+  }
+  return <Button variant="ghost" size="icon" data-testid={`edit-${type}-row-${id}`} onClick={onEdit}><Pencil className="h-4 w-4" /><span className="sr-only">{tr("Editează", "Edit")}</span></Button>;
 }
 
 function SectionHead({ icon: Icon, title, count, subtotal, accent }) {
@@ -92,28 +110,49 @@ function PartForm({ onAdd }) {
 
 export function PartsSection({ wo, onChange, locked }) {
   const { tr } = useLang();
-  const { add, del } = useLineActions(wo, onChange);
+  const { add, del, update } = useLineActions(wo, onChange);
   const lines = wo.lines.filter((l) => l.type !== "labor");
+  const [editing, setEditing] = useState("");
+  const [draft, setDraft] = useState({});
+  const begin = (line) => {
+    setEditing(line.id);
+    setDraft({
+      code: line.code || "",
+      description: line.description,
+      qty: line.qty,
+      unit_price: line.unit_price,
+      discount: line.discount || 0,
+    });
+  };
+  const save = async (line) => {
+    const ok = await update(line.id, {
+      ...draft,
+      qty: Number(draft.qty),
+      unit_price: Number(draft.unit_price),
+      discount: Number(draft.discount) || 0,
+    });
+    if (ok) setEditing("");
+  };
   return (
-    <section data-testid="parts-section">
+    <section className="min-w-0 max-w-full" data-testid="parts-section">
       <SectionHead icon={Package} title={tr("Piese & consumabile", "Parts & consumables")} count={lines.length} accent="text-primary"
         subtotal={lines.reduce((s, l) => s + lineNet(l), 0)} />
       {!locked && <PartForm onAdd={add} />}
       {!lines.length ? <Empty text={tr("Nicio piesă adăugată.", "No parts added.")} /> : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] whitespace-nowrap text-sm" data-testid="parts-table">
+        <div className="w-full max-w-full overflow-x-auto">
+          <table className="w-full min-w-[920px] whitespace-nowrap text-sm" data-testid="parts-table">
             <thead><tr className="border-b">
               <th className={TH}>{tr("Cod", "Code")}</th><th className={TH}>{tr("Denumire", "Name")}</th><th className={TH}>{tr("Tip", "Type")}</th><th className={THR}>{tr("Cant.", "Qty")}</th>
-              <th className={THR}>{tr("Preț unitar", "Unit price")}</th><th className={THR}>Disc.</th><th className={THR}>{tr("Valoare", "Net")}</th><th className="w-10" />
+              <th className={THR}>{tr("Preț unitar", "Unit price")}</th><th className={THR}>Disc.</th><th className={TH}>{tr("Sursă", "Source")}</th><th className={THR}>{tr("Valoare", "Net")}</th><th className="w-20" />
             </tr></thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={l.id} className="h-10 border-b border-border/50" data-testid={`part-row-${i}`}>
-                  <td className="px-2 font-mono text-xs">{l.code || "—"}</td><td className="px-2">{l.description}</td>
+                  <td className="px-2 font-mono text-xs">{editing === l.id ? <Input data-testid={`input-part-code-row-${l.id}`} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} /> : l.code || "—"}</td><td className="px-2">{editing === l.id ? <Input data-testid={`input-part-name-row-${l.id}`} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /> : l.description}</td>
                   <td className="px-2 text-xs text-muted-foreground">{l.type === "part" ? tr("Piesă", "Part") : tr("Consumabil", "Consumable")}</td>
-                  <td className="px-2 text-right font-mono">{num(l.qty)} {l.unit}</td><td className="px-2 text-right font-mono">{money(l.unit_price)}</td>
-                  <td className="px-2 text-right font-mono">{l.discount || 0}%</td><td className="px-2 text-right font-mono font-semibold">{money(lineNet(l))}</td>
-                  <td className="px-2 text-right">{!locked && <Button variant="ghost" size="icon" data-testid={`delete-part-${i}`} onClick={() => del(l.id)}><Trash2 className="h-4 w-4 text-rose-500" /></Button>}</td>
+                  <td className="px-2 text-right font-mono">{editing === l.id ? <Input data-testid={`input-part-qty-row-${l.id}`} type="number" min="0.001" step="any" value={draft.qty} onChange={(e) => setDraft({ ...draft, qty: e.target.value })} /> : <>{num(l.qty)} {l.unit}</>}</td><td className="px-2 text-right font-mono">{editing === l.id ? <Input data-testid={`input-part-price-row-${l.id}`} type="number" min="0" step="0.01" value={draft.unit_price} onChange={(e) => setDraft({ ...draft, unit_price: e.target.value })} /> : money(l.unit_price)}</td>
+                  <td className="px-2 text-right font-mono">{editing === l.id ? <Input data-testid={`input-part-discount-row-${l.id}`} type="number" min="0" max="100" value={draft.discount} onChange={(e) => setDraft({ ...draft, discount: e.target.value })} /> : `${l.discount || 0}%`}</td><td className="px-2 text-xs text-muted-foreground" data-testid={`part-source-row-${l.id}`}>{l.source_warehouse || "—"}</td><td className="px-2 text-right font-mono font-semibold">{money(editing === l.id ? lineNet({ ...l, ...draft, qty: Number(draft.qty), unit_price: Number(draft.unit_price), discount: Number(draft.discount) }) : lineNet(l))}</td>
+                  <td className="px-2 text-right"><div className="flex justify-end gap-1">{!locked && <RowActions id={l.id} type="part" editing={editing === l.id} onEdit={() => begin(l)} onCancel={() => setEditing("")} onSave={() => save(l)} />}{!locked && editing !== l.id && <Button variant="ghost" size="icon" data-testid={`delete-part-${i}`} onClick={() => del(l.id)}><Trash2 className="h-4 w-4 text-rose-500" /></Button>}</div></td>
                 </tr>
               ))}
             </tbody>
@@ -168,32 +207,53 @@ function LaborForm({ onAdd, mechanics, rates }) {
 
 export function LaborSection({ wo, onChange, locked }) {
   const { tr } = useLang();
-  const { add, del } = useLineActions(wo, onChange);
+  const { add, del, update } = useLineActions(wo, onChange);
   const { data: mechanics } = useApi("/mechanics");
   const { data: settings } = useApi("/settings");
   const names = Object.fromEntries((mechanics || []).map((m) => [m.id, m.name]));
   const lines = wo.lines.filter((l) => l.type === "labor");
+  const [editing, setEditing] = useState("");
+  const [draft, setDraft] = useState({});
+  const begin = (line) => {
+    setEditing(line.id);
+    setDraft({
+      description: line.description,
+      qty: line.qty,
+      unit_price: line.unit_price,
+      discount: line.discount || 0,
+      mechanic_id: line.mechanic_id || "",
+    });
+  };
+  const save = async (line) => {
+    const ok = await update(line.id, {
+      ...draft,
+      qty: Number(draft.qty),
+      unit_price: Number(draft.unit_price),
+      discount: Number(draft.discount) || 0,
+    });
+    if (ok) setEditing("");
+  };
   return (
-    <section data-testid="labor-section">
+    <section className="min-w-0 max-w-full" data-testid="labor-section">
       <SectionHead icon={Wrench} title={tr("Manoperă", "Labor")} count={lines.length} accent="text-cyan-500"
         subtotal={lines.reduce((s, l) => s + lineNet(l), 0)} />
       {!locked && <LaborForm onAdd={add} mechanics={mechanics} rates={settings?.labor_rates} />}
       {!lines.length ? <Empty text={tr("Nicio operațiune de manoperă.", "No labor operations.")} /> : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" data-testid="labor-table">
+        <div className="w-full max-w-full overflow-x-auto">
+          <table className="w-full min-w-[980px] text-sm" data-testid="labor-table">
             <thead><tr className="border-b">
               <th className={TH}>{tr("Operațiune", "Operation")}</th><th className={TH}>{tr("Categorie", "Category")}</th><th className={TH}>{tr("Normă", "Norm")}</th>
-              <th className={TH}>{tr("Mecanic", "Mechanic")}</th><th className={THR}>{tr("Ore", "Hours")}</th><th className={THR}>{tr("Tarif", "Rate")}</th>
-              <th className={THR}>{tr("Valoare", "Net")}</th><th className="w-10" />
+              <th className={TH}>{tr("Mecanic", "Mechanic")}</th><th className={THR}>{tr("Ore", "Hours")}</th><th className={THR}>{tr("Tarif", "Rate")}</th><th className={THR}>Disc.</th>
+              <th className={THR}>{tr("Valoare", "Net")}</th><th className="w-20" />
             </tr></thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={l.id} className="h-10 border-b border-border/50" data-testid={`labor-row-${i}`}>
-                  <td className="px-2">{l.description}</td><td className="px-2 text-xs">{tr(...(LABOR_CATS[l.labor_category] || ["—", "—"]))}</td>
-                  <td className="px-2 text-xs text-muted-foreground">{l.norm_source}</td><td className="px-2 text-xs">{names[l.mechanic_id] || "—"}</td>
-                  <td className="px-2 text-right font-mono">{num(l.qty)}</td><td className="px-2 text-right font-mono">{money(l.unit_price)}</td>
-                  <td className="px-2 text-right font-mono font-semibold">{money(lineNet(l))}</td>
-                  <td className="px-2 text-right">{!locked && <Button variant="ghost" size="icon" data-testid={`delete-labor-${i}`} onClick={() => del(l.id)}><Trash2 className="h-4 w-4 text-rose-500" /></Button>}</td>
+                  <td className="px-2">{editing === l.id ? <Input data-testid={`input-labor-name-row-${l.id}`} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /> : l.description}</td><td className="px-2 text-xs">{tr(...(LABOR_CATS[l.labor_category] || ["—", "—"]))}</td>
+                  <td className="px-2 text-xs text-muted-foreground">{l.norm_source}</td><td className="px-2 text-xs">{editing === l.id ? <NativeSelect data-testid={`select-labor-mechanic-row-${l.id}`} value={draft.mechanic_id} onChange={(e) => setDraft({ ...draft, mechanic_id: e.target.value })}><option value="">—</option>{(mechanics || []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</NativeSelect> : names[l.mechanic_id] || "—"}</td>
+                  <td className="px-2 text-right font-mono">{editing === l.id ? <Input data-testid={`input-labor-hours-row-${l.id}`} type="number" min="0.1" step="0.1" value={draft.qty} onChange={(e) => setDraft({ ...draft, qty: e.target.value })} /> : num(l.qty)}</td><td className="px-2 text-right font-mono">{editing === l.id ? <Input data-testid={`input-labor-rate-row-${l.id}`} type="number" min="0" step="0.01" value={draft.unit_price} onChange={(e) => setDraft({ ...draft, unit_price: e.target.value })} /> : money(l.unit_price)}</td><td className="px-2 text-right font-mono">{editing === l.id ? <Input data-testid={`input-labor-discount-row-${l.id}`} type="number" min="0" max="100" value={draft.discount} onChange={(e) => setDraft({ ...draft, discount: e.target.value })} /> : `${l.discount || 0}%`}</td>
+                  <td className="px-2 text-right font-mono font-semibold">{money(editing === l.id ? lineNet({ ...l, ...draft, qty: Number(draft.qty), unit_price: Number(draft.unit_price), discount: Number(draft.discount) }) : lineNet(l))}</td>
+                  <td className="px-2 text-right"><div className="flex justify-end gap-1">{!locked && <RowActions id={l.id} type="labor" editing={editing === l.id} onEdit={() => begin(l)} onCancel={() => setEditing("")} onSave={() => save(l)} />}{!locked && editing !== l.id && <Button variant="ghost" size="icon" data-testid={`delete-labor-${i}`} onClick={() => del(l.id)}><Trash2 className="h-4 w-4 text-rose-500" /></Button>}</div></td>
                 </tr>
               ))}
             </tbody>

@@ -78,6 +78,7 @@ export default function WorkOrderDetail() {
   const [next, setNext] = useState("");
   if (!wo) return <Loading />;
   const locked = ["facturata", "inchisa"].includes(wo.status);
+  const linesLocked = ["finalizata", "facturata", "inchisa"].includes(wo.status);
   const hasApprovedQuote = (wo.quotes || []).some((quote) => quote.status === "approved");
 
   const changeStatus = async () => {
@@ -99,7 +100,7 @@ export default function WorkOrderDetail() {
   };
 
   return (
-    <div data-testid="work-order-detail-page">
+    <div className="overflow-x-hidden" data-testid="work-order-detail-page">
       <PageHeader eyebrow={`${wo.client_name} · ${wo.vehicle.make} ${wo.vehicle.model} · ${wo.vehicle.plate}`} title={wo.number} testid="wo-number"
         actions={<>
           <StatusBadge status={wo.status} testid="wo-status-badge" />
@@ -133,10 +134,10 @@ export default function WorkOrderDetail() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-        <div className="min-w-0">
+      <div className="min-w-0 space-y-4">
+        <DetailsPanel wo={wo} onChange={setData} locked={locked} />
         <TotalsBar wo={wo} />
-        <Tabs defaultValue="parts">
+        <Tabs defaultValue="parts" className="min-w-0">
           <TabsList className="h-auto flex-wrap justify-start">
             <TabsTrigger value="parts" data-testid="wo-tab-parts">{tr("Piese", "Parts")} ({wo.lines.filter((l) => l.type !== "labor").length})</TabsTrigger>
             <TabsTrigger value="labor" data-testid="wo-tab-labor">{tr("Manoperă", "Labor")} ({wo.lines.filter((l) => l.type === "labor").length})</TabsTrigger>
@@ -146,8 +147,8 @@ export default function WorkOrderDetail() {
             <TabsTrigger value="reception" data-testid="wo-tab-reception">{tr("Recepție", "Reception")}</TabsTrigger>
             <TabsTrigger value="history" data-testid="wo-tab-history">{tr("Istoric", "History")}</TabsTrigger>
           </TabsList>
-          <TabsContent value="parts"><Panel><PartsSection wo={wo} onChange={setData} locked={locked} /></Panel></TabsContent>
-          <TabsContent value="labor"><Panel><LaborSection wo={wo} onChange={setData} locked={locked} /></Panel></TabsContent>
+          <TabsContent value="parts"><Panel className="min-w-0"><PartsSection wo={wo} onChange={setData} locked={linesLocked} /></Panel></TabsContent>
+          <TabsContent value="labor"><Panel className="min-w-0"><LaborSection wo={wo} onChange={setData} locked={linesLocked} /></Panel></TabsContent>
           <TabsContent value="quotes"><Panel><QuotesTab wo={wo} onChange={reload} /></Panel></TabsContent>
           <TabsContent value="qc"><Panel><QcTab key={wo.qc?.at || "new"} wo={wo} onChange={setData} locked={locked} /></Panel></TabsContent>
           <TabsContent value="time"><Panel><TimeTab wo={wo} onChange={setData} /></Panel></TabsContent>
@@ -182,8 +183,6 @@ export default function WorkOrderDetail() {
             </Panel>
           </TabsContent>
         </Tabs>
-        </div>
-        <DetailsPanel wo={wo} onChange={setData} locked={locked} />
       </div>
     </div>
   );

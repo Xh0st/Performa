@@ -1,158 +1,197 @@
 {
-  "project_title": "ERP Service Auto România — Enterprise Automotive Workshop Platform",
-  "app_type": "dashboard / enterprise saas_app",
-  "design_archetype": "THE PERFORMANCE PRO & TACTICAL PRECISION",
-  "theme_strategy": {
+  "project_title": "Work Orders Page Layout & Inline Editing Refactor (Comandă de Lucru)",
+  "context_type": "DASHBOARDS & ADMIN PANELS",
+  "archetype": "ARCHETYPE 2: THE PERFORMANCE PRO & SWISS TACTICAL AUTOMOTIVE ERP",
+  "theme": {
     "default_mode": "dark",
-    "mode_toggle_support": true,
-    "rationale": "Automotive workshop command centers requirement high-contrast readability under bright fluorescent garage lights and intense night shift diagnostics. Deep obsidian dark mode paired with vibrant status accents (Amber, Signal Cyan, Emerald Green, Flame Red) gives maximum data density without eye strain."
+    "color_palette": {
+      "background": "#090D14",
+      "surface_card": "#111723",
+      "surface_card_hover": "#172030",
+      "border_default": "#1E293B",
+      "border_focus": "#38BDF8",
+      "primary": "#38BDF8",
+      "primary_foreground": "#090D14",
+      "accent_amber": "#F59E0B",
+      "accent_emerald": "#10B981",
+      "accent_rose": "#F43F5E",
+      "text_main": "#F8FAFC",
+      "text_muted": "#94A3B8",
+      "text_dim": "#64748B"
+    }
   },
   "typography": {
-    "heading_font": "Barlow Condensed, Outfit, sans-serif",
-    "body_font": "Inter, Plus Jakarta Sans, sans-serif",
-    "mono_font": "JetBrains Mono, Fira Code, monospace",
-    "font_loading": "<link href=\"https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap\" rel=\"stylesheet\">",
-    "hierarchy": {
-      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight uppercase font-heading",
-      "h2": "text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight uppercase font-heading",
-      "h3": "text-lg sm:text-xl font-semibold font-heading tracking-wide",
-      "h4_card": "text-base sm:text-lg font-semibold font-sans",
-      "body": "text-sm sm:text-base font-normal leading-relaxed font-sans",
-      "mono_data": "font-mono text-xs sm:text-sm tracking-wider uppercase",
-      "label_overline": "text-[11px] font-bold tracking-[0.2em] uppercase text-slate-400 font-sans"
+    "heading_font": "Barlow Condensed, sans-serif",
+    "body_font": "IBM Plex Sans, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "rules": {
+      "h1": "font-heading uppercase tracking-wide text-3xl sm:text-4xl text-slate-100 font-extrabold",
+      "h2": "font-heading uppercase tracking-wider text-xl sm:text-2xl text-slate-200 font-bold",
+      "h3": "font-heading text-lg font-semibold text-slate-300",
+      "numbers_totals": "font-mono font-bold tracking-tight text-slate-100",
+      "labels": "text-xs font-semibold uppercase tracking-widest text-slate-400"
     }
   },
-  "colors": {
-    "palette": {
-      "bg_dark": "#0B0F17",
-      "card_dark": "#131B2A",
-      "card_dark_hover": "#1A2438",
-      "border_dark": "#233044",
-      "text_primary_dark": "#F8FAFC",
-      "text_secondary_dark": "#94A3B8",
-      "primary_brand": "#E05600",
-      "primary_brand_hover": "#F96D16",
-      "accent_cyan": "#00F0FF",
-      "accent_green_success": "#10B981",
-      "accent_yellow_warning": "#F59E0B",
-      "accent_red_danger": "#EF4444",
-      "accent_purple_ai": "#A855F7",
-      "bg_light": "#F8FAFC",
-      "card_light": "#FFFFFF",
-      "border_light": "#E2E8F0",
-      "text_primary_light": "#0F172A",
-      "text_secondary_light": "#64748B"
+  "layout_refactoring": {
+    "mode": "FULL_WIDTH_SINGLE_COLUMN",
+    "description": "Migration from old 2-column layout to 100% full-width workspace with maximum horizontal real estate for dynamic inline editing tables.",
+    "top_bar": {
+      "sticky": true,
+      "background": "bg-[#090d14]/90 backdrop-blur-md border-b border-slate-800/80 z-30 p-4",
+      "elements": [
+        "Breadcrumb & Back to Work Orders button (data-testid='btn-back-work-orders')",
+        "Work Order Code & Status Badge (e.g., 'CL-2026-0894' & Status: În Lucru / Finalizată)",
+        "Summary metrics pill (Subtotal Manoperă, Subtotal Piese, TVA, Total General)",
+        "Action controls: Save Order (data-testid='btn-save-work-order'), Print PDF (data-testid='btn-print-work-order'), Status Dropdown (data-testid='select-status')"
+      ]
     },
-    "semantic_status_badges": {
-      "Nouă": "bg-blue-500/10 text-blue-400 border-blue-500/30",
-      "În diagnosticare": "bg-purple-500/10 text-purple-400 border-purple-500/30",
-      "Așteaptă ofertă": "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-      "Aprobată": "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-      "În lucru": "bg-orange-500/10 text-orange-400 border-orange-500/30",
-      "Așteaptă piese": "bg-rose-500/10 text-rose-400 border-rose-500/30",
-      "Finalizată": "bg-teal-500/10 text-teal-400 border-teal-500/30",
-      "Facturată": "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
-      "Închisă": "bg-slate-500/10 text-slate-400 border-slate-500/30"
+    "sections": [
+      {
+        "id": "wo_header_info",
+        "title": "Date Generale Comandă & Vehicul",
+        "layout": "grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl bg-[#111723] border border-slate-800 mb-6"
+      },
+      {
+        "id": "labor_table_section",
+        "title": "Tabel Manoperă (Labor Operations)",
+        "layout": "w-full rounded-xl bg-[#111723] border border-slate-800 p-6 mb-6 overflow-x-auto"
+      },
+      {
+        "id": "parts_table_section",
+        "title": "Tabel Piese & Materiale (Parts & Materials)",
+        "layout": "w-full rounded-xl bg-[#111723] border border-slate-800 p-6 mb-6 overflow-x-auto"
+      },
+      {
+        "id": "financial_recalculation_summary",
+        "title": "Sumar Financiar & Recalculare Automată",
+        "layout": "w-full grid grid-cols-1 lg:grid-cols-3 gap-6 rounded-xl bg-[#111723] border border-slate-800 p-6 mb-8"
+      }
+    ]
+  },
+  "inline_editing_spec": {
+    "labor_table": {
+      "add_row_trigger": "data-testid='btn-add-labor-row'",
+      "editable_fields_post_add": [
+        {
+          "field": "name_description",
+          "label": "Denumire Operațiune / Descriere",
+          "type": "text/textarea",
+          "data_testid": "input-labor-name-row-{id}"
+        },
+        {
+          "field": "hours_quantity",
+          "label": "Ore Normative / Cantitate",
+          "type": "number",
+          "step": "0.1",
+          "data_testid": "input-labor-hours-row-{id}"
+        },
+        {
+          "field": "hourly_rate",
+          "label": "Tarif Orar / Preț Unitar (RON)",
+          "type": "number",
+          "step": "1",
+          "data_testid": "input-labor-rate-row-{id}"
+        },
+        {
+          "field": "discount",
+          "label": "Discount (%)",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "data_testid": "input-labor-discount-row-{id}"
+        },
+        {
+          "field": "mechanic_id",
+          "label": "Mecanic Alocat",
+          "type": "select",
+          "data_testid": "select-labor-mechanic-row-{id}"
+        }
+      ],
+      "actions": [
+        "Inline Edit Button: data-testid='btn-edit-labor-row-{id}'",
+        "Inline Save Button: data-testid='btn-save-labor-row-{id}'",
+        "Inline Cancel Button: data-testid='btn-cancel-labor-row-{id}'",
+        "Inline Delete Button: data-testid='btn-delete-labor-row-{id}'"
+      ]
+    },
+    "parts_table": {
+      "add_row_trigger": "data-testid='btn-add-part-row'",
+      "editable_fields_post_add": [
+        {
+          "field": "code_name",
+          "label": "Cod Piesă / Denumire",
+          "type": "text",
+          "data_testid": "input-part-code-name-row-{id}"
+        },
+        {
+          "field": "quantity",
+          "label": "Cantitate",
+          "type": "number",
+          "step": "1",
+          "data_testid": "input-part-qty-row-{id}"
+        },
+        {
+          "field": "unit_price",
+          "label": "Preț de Vânzare Unitar (RON)",
+          "type": "number",
+          "step": "0.01",
+          "data_testid": "input-part-price-row-{id}"
+        },
+        {
+          "field": "discount",
+          "label": "Discount (%)",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "data_testid": "input-part-discount-row-{id}"
+        },
+        {
+          "field": "source_info",
+          "label": "Furnizor / Depozit Sursă (Read-only preserve existing)",
+          "type": "text_readonly",
+          "data_testid": "part-source-row-{id}"
+        }
+      ],
+      "actions": [
+        "Inline Edit Button: data-testid='btn-edit-part-row-{id}'",
+        "Inline Save Button: data-testid='btn-save-part-row-{id}'",
+        "Inline Cancel Button: data-testid='btn-cancel-part-row-{id}'",
+        "Inline Delete Button: data-testid='btn-delete-part-row-{id}'"
+      ]
     }
   },
-  "layout_and_spacing": {
-    "dashboard_grid_mode": "High Density Grid (Mode B)",
-    "container_paddings": "p-4 sm:p-6 lg:p-8",
-    "card_internal_padding": "p-5 sm:p-6",
-    "grid_gap": "gap-4 sm:gap-6",
-    "sidebar_width": "w-64 desktop, collapsable to w-16 or slide-over on mobile",
-    "alignment_rules": "Always left-align text data, tables, VIN numbers, and financial details. Right-align monetary amounts (RON / EUR) and metrics. Center badges and action buttons."
+  "recalculation_rules": {
+    "line_total_formula": "rowTotal = (quantity * unitPrice) * (1 - discount / 100)",
+    "labor_subtotal_formula": "subtotalLabor = sum(laborRowTotals)",
+    "parts_subtotal_formula": "subtotalParts = sum(partsRowTotals)",
+    "subtotal_net_formula": "subtotalNet = subtotalLabor + subtotalParts",
+    "vat_formula": "vatAmount = subtotalNet * (vatRate / 100)",
+    "grand_total_formula": "grandTotal = subtotalNet + vatAmount",
+    "trigger": "Recalculate automatically on every inline input change or line save."
   },
-  "component_strategies": {
-    "file_type_extension": ".js files (React JavaScript)",
-    "ui_library": "Shadcn UI primitives with heavy industrial custom styling",
-    "navigation_header": {
-      "visible_links_desktop": "Always show current Module, Search VIN/Client input, Language Switcher (RO/EN), Theme Switcher (Dark/Light), Notification Bell, Quick Action (+ Notă Recepție), User Profile",
-      "sticky_header_classes": "sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 dark:bg-slate-950/80 border-b border-slate-800"
-    },
-    "data_tables": {
-      "density": "Compact, 40px row height for maximum scanability",
-      "features": "Column sorting, search filters, pagination, row highlight, click-to-expand details, action dropdowns",
-      "borders": "1px solid border-slate-800, striped alternating rows in dark mode"
-    },
-    "work_order_kanban": {
-      "columns": ["Nouă", "În diagnosticare", "Așteaptă ofertă", "Aprobată", "În lucru", "Așteaptă piese", "Finalizată", "Facturată"],
-      "card_style": "Industrial card with VIN badge, mechanic avatar, progress bar, countdown timer, and total estimate"
-    },
-    "reception_wizard": {
-      "mandatory_photos": ["Față", "Spate", "Lateral Stânga", "Lateral Dreapta", "Interior / Bord / Km"],
-      "signature_pad": "Interactive Canvas Signature Pad for digital customer handover validation",
-      "car_diagram": "Interactive damage inspection map (click to mark scratches/dents)"
-    },
-    "ai_assistant_panel": {
-      "title": "AI Service Advisor & OBD Diagnostic (Gemini)",
-      "capabilities": ["Fault code diagnosis (DTC P0300 etc.)", "Labor time & OEM part estimation", "Customer message generator (RO/EN)", "E-Factura XML validation check"]
-    }
+  "status_based_locking": {
+    "editable_statuses": ["Draft", "În Lucru", "În Așteptare"],
+    "locked_status": "Finalizată",
+    "behavior": "When status is 'Finalizată' (or Invoiced/Closed), all table inputs become disabled/read-only, add/edit/delete buttons are hidden or disabled, and a persistent lock banner is displayed."
   },
-  "image_urls": [
-    {
-      "category": "hero_workshop_banner",
-      "url": "https://images.unsplash.com/photo-1615906655593-ad0386982a0f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwxfHxhdXRvJTIwcmVwYWlyJTIwc2VydmljZSUyMG1lY2hhbmljJTIwd29ya3Nob3AlMjBjYXIlMjBkaWFnbm9zdGljc3xlbnwwfHx8fDE3OTIxODk2MDJ8MA&ixlib=rb-4.1.0&q=85",
-      "description": "Mechanic inspecting car engine with precision diagnostics in modern workshop",
-      "placement": "Dashboard header banner & Reception hero section"
-    },
-    {
-      "category": "under_vehicle_service",
-      "url": "https://images.unsplash.com/photo-1643701079732-3b1c7a797e3d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHw0fHxhdXRvJTIwcmVwYWlyJTIwc2VydmljZSUyMG1lY2hhbmljJTIwd29ya3Nob3AlMjBjYXIlMjBkaWFnbm9zdGljc3xlbnwwfHx8fDE3OTIxODk2MDJ8MA&ixlib=rb-4.1.0&q=85",
-      "description": "Technician working on car underside elevator lift",
-      "placement": "Elevator occupancy widget & Mechanic productivity modal"
-    },
-    {
-      "category": "obd_diagnostic_tablet",
-      "url": "https://images.pexels.com/photos/4116172/pexels-photo-4116172.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-      "description": "OBD diagnostic scanner connected to car engine compartment",
-      "placement": "AI Diagnostic OBD modal & Reception wizard step"
-    },
-    {
-      "category": "mechanic_coveralls_inspection",
-      "url": "https://images.pexels.com/photos/6870295/pexels-photo-6870295.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-      "description": "Mechanic in blue coveralls performing quality inspection",
-      "placement": "Mechanics team list & Quality Control checklist header"
+  "image_urls": {
+    "workshop_banner": {
+      "url": "https://images.unsplash.com/photo-1615906655593-ad0386982a0f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxhdXRvJTIwbWVjaGFuaWMlMjByZXBhaXJpbmclMjBjYXIlMjB3b3Jrc2hvcCUyMGdhcmFnZXxlbnwwfHx8YmxhY2t8MTc5MjM1NjMxMHww&ixlib=rb-4.1.0&q=85",
+      "description": "Mechanic working on car engine in modern service bay",
+      "usage": "Optional header avatar / hero background widget for work order workspace"
     }
-  ],
-  "motion_and_interactions": {
-    "libraries": "framer-motion, lucide-react",
-    "animations": {
-      "hover_cards": "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-orange-500/5 transition-all duration-200",
-      "button_click": "active:scale-95 transition-transform duration-100",
-      "kanban_drag": "Smooth drag and drop reordering of work orders across columns",
-      "modal_fade": "initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.15 }}"
-    }
-  },
-  "testing_and_accessibility": {
-    "data_testid_requirement": "CRITICAL: All interactive elements (buttons, inputs, select dropdowns, tab triggers, modal buttons, language toggles, status pills, table action menus, print buttons) MUST have specific `data-testid` attributes in kebab-case format.",
-    "examples": [
-      "data-testid=\"login-email-input\"",
-      "data-testid=\"login-submit-button\"",
-      "data-testid=\"nav-language-toggle\"",
-      "data-testid=\"nav-theme-toggle\"",
-      "data-testid=\"sidebar-comenzi-lucru-link\"",
-      "data-testid=\"reception-wizard-start-button\"",
-      "data-testid=\"kanban-card-WO-8902\"",
-      "data-testid=\"quote-version-approve-button\"",
-      "data-testid=\"efactura-download-xml-button\"",
-      "data-testid=\"ai-advisor-ask-button\""
-    ],
-    "contrast_ratio": "Minimum 4.5:1 for standard body text, 3:1 for large headers and status tags against background."
   },
   "instructions_to_main_agent": [
-    "1. Use standard JS/JSX syntax throughout all components (.js files).",
-    "2. Implement full support for RO/EN language translation via a centralized state or i18n dictionary so every label, menu item, table header, and status has both Romanian and English strings.",
-    "3. Build all core enterprise modules: Dashboard Executiv (with KPI cards, Recharts graphics, elevator occupancy), CRM Clienți (Persoane fizice/juridice with CNP/CUI/Reg Com), Parc Auto (VIN lookup, car specs, history), Recepție Service (inspection wizard, photos upload slots, signature canvas pad), Comenzi de Lucru (Kanban + pipeline + line items for parts & labor), Devize (versioning & approval), Mecanici (time tracking, efficiency = billed hours/present hours), Magazie (NIR, OE/Aftermarket stocks, shelf location), Facturare (e-Factura ANAF XML generator/downloader), Încasări (cash/POS register log), and AI Advisor (Gemini OBD diagnostic assistant).",
-    "4. Implement responsive layout with collapsible dark sidebar, top navigation bar with search bar and user profile dropdown.",
-    "5. Ensure mock data is highly authentic with real Romanian car brands, VINs, Romanian CUI/CNP formats, and realistic RON pricing.",
-    "6. Include data-testid on every clickable or inspectable UI element."
+    "Refactor WorkOrderDetail.js and WorkOrders.js to use full-width single column workspace layout.",
+    "Implement inline editing directly on table rows using stateful inline input fields or inline popovers for labor and parts.",
+    "Ensure immediate automatic recalculation of subtotal Manoperă, subtotal Piese, TVA (19%), and Total Deviz upon editing any cell.",
+    "Enforce status locking: when work order status is 'Finalizată', disable all editing actions and show lock status banner.",
+    "Add explicit data-testid attributes to all editable inputs, buttons, totals, and table rows.",
+    "Use standard JavaScript (.js) files as configured in the frontend codebase."
   ],
-  "UNIVERSAL GUIDELINES FOR MAIN AGENT": {
-    "anti_ai_slop": "Avoid standard centered Bootstrap-like templates. Use dense, high-utility tactical grids with sharp 1px borders, subtle glowing status accents, and crisp typography.",
-    "dark_light_toggle": "Default to dark theme while offering a top-nav toggle button for light mode.",
-    "spacing": "Maintain generous internal padding inside containers to prevent border collisions.",
-    "no_transparent_overlays": "Never use fully transparent header or dropdown backgrounds. Always apply backdrop-blur with slate-900/95 or slate-950/95.",
-    "toasts": "Use Sonner component at `/app/frontend/src/components/ui/sonner.js` for action feedback (e.g., invoice generated, signature saved, work order updated)."
-  }
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "DO NOT use pure transparent backgrounds on floating panels, dropdowns, or sticky headers. Always combine background colors with backdrop-blur.",
+    "Ensure high contrast APCA standards for dark theme text (e.g., text-slate-100 on bg-[#111723]).",
+    "All interactive elements MUST contain data-testid attributes for automated testing."
+  ]
 }
