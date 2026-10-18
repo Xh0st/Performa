@@ -15,6 +15,7 @@ const REASONS = {
   diagnoza: ["Diagnoză", "Diagnosis"],
   constatare: ["Constatare", "Assessment"],
   inchidere_nefacturata: ["Închidere fără factură", "Closed without invoice"],
+  deviz_aprobat: ["Deviz aprobat", "Approved quote"],
 };
 
 export default function ClosureReview() {
@@ -50,7 +51,7 @@ export default function ClosureReview() {
     <div data-testid="closure-review-page">
       <PageHeader
         eyebrow={tr("Administrare · conformitate financiară", "Administration · financial compliance")}
-        title={tr("Verificare închideri fără deviz aprobat", "Closure review without approved quote")}
+        title={tr("Verificare închideri nefacturate", "Uninvoiced closure review")}
       />
       <Panel testid="closure-review-panel">
         {!data.length ? (
@@ -66,7 +67,6 @@ export default function ClosureReview() {
                   <th>{tr("Client", "Client")}</th>
                   <th>{tr("Motiv", "Reason")}</th>
                   <th>{tr("Închisă", "Closed")}</th>
-                  <th>{tr("Aprobare", "Approval")}</th>
                   <th />
                 </tr>
               </thead>
@@ -87,7 +87,6 @@ export default function ClosureReview() {
                       <td>{workOrder.client_name}</td>
                       <td>{tr(reason[0], reason[1])}</td>
                       <td className="font-mono text-xs">{dt(workOrder.closed_at)}</td>
-                      <td>{tr("În așteptare", "Pending")}</td>
                       <td>
                         <div className="flex gap-2">
                           <Button
@@ -98,7 +97,7 @@ export default function ClosureReview() {
                             onClick={() => review(workOrder)}
                           >
                             <CheckCircle2 className="mr-1 h-4 w-4" />
-                            {tr("Aprobă", "Approve")}
+                            {tr("Aprobare", "Approve")}
                           </Button>
                           <Button
                             variant="outline"
@@ -108,7 +107,7 @@ export default function ClosureReview() {
                             onClick={() => reopen(workOrder)}
                           >
                             <RotateCcw className="mr-1 h-4 w-4" />
-                            {tr("Redeschide", "Reopen")}
+                            {tr("Redeschidere comandă", "Reopen work order")}
                           </Button>
                         </div>
                       </td>

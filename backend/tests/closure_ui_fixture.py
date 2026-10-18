@@ -28,6 +28,10 @@ def setup():
                     "closure_quote_rule": {"allowed": True, "reason": "inchidere_nefacturata", "review": True}}
             doc["status_history"].append({"status": "inchisa", "at": iso(), "by": "TEST", "note": ""})
         ids[key] = str(db.work_orders.insert_one(doc).inserted_id)
+    # D: invoiced (fake invoice_id) -> no status selector in UI
+    ids["D"] = str(db.work_orders.insert_one({"number": f"TEST-UI{tag}-D", "client_id": str(cid), "vehicle_id": str(vid), "status": "facturata",
+                                              "invoice_id": str(ObjectId()), "mileage_in": 1000, "complaint": "TEST", "lines": [], "quotes": [],
+                                              "qc": {}, "status_history": [], "created_at": iso(), "reception": {}, "mechanic_ids": []}).inserted_id)
     st = {"tag": tag, "cid": str(cid), "vid": str(vid), "ids": ids}
     json.dump(st, open(STATE, "w"))
     print(json.dumps(st))

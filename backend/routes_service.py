@@ -264,6 +264,8 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
     st = body.status
     if st not in WO_STATUSES or st == "facturata":
         raise HTTPException(400, "Status invalid (Facturată se setează automat la emiterea facturii)")
+    if w.get("invoice_id"):
+        raise HTTPException(400, "Comanda facturată nu poate fi închisă sau redeschisă")
     if w["status"] in LOCKED:
         raise HTTPException(400, "Comanda este facturată sau închisă și nu mai poate fi modificată")
     if st == "finalizata" and not w.get("qc", {}).get("passed"):
@@ -292,7 +294,11 @@ class ClosureReviewIn(BaseModel):
 
 @router.get("/closure-exceptions/work-orders")
 async def closure_exceptions(user=Depends(require("settings"))):
-    rows = await db.work_orders.find({"status": "inchisa", "closure_review": {"$exists": False}}).sort("closed_at", -1).to_list(2000)
+    rows = await db.work_orders.find({
+        "status": "inchisa",
+        "invoice_id": {"$in": [None, ""]},
+        "closure_review": {"$exists": False},
+    }).sort("closed_at", -1).to_list(2000)
     flagged = []
     for row in rows:
         row["closure_quote_rule"] = row.get("closure_quote_rule") or quote_closure_rule(row)

@@ -1,0 +1,36 @@
+{
+  "summary": "Tested closure without an invoice, Verificare închideri (approve/reopen) and the fiscal invoice gate (backend + UI), using isolated TEST data only. Backend: 30/34 pass, 1 skip. Direct close with no quote, draft, rejected (real API flow), approved and warranty orders all work across all 7 operational statuses. No QC is required to close, and pre_closure_status + closure_quote_rule are stored. facturata orders cannot be changed to any status, closed, reopened, approved or re-invoiced. Approve removes the order from the list and it stays inchisa. Reopen restores pre_closure_status (or the legacy fallback from history), removes the order from the list, and the order can be edited and closed again. RBAC: 403 for mecanic, 401 without a token. Fiscal invoice gate: returns 400 'Factura fiscală necesită un deviz emis și aprobat' with no quote, or a rejected/draft/sent/superseded quote, and creates no invoice. It returns 400 without QC and 400 when the order is not finalizata. It accepts a real flow: generated quote -> approved with signature -> QC passed -> finalizata -> fiscal invoice 200, and the order becomes facturata. UI: every row on /closure-review has a Link href=/work-orders/{id}; clicking it navigates correctly. Every row has approve and reopen buttons. Clicking approve or reopen on TEST rows removes the row; the reopened order shows ÎN LUCRU. Work order detail: an in_lucru order lists 'inchisa' in the status select; facturata and inchisa orders show no status selector. IMPORTANT: real CL-2026-00086 is NOT currently inchisa. It was reopened to 'aprobata' at 2026-10-18T20:21:59Z by andrei.melek@gmail.com (POST /reopen 200 in the backend log, audit 'reopen'), about 4.5 minutes BEFORE this testing session began. My tests never mutated it: snapshot assertions at teardown passed. It is therefore not in the review list. I did not restore it, as instructed (no mutation).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/work-orders/{id}/status (inchisa)", "issue": "Only status is checked (LOCKED). A work order that has invoice_id but a status other than facturata (e.g. finalizata after data drift) can be closed (200). The rule says invoiced orders must never close. Add `if w.get('invoice_id'): 400`."},
+      {"endpoint": "GET /api/closure-exceptions/work-orders", "issue": "The query does not exclude invoice_id, so an inchisa order with invoice_id shows up in the review list, where Aprobă/Redeschide then return 400. Add `'invoice_id': {'$in': [None, '']}` (or $exists False) to the filter."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/closure-review", "issues": ["The title 'Verificare închideri fără deviz aprobat' is misleading: under the new rule every unbilled closure appears, including ones with an approved quote. Suggest 'Verificare închideri nefacturate'.", "Button labels are 'Aprobă'/'Redeschide', while the spec says 'Aprobare'/'Redeschidere comandă' (cosmetic).", "The 'Aprobare' column is static text 'În așteptare' and adds no information."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_closure_review.py", "/app/backend/tests/test_fiscal_quote_gate.py", "/app/backend/tests/closure_ui_fixture.py", "/app/test_reports/pytest/pytest_iter7.xml"],
+  "action_items": [
+    "change_status: reject inchisa (and any change) when w.get('invoice_id') is set, regardless of status",
+    "closure_exceptions GET: exclude records with invoice_id from the list",
+    "Inform the user: CL-2026-00086 was reopened to 'aprobata' at 20:21:59Z via /reopen by andrei.melek@gmail.com (this happened before testing and was not done by the test agent). If it should stay closed, the user must close it again; the test agent did not touch it",
+    "Optional: rename the ClosureReview title/buttons to match the spec"
+  ],
+  "critical_code_review_comments": [
+    "quote_closure_rule is now only used for finalizata. For a draft/sent quote, finalizata returns 'Devizul este în așteptare', which is consistent with the fiscal gate. However, closure_exceptions still recomputes quote_closure_rule for legacy rows, which yields 'deviz_aprobat' -> the UI REASONS map has no entry -> shows '—'",
+    "invoice_from_wo checks `any approved` quote but not that the approved quote matches the current lines (the lines can be edited after approval). Consider comparing totals or locking lines after approval",
+    "The leftover TEST-UI012EE5 fixture (3 work orders + client + vehicle) from a previous run was found in the review list. I cleaned it up; make sure closure_ui_fixture teardown is always run"
+  ],
+  "updated_files": ["/app/backend/tests/test_fiscal_quote_gate.py", "/app/backend/tests/closure_ui_fixture.py"],
+  "success_rate": {"backend": "88% (30/34; 2 real minor bugs, 1 real-record-state assertion x2)", "frontend": "100%"},
+  "seed_data_creation": "Only TEST_-prefixed clients/vehicles/WOs/invoices. All of it was removed, along with the leftover TEST-UI012EE5 data. The invoice and warranty_certificate counters were restored and efactura auto_send was restored. Residue check: 0.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend/tests && pytest test_closure_review.py test_fiscal_quote_gate.py. Two failures in test_closure_review (invoice_id edge cases) remain until the backend fix. test_real_cl_00086_readonly in test_fiscal_quote_gate.py fails because the real record is now 'aprobata' (it was reopened by a real user at 20:21:59Z). UI fixture: python closure_ui_fixture.py setup|teardown (A,B closed; C in_lucru; D facturata).",
+  "rca of the issue": "CL-2026-00086 state: backend log shows POST /api/work-orders/6ad3d505afe314ce5bd6df92/reopen 200, and audit_logs show action=reopen by andrei.melek@gmail.com at 2026-10-18T20:21:59Z. The status history ends with 'aprobata' / 'Redeschis din verificare închideri'. This happened before test execution started (~20:26Z), most likely a click on Redeschide in the UI preview."
+}
