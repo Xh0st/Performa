@@ -1,5 +1,4 @@
-# Closure review / quote closure rules / facturata immutability regression tests (iteration 7)
-import os
+# Direct closure of non-invoiced work orders + Administrare > Verificare închideri (approve / reopen) regression tests (iteration 7)
 import secrets
 from datetime import datetime, timezone
 
@@ -9,8 +8,10 @@ from bson import ObjectId
 from warranty_fixtures import BASE, mdb, session
 
 TAG = "CLR" + secrets.token_hex(3).upper()
-REAL_NUMBER = "CL-2026-00083"
-QC_OK = {"passed": True, "at": "2026-01-01T00:00:00+00:00", "inspector_name": "TEST"}
+REAL_NUMBER = "CL-2026-00086"
+PROJ = {"status": 1, "quotes": 1, "status_history": 1, "closure_review": 1, "pre_closure_status": 1, "closed_at": 1, "invoice_id": 1}
+OPERATIONAL = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "in_lucru", "asteapta_piese", "finalizata"]
+APPROVED_Q = [{"version": 1, "status": "approved", "number": "DV-TEST"}]
 
 
 def iso():
@@ -20,150 +21,202 @@ def iso():
 @pytest.fixture(scope="module")
 def ctx():
     db = mdb()
-    real = db.work_orders.find_one({"number": REAL_NUMBER}, {"status": 1, "quotes": 1, "status_history": 1, "closure_review": 1})
+    real = db.work_orders.find_one({"number": REAL_NUMBER}, PROJ)
     s = session()
     cid = db.clients.insert_one({"name": f"TEST_Client {TAG}", "type": "pf", "phone": "0700000000", "created_at": iso()}).inserted_id
     vid = db.vehicles.insert_one({"client_id": str(cid), "vin": f"TEST{TAG}".ljust(17, "0")[:17], "plate": f"TS{TAG}",
                                   "make": "Test", "model": "Car", "mileage": 1000, "created_at": iso()}).inserted_id
     made = []
 
-    def mk(suffix, status="asteapta_oferta", quotes=None, qc=None, lines=None, **extra):
+    def mk(suffix, status="asteapta_oferta", quotes=None, qc=None, lines=None, history=None, **extra):
         doc = {"number": f"TEST-{TAG}-{suffix}", "client_id": str(cid), "vehicle_id": str(vid), "status": status, "mileage_in": 1000,
-               "complaint": "TEST", "lines": lines or [], "quotes": quotes or [], "qc": qc or {}, "status_history": [],
+               "complaint": "TEST", "lines": lines or [], "quotes": quotes or [], "qc": qc or {},
+               "status_history": history if history is not None else [{"status": status, "at": iso(), "by": "TEST", "note": ""}],
                "created_at": iso(), "reception": {}, "mechanic_ids": []} | extra
         wid = str(db.work_orders.insert_one(doc).inserted_id)
         made.append(wid)
         return wid
 
-    yield {"s": s, "db": db, "mk": mk, "real": real}
+    def listed():
+        r = s.get(f"{BASE}/closure-exceptions/work-orders")
+        assert r.status_code == 200, r.text
+        return {x["id"]: x for x in r.json()}
+
+    yield {"s": s, "db": db, "mk": mk, "real": real, "listed": listed}
     db.work_orders.delete_many({"$or": [{"_id": {"$in": [ObjectId(w) for w in made]}}, {"vehicle_id": str(vid)}]})
     db.audit_logs.delete_many({"entity_id": {"$in": made}})
     db.time_entries.delete_many({"work_order_id": {"$in": made}})
     db.notifications.delete_many({"work_order_id": {"$in": made}})
     db.vehicles.delete_one({"_id": vid})
     db.clients.delete_one({"_id": cid})
-    after = db.work_orders.find_one({"number": REAL_NUMBER}, {"status": 1, "quotes": 1, "status_history": 1, "closure_review": 1})
-    assert after == real, "Real CL-2026-00083 was modified!"
+    assert db.work_orders.find_one({"number": REAL_NUMBER}, PROJ) == real, "Real CL-2026-00086 was modified!"
     assert db.work_orders.count_documents({"number": {"$regex": TAG}}) == 0
 
 
-# --- quote closure rule: no quote -> direct close
-def test_no_quote_direct_close_from_asteapta_oferta(ctx):
-    s, wid = ctx["s"], ctx["mk"]("NOQ")
+# --- approved quote: every operational status -> inchisa without QC, pre_closure_status kept, listed
+@pytest.mark.parametrize("st", OPERATIONAL)
+def test_approved_quote_any_status_closes_without_qc(ctx, st):
+    s = ctx["s"]
+    wid = ctx["mk"](f"APP{st}", status=st, quotes=APPROVED_Q)
     r = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
     assert r.status_code == 200, r.text
     d = r.json()
-    assert d["status"] == "inchisa"
-    assert d["closure_quote_rule"]["reason"] == "fara_deviz_generat" and d["closure_quote_rule"]["review"] is True
-    assert d["closed_at"]
-    g = s.get(f"{BASE}/work-orders/{wid}").json()
-    assert g["status"] == "inchisa"
+    assert d["status"] == "inchisa" and d["closed_at"]
+    assert d["pre_closure_status"] == st
+    assert d["closure_quote_rule"]["review"] is True
+    assert d["status_history"][-1]["status"] == "inchisa"
+    row = ctx["listed"]().get(wid)
+    assert row, "closed WO not in closure review list"
+    assert row["number"] == f"TEST-{TAG}-APP{st}" and row["client_name"].startswith("TEST_Client")
+
+
+# --- no quote / rejected (real API flow) / draft quote -> direct close
+def test_no_quote_closes(ctx):
+    s, wid = ctx["s"], ctx["mk"]("NOQ", status="noua", quotes=[])
+    r = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
+    assert r.status_code == 200, r.text
+    assert r.json()["pre_closure_status"] == "noua"
+    assert wid in ctx["listed"]()
     ctx["noq"] = wid
 
 
-# --- exceptions list contains it, review removes it, history persists
-def test_exception_listed_then_reviewed_disappears(ctx):
-    s, wid = ctx["s"], ctx["noq"]
-    lst = s.get(f"{BASE}/closure-exceptions/work-orders").json()
-    assert wid in [x["id"] for x in lst]
-    r = s.post(f"{BASE}/work-orders/{wid}/closure-review", json={"note": "TEST review"})
-    assert r.status_code == 200, r.text
-    assert r.json()["closure_review"]["note"] == "TEST review"
-    lst2 = s.get(f"{BASE}/closure-exceptions/work-orders").json()
-    assert wid not in [x["id"] for x in lst2]
-    g = s.get(f"{BASE}/work-orders/{wid}").json()
-    assert g["closure_review"]["by"] and g["closure_review"]["at"]
-
-
-# --- rejected quote via real API flow can be closed
-def test_rejected_quote_can_close(ctx):
+def test_rejected_quote_closes(ctx):
     s = ctx["s"]
     wid = ctx["mk"]("REJ", status="diagnosticare")
-    r = s.post(f"{BASE}/work-orders/{wid}/lines", json={"type": "labor", "description": "TEST manopera", "qty": 1, "unit_price": 100})
-    assert r.status_code == 200, r.text
-    q = s.post(f"{BASE}/work-orders/{wid}/quotes", json={"valid_days": 7})
-    assert q.status_code == 200, q.text
-    assert s.get(f"{BASE}/work-orders/{wid}").json()["status"] == "asteapta_oferta"
-    # draft blocks
-    b = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
-    assert b.status_code == 400
-    dec = s.post(f"{BASE}/work-orders/{wid}/quotes/1/decision", json={"approved": False, "reason": "TEST"})
-    assert dec.status_code == 200, dec.text
-    r2 = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
-    assert r2.status_code == 200, r2.text
-    assert r2.json()["closure_quote_rule"]["reason"] == "deviz_respins"
-    assert wid in [x["id"] for x in s.get(f"{BASE}/closure-exceptions/work-orders").json()]
-
-
-# --- draft/sent quote blocks finalizata and inchisa (even with QC passed)
-@pytest.mark.parametrize("qstatus", ["draft", "sent"])
-def test_pending_quote_blocks(ctx, qstatus):
-    s = ctx["s"]
-    wid = ctx["mk"](f"PEND{qstatus}", quotes=[{"version": 1, "status": qstatus, "number": "DV-TEST"}], qc=QC_OK)
-    for st in ("finalizata", "inchisa"):
-        r = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": st})
-        assert r.status_code == 400, f"{st}: {r.text}"
-        assert "Devizul" in r.json().get("detail", "")
-    assert s.get(f"{BASE}/work-orders/{wid}").json()["status"] == "asteapta_oferta"
-
-
-# --- other allowed exceptions: warranty (no review), closure categories (review)
-@pytest.mark.parametrize("cat", ["fara_cost", "diagnoza", "constatare"])
-def test_closure_category_allows_close(ctx, cat):
-    s = ctx["s"]
-    wid = ctx["mk"](f"CAT{cat}", status="in_lucru")
-    u = s.put(f"{BASE}/work-orders/{wid}", json={"closure_category": cat})
-    assert u.status_code == 200 and u.json()["closure_category"] == cat
+    assert s.post(f"{BASE}/work-orders/{wid}/lines", json={"type": "labor", "description": "TEST manopera", "qty": 1, "unit_price": 100}).status_code == 200
+    assert s.post(f"{BASE}/work-orders/{wid}/quotes", json={"valid_days": 7}).status_code == 200
+    assert s.post(f"{BASE}/work-orders/{wid}/quotes/1/decision", json={"approved": False, "reason": "TEST"}).status_code == 200
     r = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
     assert r.status_code == 200, r.text
-    assert r.json()["closure_quote_rule"] == {"allowed": True, "reason": cat, "review": True}
+    assert r.json()["pre_closure_status"] == "asteapta_oferta"
+    assert wid in ctx["listed"]()
 
 
-def test_warranty_allows_close_without_review(ctx):
-    s = ctx["s"]
+def test_draft_quote_closes(ctx):
+    wid = ctx["mk"]("DRAFT", quotes=[{"version": 1, "status": "draft"}])
+    r = ctx["s"].post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
+    assert r.status_code == 200, r.text
+
+
+def test_warranty_wo_closes_and_listed(ctx):
     wid = ctx["mk"]("GAR", is_warranty=True)
-    r = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
+    r = ctx["s"].post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
     assert r.status_code == 200, r.text
-    assert r.json()["closure_quote_rule"]["review"] is False
-    assert wid not in [x["id"] for x in s.get(f"{BASE}/closure-exceptions/work-orders").json()]
+    assert wid in ctx["listed"]()
 
 
-def test_invalid_closure_category_rejected(ctx):
-    wid = ctx["mk"]("BADCAT")
-    r = ctx["s"].put(f"{BASE}/work-orders/{wid}", json={"closure_category": "xyz"})
+# --- finalizata still requires QC
+def test_finalizata_still_requires_qc(ctx):
+    wid = ctx["mk"]("FINQC", status="in_lucru", quotes=APPROVED_Q)
+    r = ctx["s"].post(f"{BASE}/work-orders/{wid}/status", json={"status": "finalizata"})
     assert r.status_code == 400
 
 
-# --- facturata is immutable
+# --- invoiced orders can never become inchisa
 @pytest.mark.parametrize("target", ["inchisa", "finalizata", "in_lucru", "facturata"])
 def test_facturata_immutable(ctx, target):
     s = ctx["s"]
-    wid = ctx.get("fact") or ctx["mk"]("FACT", status="facturata", qc=QC_OK, invoiced_at=iso(),
-                                       lines=[{"id": "l1", "type": "labor", "description": "x", "qty": 1, "unit_price": 10, "discount": 0, "vat_rate": 21}])
+    wid = ctx.get("fact") or ctx["mk"]("FACT", status="facturata", invoice_id=str(ObjectId()), invoiced_at=iso(), quotes=APPROVED_Q)
     ctx["fact"] = wid
     r = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": target})
     assert r.status_code == 400
     assert s.get(f"{BASE}/work-orders/{wid}").json()["status"] == "facturata"
 
 
-# --- review endpoint permissions/validation
-def test_review_not_needed_returns_400(ctx):
-    wid = ctx["mk"]("APPR", quotes=[{"version": 1, "status": "approved"}])
-    r = ctx["s"].post(f"{BASE}/work-orders/{wid}/closure-review", json={"note": ""})
-    assert r.status_code == 400
+def test_invoice_id_with_non_facturata_status_cannot_close(ctx):
+    wid = ctx["mk"]("INVID", status="finalizata", invoice_id=str(ObjectId()), quotes=APPROVED_Q)
+    r = ctx["s"].post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
+    assert r.status_code == 400, f"WO with invoice_id was closed: {r.status_code}"
 
 
-def test_non_admin_cannot_review(ctx):
+def test_list_excludes_invoiced(ctx):
+    for row in ctx["listed"]().values():
+        assert not row.get("invoice_id"), f"{row['number']} invoiced but listed"
+        assert row["status"] == "inchisa"
+
+
+# --- approve: removed from list, stays inchisa
+def test_approve_removes_from_list(ctx):
+    s, wid = ctx["s"], ctx["noq"]
+    r = s.post(f"{BASE}/work-orders/{wid}/closure-review", json={"note": "TEST review"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["status"] == "inchisa" and d["closure_review"]["status"] == "aprobat" and d["closure_review"]["note"] == "TEST review"
+    assert wid not in ctx["listed"]()
+    assert s.get(f"{BASE}/work-orders/{wid}").json()["status"] == "inchisa"
+
+
+# --- reopen: back to pre_closure_status, removed from list, history kept; re-close re-enters list
+def test_reopen_restores_previous_status(ctx):
+    s = ctx["s"]
+    wid = ctx["mk"]("REOP", status="asteapta_piese", quotes=APPROVED_Q)
+    assert s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"}).status_code == 200
+    r = s.post(f"{BASE}/work-orders/{wid}/reopen", json={"note": ""})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["status"] == "asteapta_piese"
+    assert d["reopened_at"] and d["reopened_by"]
+    hist = [h["status"] for h in d["status_history"]]
+    assert hist[-2:] == ["inchisa", "asteapta_piese"]
+    assert d["status_history"][-1]["note"] == "Redeschis din verificare închideri"
+    assert wid not in ctx["listed"]()
+    # editable again
+    assert s.post(f"{BASE}/work-orders/{wid}/lines", json={"type": "labor", "description": "TEST", "qty": 1, "unit_price": 1}).status_code == 200
+    # close again from another status -> listed again, new pre_closure_status
+    assert s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "in_lucru"}).status_code == 200
+    r2 = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": "inchisa"})
+    assert r2.status_code == 200 and r2.json()["pre_closure_status"] == "in_lucru"
+    assert wid in ctx["listed"]()
+
+
+def test_reopen_after_approve(ctx):
+    s, wid = ctx["s"], ctx["noq"]
+    r = s.post(f"{BASE}/work-orders/{wid}/reopen", json={"note": "TEST"})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "noua" and not r.json().get("closure_review")
+
+
+def test_reopen_legacy_without_pre_closure_status(ctx):
+    hist = [{"status": "noua", "at": iso(), "by": "T", "note": ""}, {"status": "in_lucru", "at": iso(), "by": "T", "note": ""},
+            {"status": "inchisa", "at": iso(), "by": "T", "note": ""}]
+    wid = ctx["mk"]("LEG", status="inchisa", history=hist, closed_at=iso())
+    r = ctx["s"].post(f"{BASE}/work-orders/{wid}/reopen", json={})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "in_lucru"
+
+
+# --- validation / RBAC
+def test_review_and_reopen_require_closed_uninvoiced(ctx):
+    s = ctx["s"]
+    open_wid = ctx["mk"]("OPEN", status="in_lucru")
+    inv_wid = ctx["mk"]("INVCL", status="inchisa", invoice_id=str(ObjectId()), closed_at=iso())
+    for wid in (open_wid, inv_wid):
+        assert s.post(f"{BASE}/work-orders/{wid}/closure-review", json={}).status_code == 400
+        assert s.post(f"{BASE}/work-orders/{wid}/reopen", json={}).status_code == 400
+    assert inv_wid not in ctx["listed"](), "invoiced closed WO appears in closure review list"
+
+
+def test_non_admin_forbidden(ctx):
     s2 = session("mecanic@")
-    r = s2.get(f"{BASE}/closure-exceptions/work-orders")
-    assert r.status_code == 403
-    r = s2.post(f"{BASE}/work-orders/{ctx['noq']}/closure-review", json={})
-    assert r.status_code == 403
+    wid = ctx["mk"]("RBAC", status="inchisa", closed_at=iso())
+    assert s2.get(f"{BASE}/closure-exceptions/work-orders").status_code == 403
+    assert s2.post(f"{BASE}/work-orders/{wid}/closure-review", json={}).status_code == 403
+    assert s2.post(f"{BASE}/work-orders/{wid}/reopen", json={}).status_code == 403
+    assert ctx["s"].get(f"{BASE}/work-orders/{wid}").json()["status"] == "inchisa"
 
 
-# --- real CL-2026-00083: read only
-def test_real_wo_readonly(ctx):
+def test_unauthenticated_401():
+    import requests
+    assert requests.get(f"{BASE}/closure-exceptions/work-orders").status_code == 401
+
+
+# --- real CL-2026-00086: read only
+def test_real_wo_readonly_snapshot(ctx):
     real = ctx["real"]
-    assert real, "CL-2026-00083 missing"
-    assert real["status"] == "asteapta_oferta"
-    assert not real.get("quotes")
+    assert real, "CL-2026-00086 missing"
+    assert not real.get("invoice_id")
+    listed = ctx["listed"]()
+    if real["status"] == "inchisa" and not real.get("closure_review"):
+        assert str(real["_id"]) in listed
+    else:
+        pytest.skip(f"CL-2026-00086 is currently '{real['status']}' (changed by a real user, not the test) - not in list")

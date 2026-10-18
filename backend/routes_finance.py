@@ -40,8 +40,8 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
             raise HTTPException(400, "Comenzile de garanție nu se facturează clientului")
         if not w.get("qc", {}).get("passed"):
             raise HTTPException(400, "Controlul calității final trebuie promovat înainte de facturare")
-        if not quote_closure_rule(w)["allowed"]:
-            raise HTTPException(400, "Devizul este în așteptare; aprobați sau respingeți-l înainte de facturare")
+        if not any(quote.get("status") == "approved" for quote in w.get("quotes", [])):
+            raise HTTPException(400, "Factura fiscală necesită un deviz emis și aprobat")
         if w.get("invoice_id"):
             raise HTTPException(400, "Comanda este deja facturată")
     s = await get_settings()
