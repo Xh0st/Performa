@@ -69,7 +69,10 @@ def setup(s, tag=None):
          "product_id": "", "code": "", "unit": "ore"},
     ]
     wid = db.work_orders.insert_one({"number": f"TEST-WOG-{tag}", "client_id": str(cid), "vehicle_id": str(vid), "status": "finalizata",
-                                     "mileage_in": 5000, "lines": lines, "quotes": [],
+                                     "mileage_in": 5000, "lines": lines,
+                                     "quotes": [{"version": 1, "number": f"DV-TEST-{tag}-v1", "status": "approved", "lines": [dict(x) for x in lines],
+                                                 "token": f"TEST{tag}", "created_at": iso(),
+                                                 "decision": {"approved": True, "name": "TEST", "via": "service", "at": iso(), "paper_approved": True, "signature": ""}}],
                                      "qc": {"passed": True, "at": iso(), "inspector_name": "TEST Inspector"},
                                      "status_history": [], "created_at": iso(), "reception": {}, "mechanic_ids": []}).inserted_id
     prof = s.post(f"{BASE}/invoices/from-work-order/{wid}", json={"type": "proforma"}).json()
