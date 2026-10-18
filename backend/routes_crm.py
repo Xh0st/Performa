@@ -111,6 +111,7 @@ async def update_client(cid: str, body: ClientIn, user=Depends(require("crm"))):
 
 @router.delete("/clients/{cid}")
 async def delete_client(cid: str, user=Depends(require("crm"))):
+    await get_or_404("clients", cid)
     if await db.work_orders.find_one({"client_id": cid}):
         raise HTTPException(400, "Clientul are comenzi de lucru și nu poate fi șters")
     await db.clients.delete_one({"_id": oid(cid)})

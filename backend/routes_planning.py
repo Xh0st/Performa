@@ -259,8 +259,11 @@ async def send_reminders() -> None:
 async def send_reminders_all_tenants() -> None:
     branches = await raw_db.branches.find({"status": "ACTIVE"}).to_list(5000)
     for branch in branches:
-        set_scope({"tenant_id": branch["tenant_id"], "branch_id": branch["_id"], "system_scope": True})
-        await send_reminders()
+        try:
+            set_scope({"tenant_id": branch["tenant_id"], "branch_id": branch["_id"], "system_scope": True})
+            await send_reminders()
+        except Exception as error:  # noqa: BLE001
+            await raw_db.cron_errors.insert_one({"job": "appointment-reminders", "tenant_id": branch["tenant_id"], "branch_id": branch["_id"], "error": str(error)[:1500], "at": iso()})
 
 
 @router.post("/cron/appointments/reminders")

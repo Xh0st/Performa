@@ -8,6 +8,17 @@ from core import (db, raw_db, ser, oid, iso, now, hash_password, verify_password
                   permissions_for, audit, get_settings, ROLES, JWT_ALG)
 
 router = APIRouter(prefix="/api")
+
+
+async def ensure_active_context(user: dict) -> None:
+    if not user.get("active", True):
+        raise HTTPException(401, "Utilizator inactiv")
+    tenant = await raw_db.tenants.find_one({"_id": user.get("tenant_id")})
+    branch = await raw_db.branches.find_one({"_id": user.get("active_branch_id"), "tenant_id": user.get("tenant_id")})
+    if not tenant or tenant.get("status") != "ACTIVE":
+        raise HTTPException(403, "Tenant suspendat sau expirat")
+    if not branch or branch.get("status") != "ACTIVE":
+        raise HTTPException(403, "Punctul de lucru este inactiv")
 ACCESS_MIN = 60 * 8
 
 
@@ -49,6 +60,7 @@ async def login(body: LoginIn, request: Request, response: Response):
             {"identifier": ident},
             {"$inc": {"count": 1}, "$set": {"locked_until": (now() + timedelta(minutes=15)).isoformat()}}, upsert=True)
         raise HTTPException(401, "Email sau parolă incorectă")
+    await ensure_active_context(user)
     await db.login_attempts.delete_many({"identifier": ident})
     token = set_cookies(response, user)
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": iso()}})
@@ -81,6 +93,7 @@ async def refresh(request: Request, response: Response):
     user = await raw_db.users.find_one({"_id": oid(payload["sub"])})
     if not user:
         raise HTTPException(401, "User not found")
+    await ensure_active_context(user)
     return {"token": set_cookies(response, user)}
 
 

@@ -91,6 +91,7 @@ class TenantCollection:
         return await self.collection.distinct(key, self._scope_filter(query), *args, **kwargs)
 
     async def update_one(self, query, update, *args, **kwargs):
+        update = self._sanitize_update(update)
         if kwargs.get("upsert") and self.name not in GLOBAL_COLLECTIONS:
             scope = current_scope()
             update = dict(update)
@@ -102,6 +103,7 @@ class TenantCollection:
         return await self.collection.update_one(self._scope_filter(query), update, *args, **kwargs)
 
     async def update_many(self, query, update, *args, **kwargs):
+        update = self._sanitize_update(update)
         return await self.collection.update_many(self._scope_filter(query), update, *args, **kwargs)
 
     async def delete_one(self, query, *args, **kwargs):
@@ -111,6 +113,7 @@ class TenantCollection:
         return await self.collection.delete_many(self._scope_filter(query), *args, **kwargs)
 
     async def find_one_and_update(self, query, update, *args, **kwargs):
+        update = self._sanitize_update(update)
         if kwargs.get("upsert") and self.name not in GLOBAL_COLLECTIONS:
             scope = current_scope()
             update = dict(update)
@@ -127,7 +130,21 @@ class TenantCollection:
         return self.collection.aggregate([{"$match": self._scope_filter()}] + list(pipeline), *args, **kwargs)
 
     def __getattr__(self, name):
-        return getattr(self.collection, name)
+        if name in {"create_index", "drop_index", "index_information", "list_indexes"}:
+            return getattr(self.collection, name)
+        raise AttributeError(f"Metoda Mongo ne-scoped este interzisă: {name}")
+
+    def _sanitize_update(self, update: dict) -> dict:
+        if self.name in GLOBAL_COLLECTIONS:
+            return update
+        safe = dict(update)
+        for operator in ("$set", "$setOnInsert"):
+            if operator in safe:
+                safe[operator] = {
+                    key: value for key, value in safe[operator].items()
+                    if key not in {"tenant_id", "branch_id"}
+                }
+        return safe
 
 
 class TenantDatabase:
@@ -221,6 +238,12 @@ async def get_current_user(request: Request) -> dict:
             }).to_list(100)
         ]
     if u["tenant_id"] and u["active_branch_id"]:
+        tenant = await raw_db.tenants.find_one({"_id": u["tenant_id"]})
+        branch = await raw_db.branches.find_one({"_id": u["active_branch_id"], "tenant_id": u["tenant_id"]})
+        if not tenant or tenant.get("status") != "ACTIVE":
+            raise HTTPException(403, "Tenant suspendat sau expirat")
+        if not branch or branch.get("status") != "ACTIVE":
+            raise HTTPException(403, "Punctul de lucru este inactiv")
         if payload.get("tenant_id") != u["tenant_id"]:
             raise HTTPException(401, "Context tenant invalid")
         if u["active_branch_id"] not in user.get("assigned_branch_ids", []):

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core import iso, raw_db, require_superadmin, ser
+from core import hash_password, iso, oid, raw_db, require_superadmin, ser
 
 
 router = APIRouter(prefix="/api")
@@ -22,6 +22,17 @@ class BranchIn(BaseModel):
     address: str = ""
     rar_authorization_code: str = ""
     is_main_branch: bool = False
+
+
+class TenantAdminIn(BaseModel):
+    email: str
+    name: str
+    password: str = Field(min_length=8)
+    branch_ids: list[str]
+
+
+class BranchAssignmentIn(BaseModel):
+    branch_ids: list[str]
 
 
 class TenantQuotaIn(BaseModel):
@@ -76,3 +87,36 @@ async def create_branch(tenant_id: str, body: BranchIn, user=Depends(require_sup
     document["_id"] = body.branch_id
     await raw_db.branches.insert_one(document)
     return ser(document)
+
+
+async def validate_branch_assignment(tenant_id: str, branch_ids: list[str]) -> None:
+    branches = await raw_db.branches.find({"tenant_id": tenant_id, "_id": {"$in": branch_ids}, "status": "ACTIVE"}).to_list(1000)
+    if not branch_ids or len(branches) != len(set(branch_ids)):
+        raise HTTPException(400, "Sucursale invalide pentru acest tenant")
+
+
+@router.post("/platform/tenants/{tenant_id}/admins")
+async def create_tenant_admin(tenant_id: str, body: TenantAdminIn, user=Depends(require_superadmin())):
+    if not await raw_db.tenants.find_one({"_id": tenant_id, "status": "ACTIVE"}):
+        raise HTTPException(404, "Tenant inexistent")
+    await validate_branch_assignment(tenant_id, body.branch_ids)
+    if await raw_db.users.find_one({"email": body.email.strip().lower()}):
+        raise HTTPException(400, "Email deja existent")
+    document = {
+        "email": body.email.strip().lower(), "name": body.name.strip(), "role": "admin",
+        "tenant_role": "TENANT_ADMIN", "active": True, "password_hash": hash_password(body.password),
+        "tenant_id": tenant_id, "assigned_branch_ids": body.branch_ids,
+        "active_branch_id": body.branch_ids[0], "created_at": iso(),
+    }
+    result = await raw_db.users.insert_one(document)
+    return ser(await raw_db.users.find_one({"_id": result.inserted_id}))
+
+
+@router.put("/platform/users/{uid}/branches")
+async def assign_user_branches(uid: str, body: BranchAssignmentIn, user=Depends(require_superadmin())):
+    target = await raw_db.users.find_one({"_id": oid(uid)})
+    if not target or not target.get("tenant_id"):
+        raise HTTPException(404, "Utilizator inexistent")
+    await validate_branch_assignment(target["tenant_id"], body.branch_ids)
+    await raw_db.users.update_one({"_id": target["_id"]}, {"$set": {"assigned_branch_ids": body.branch_ids, "active_branch_id": body.branch_ids[0]}})
+    return ser(await raw_db.users.find_one({"_id": target["_id"]}))

@@ -250,7 +250,7 @@ def test_tenant_admin_can_escalate_via_superadmin_password_reset(ua):
 
 def test_shared_counter_numbering(ua):
     db = rdb()
-    before = run(db.counters.find_one({"_id": "work_order"}))["seq"]
+    before = (run(db.counters.find_one({"_id": "demo-tenant-001:demo-branch-001:work_order"})) or {}).get("seq")
     cid = ua.get(f"{BASE}/clients").json()[0]["id"]
     vr = ua.post(f"{BASE}/vehicles", json={"client_id": cid, "vin": f"TSTB{SUF.upper()}".ljust(17, "1"), "plate": "TST03AAA", "make": "Dacia", "model": "Logan"})
     assert vr.status_code == 200, vr.text

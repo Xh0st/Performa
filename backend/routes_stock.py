@@ -89,6 +89,7 @@ async def update_product(pid: str, body: ProductIn, user=Depends(require("stock"
 
 @router.get("/products/{pid}/moves")
 async def product_moves(pid: str, user=Depends(require("stock"))):
+    await get_or_404("products", pid)
     return {"moves": [ser(m) for m in await db.stock_moves.find({"product_id": pid}).sort("at", -1).to_list(500)],
             "lots": [ser(lot) for lot in await db.stock_lots.find({"product_id": pid, "qty_remaining": {"$gt": 0}}).sort("date", 1).to_list(500)]}
 

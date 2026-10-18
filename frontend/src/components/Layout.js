@@ -105,7 +105,7 @@ export default function Layout() {
           <div className="flex-1" />
           {user?.branches?.length > 1 && (
             <select
-              className="h-9 max-w-32 rounded border bg-background px-2 text-sm md:max-w-48"
+              className="h-9 max-w-28 rounded border bg-background px-2 text-sm md:max-w-48"
               data-testid="active-branch-selector"
               value={user.active_branch_id}
               onChange={(event) => switchBranch(event.target.value).catch((error) => toast.error(errMsg(error)))}
@@ -114,14 +114,14 @@ export default function Layout() {
             </select>
           )}
           {can("reception") && (
-            <Button size="sm" onClick={() => nav("/reception")} data-testid="header-new-reception-button" className="active:scale-95">
+            <Button size="sm" onClick={() => nav("/reception")} data-testid="header-new-reception-button" className="hidden active:scale-95 sm:inline-flex">
               <Plus className="mr-1 h-4 w-4" /> {tr("Recepție nouă", "New reception")}
             </Button>
           )}
-          <Button variant="outline" size="sm" className="font-mono" data-testid="nav-language-toggle" onClick={() => setLang(lang === "ro" ? "en" : "ro")}>
+          <Button variant="outline" size="sm" className="hidden font-mono sm:inline-flex" data-testid="nav-language-toggle" onClick={() => setLang(lang === "ro" ? "en" : "ro")}>
             {lang === "ro" ? "RO" : "EN"}
           </Button>
-          <Button variant="outline" size="icon" className="h-9 w-9" data-testid="nav-theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+          <Button variant="outline" size="icon" className="hidden h-9 w-9 sm:inline-flex" data-testid="nav-theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           <div className="hidden text-right sm:block">

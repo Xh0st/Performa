@@ -58,6 +58,10 @@ async def oauth_start(user=Depends(require("settings"))):
 @router.get("/efactura/oauth/callback")
 async def oauth_callback(code: str = "", state: str = "", error: str = ""):
     front = os.environ["FRONTEND_URL"].split(",")[0].strip()
+    state_doc = await raw_db.efactura_config.find_one({"kind": "efactura", "oauth_state": state})
+    if not state_doc:
+        return RedirectResponse(f"{front}/efactura?oauth=error")
+    set_scope({"tenant_id": state_doc["tenant_id"], "branch_id": state_doc["branch_id"]})
     cfg = await ef.get_cfg()
     if error or not code or not ef.state_valid(cfg, state):
         await ef.log("oauth", False, error or "state invalid / cod lipsă", env=cfg["environment"])
@@ -207,8 +211,11 @@ async def _run_job(job: str):
 async def _run_job_all_tenants(job: str):
     branches = await raw_db.branches.find({"status": "ACTIVE"}).to_list(5000)
     for branch in branches:
-        set_scope({"tenant_id": branch["tenant_id"], "branch_id": branch["_id"], "system_scope": True})
-        await _run_job(job)
+        try:
+            set_scope({"tenant_id": branch["tenant_id"], "branch_id": branch["_id"], "system_scope": True})
+            await _run_job(job)
+        except Exception as error:  # noqa: BLE001
+            await raw_db.cron_errors.insert_one({"job": f"efactura-{job}", "tenant_id": branch["tenant_id"], "branch_id": branch["_id"], "error": str(error)[:1500], "at": iso()})
 
 
 @router.post("/cron/efactura/{job}")
