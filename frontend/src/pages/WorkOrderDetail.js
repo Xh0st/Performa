@@ -148,6 +148,7 @@ export default function WorkOrderDetail() {
               <option value="">—</option>
               {Object.keys(STATUS).filter((k) => {
                 if (k === "facturata" || k === wo.status) return false;
+                if (k === "finalizata" && !wo.qc?.passed) return false;
                 return !["aprobata", "finalizata"].includes(k) || hasApprovedQuote;
               }).map((k) => <option key={k} value={k}>{tr(STATUS[k][0], STATUS[k][1])}</option>)}
             </NativeSelect>

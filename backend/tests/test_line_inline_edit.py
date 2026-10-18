@@ -194,3 +194,24 @@ def test_public_signed_still_works(ctx):
     r = requests.post(f"{BASE}/public/quotes/{token}/decision", json={"approved": True, "signature": SIG, "name": "TEST"})
     assert r.status_code == 200
     assert s.get(f"{BASE}/work-orders/{wid}").json()["status"] == "aprobata"
+
+
+# --- Warranty work orders: lines locked (PUT/POST/DELETE)
+def test_warranty_lines_locked(ctx):
+    wid = ctx["mk"]("WAR", status="in_lucru")
+    ctx["db"].work_orders.update_one({"_id": ObjectId(wid)}, {"$set": {"is_warranty": True}})
+    s = ctx["s"]
+    r = put(ctx, wid, "li_part", {"unit_price": 999})
+    assert r.status_code == 400 and "garan" in r.json()["detail"].lower()
+    assert s.post(f"{BASE}/work-orders/{wid}/lines", json={"type": "labor", "description": "TEST", "qty": 1}).status_code == 400
+    assert s.delete(f"{BASE}/work-orders/{wid}/lines/li_part").status_code == 400
+    assert ctx["db"].work_orders.find_one({"_id": ObjectId(wid)})["lines"][0]["unit_price"] == 100
+
+
+# --- Part source_warehouse/product_id not changeable via PUT (extra fields ignored)
+def test_part_source_readonly(ctx):
+    wid = ctx["mk"]("SRC")
+    r = put(ctx, wid, "li_part", {"source_warehouse": "HACK", "product_id": "x", "vat_rate": 0, "type": "labor", "unit_price": 50})
+    assert r.status_code == 200
+    ln = line(r.json(), "li_part")
+    assert ln["source_warehouse"] == "Depozit Central" and ln["vat_rate"] == 21 and ln["type"] == "part" and ln["unit_price"] == 50

@@ -419,7 +419,9 @@ async def update_line(wid: str, lid: str, body: LineUpdateIn, user=Depends(requi
     line = next((item for item in work_order.get("lines", []) if item["id"] == lid), None)
     if not line:
         raise HTTPException(404, "Linie inexistentă")
-    update = body.model_dump(exclude_unset=True)
+    update = body.model_dump(exclude_unset=True, exclude_none=True)
+    if not update:
+        raise HTTPException(400, "Transmiteți cel puțin un câmp valid pentru actualizare")
     validate_line_update(update)
     if "mechanic_id" in update and update["mechanic_id"]:
         await get_or_404("mechanics", update["mechanic_id"])

@@ -33,15 +33,27 @@ export default function QuotesTab({ wo, onChange }) {
       await fn();
       if (msg) toast.success(msg);
       onChange();
+      return true;
     } catch (e) {
       toast.error(errMsg(e));
+      return false;
     }
   };
   const create = () => run(() => api.post(`/work-orders/${wo.id}/quotes`, { valid_days: 7 }), tr("Deviz generat", "Quote generated"));
   const send = (q, channel) => run(() => api.post(`/work-orders/${wo.id}/quotes/${q.version}/send`, { channel, link: link(q) }),
     tr(`Trimis prin ${channel} (SIMULAT)`, `Sent via ${channel} (SIMULATED)`));
-  const decide = (q, approved) => run(() => api.post(`/work-orders/${wo.id}/quotes/${q.version}/decision`, { approved, signature: approved ? sig : "", paper_approved: approved && paperApproved, name }),
-    approved ? tr("Deviz aprobat", "Quote approved") : tr("Deviz respins", "Quote rejected")).then(() => setApprove(null));
+  const decide = async (q, approved) => {
+    const saved = await run(
+      () => api.post(`/work-orders/${wo.id}/quotes/${q.version}/decision`, {
+        approved,
+        signature: approved ? sig : "",
+        paper_approved: approved && paperApproved,
+        name,
+      }),
+      approved ? tr("Deviz aprobat", "Quote approved") : tr("Deviz respins", "Quote rejected")
+    );
+    if (saved) setApprove(null);
+  };
 
   return (
     <div>
@@ -63,7 +75,7 @@ export default function QuotesTab({ wo, onChange }) {
               <span className="font-mono text-lg font-semibold text-primary">{money(q.totals.gross)}</span>
             </div>
             <div className="mt-1 text-xs text-muted-foreground">{dt(q.created_at)} · {q.created_by} · {tr("valabil până la", "valid until")} {date(q.valid_until)} · {q.lines.length} {tr("poziții", "items")}</div>
-            {q.decision && <div className="mt-1 text-xs">{tr("Decizie", "Decision")}: {q.decision.name} · {q.decision.via} · {dt(q.decision.at)}</div>}
+            {q.decision && <div className="mt-1 flex flex-wrap items-center gap-1 text-xs">{tr("Decizie", "Decision")}: {q.decision.name} · {q.decision.via} · {dt(q.decision.at)}{q.decision.paper_approved && <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-amber-700 dark:text-amber-300" data-testid={`quote-v${q.version}-paper-approved`}>{tr("Aprobat pe hârtie", "Approved on paper")}</span>}</div>}
             {!!q.sent?.length && <div className="mt-1 text-xs text-muted-foreground">{tr("Trimis", "Sent")}: {q.sent.map((s) => `${s.channel} → ${s.to}`).join("; ")}</div>}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" variant="outline" data-testid={`quote-v${q.version}-print`} onClick={() => window.open(`/print/quote/${wo.id}?v=${q.version}`, "_blank")}><Printer className="mr-1 h-3 w-3" />{tr("Tipărește", "Print")}</Button>

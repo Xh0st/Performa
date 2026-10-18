@@ -1,0 +1,46 @@
+{
+  "summary": "Tested the Comandă de Lucru refactor (inline line edit, LINE_LOCKED, quote-approval status rules, paper approval of quotes) on both backend and UI, using isolated TEST data only. Backend: 101/105 tests passed and 1 was skipped, across test_line_inline_edit, test_paper_quote_approval, test_status_quote_guard, test_closure_review and test_fiscal_quote_gate. The only failures: sending an explicit JSON null in PUT /lines returns 500. UI on desktop (1920) and mobile (390): every requested item works.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/work-orders/{wid}/lines/{lid}", "issue": "Sending explicit null (e.g. {\"qty\": null}, {\"description\": null}, {\"unit_price\": null}, {\"discount\": null}) returns 500. Cause: body.model_dump(exclude_unset=True) keeps None values, so validate_line_update does None <= 0 (TypeError) and None.strip() (AttributeError). No data is corrupted because the crash happens before $set. Fix: use model_dump(exclude_unset=True, exclude_none=True), or return 400 for None."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "QuotesTab decision line", "issues": ["The decision line ('Decizie: name · via · at') does not show whether the approval was a paper approval or a digital signature. Suggestion: add a badge such as 'Aprobat pe hârtie' when decision.paper_approved is set."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_line_inline_edit.py", "/app/backend/tests/test_paper_quote_approval.py", "/app/backend/tests/test_status_quote_guard.py", "/app/test_reports/pytest/iter9.xml"],
+  "action_items": [
+    "routes_service.update_line: ignore or reject None fields (model_dump(exclude_unset=True, exclude_none=True)) so explicit nulls do not return 500"
+  ],
+  "critical_code_review_comments": [
+    "QuotesTab.decide: run() catches errors and then .then(() => setApprove(null)) always runs, so the approval dialog closes even when the API fails. The user loses the signature they drew. Keep the dialog open on error.",
+    "WorkOrderDetail status selector offers 'finalizata' once a quote is approved even when QC has not passed. The backend correctly rejects it with a toast. Optionally also hide or disable the option while qc.passed is false.",
+    "Verified: the PUT ignores fields outside LineUpdateIn (source_warehouse, type, vat_rate, product_id), so the part source stays read-only on the server side as well."
+  ],
+  "verified_ok": [
+    "PUT line updates description/code/qty/unit_price/discount/mechanic_id and recalculates totals. Example: part 3x200 with 10% discount = 540, net 690, VAT 144.9, gross 834.9; values persist on GET.",
+    "Validation returns 400 for qty<=0, price<0, discount outside 0..100 and blank description. A non-existent or invalid mechanic returns 404/400. A missing line returns 404. Boundary values price=0 and discount=100 are accepted.",
+    "Line PUT/POST/DELETE return 400 for finalizata, facturata and inchisa, and for is_warranty work orders. All other statuses allow edits.",
+    "Status: aprobata/finalizata return 400 with no approved quote, including draft/sent/rejected/superseded/mixed quotes. finalizata without QC returns 400; with QC passed it returns 200.",
+    "Internal paper approval (no signature) sets the quote to approved and the work order to aprobata, with decision.paper_approved=true and via=service. The public route returns 403 when paper_approved is true (with or without a signature). Public approval with a signature still works.",
+    "UI: DiagnosisPanel and AllocationPanel are separate. AllocationPanel comes after the tabs and is the last section. wo-closure-category-select is absent.",
+    "UI: parts and labor edit/save/cancel works per row, with all required input testids. The part source (part-source-row) is read-only. Cancel discards the draft. An invalid qty shows an error toast and the row stays in edit mode.",
+    "UI totals after inline edits: part 3x150 with 10% = 405, labor 2x200 = 400, net 805, VAT 169.05, total 974.05.",
+    "UI: on a finalizata work order there are no edit/delete buttons and no add forms.",
+    "UI: with no approved quote, the status select has no aprobata/finalizata options. After paper approval, finalizata appears; applying it without QC shows the backend error toast.",
+    "Quote modal: confirm is disabled until the paper checkbox is ticked and becomes disabled again when it is unticked. Paper confirmation works without a signature. The public approval page has no paper option.",
+    "Mobile 390px: document scrollWidth is 390 (no outer overflow). The parts and labor tables scroll inside their containers (920/980px inside a 324px wrapper, overflow-x auto)."
+  ],
+  "updated_files": ["/app/backend/tests/test_line_inline_edit.py (added warranty-lock and source-read-only tests)"],
+  "success_rate": {"backend": "96% (101/105, 4 fails = explicit-null 500)", "frontend": "100%"},
+  "seed_data_creation": "Isolated TEST_ data only, created via inline_edit_ui_fixture.py / paper_ui_fixture.py and the pytest fixtures, all torn down afterwards. Stale TEST-INLINEUI-* and TEST-PUI899FE9-* records left by an earlier run were also removed. The fixtures confirmed that CL-2026-00083/00086/00069 were not modified.",
+  "test_credentials": "From /app/memory/test_credentials.md (admin andrei.melek). Not reproduced here.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend/tests && pytest test_line_inline_edit.py test_paper_quote_approval.py test_status_quote_guard.py. test_explicit_null_no_500 should pass once update_line drops or rejects None values. UI fixtures: python inline_edit_ui_fixture.py setup|teardown, python paper_ui_fixture.py setup|teardown."
+}
