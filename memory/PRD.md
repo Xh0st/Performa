@@ -28,9 +28,29 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - AI Gemini (gemini-3.1-pro-preview) Service Advisor + Diagnostic OBD cu context istoric vehicul, streaming, markdown
 - Utilizatori & audit log, setări companie (date firmă placeholder, tarife, serii, elevatoare)
 
+## Financiar, stoc și documente (2026-10-18)
+- Stornare fiscală totală/parțială pe linii și cantități, prin note de credit UBL `CreditNote`
+- Legătură bidirecțională factură originală ↔ notă de credit, cu status și valori stornate
+- Reintroducere opțională în stoc a pieselor stornate, la costul de ieșire
+- Retururi către furnizor, cu scădere stoc FIFO și legare opțională de NIR-ul de origine
+- PDF local pentru facturile e-Factura primite, generat din XML și disponibil lângă NIR
+- UBL pentru facturi și note de credit cu `TaxSubtotal` separat pentru fiecare cotă TVA
+
+## RAR AutoPass (2026-10-18)
+- Administrare › RAR AutoPass: un punct de lucru implicit, cod autorizație RAR, CUI,
+  mediu Test/Producție și token stocat criptat pe server
+- La emiterea facturii fiscale și la închiderea comenzii se creează/actualizează idempotent
+  o intrare outbox cu VIN, număr de înmatriculare, kilometraj, timestamp recepție,
+  referință foto opțională, factură și rezumat operațiuni
+- Transmiterea externă este intenționat inactivă până la primirea contractului API RAR,
+  endpointurilor oficiale de test/producție și a tokenului de acces
+- Teste RAR/stornare/retur/TVA mixt: 30 teste funcționale trecute, cu 2 skip-uri RBAC
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
+- RAR AutoPass: outbox-ul și validarea precondițiilor sunt active, însă transportul către RAR
+  este blocat până la contractul API oficial și tokenul furnizate de client
 
 ## RO e-Factura (2026-10-17)
 - Administrare › eFactura / Setări API: OAuth 2.0 ANAF (Client ID/Secret criptat Fernet, Redirect URI, state CSRF), comutare Simulare/Test/Producție (api.anaf.ro/test|prod), status conexiune, jurnal, auto-trimitere
@@ -41,8 +61,10 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 
 ## Backlog
 - P0: date reale firmă în Setări (acum placeholder), certificat/OAuth ANAF real
-- P1: Planificare calendar (elevatoare/mecanici DnD), Garanții & reclamații, Notificări reale (ITP/RCA), Portal client complet, Achiziții furnizori + comparare prețuri, RAR / RAR PASS export XML, Rapoarte (TVA, producție, marjă), Flotă cu aprobări multiple
-- P2: Multi-company/warehouse/currency complet, AI stock forecast & retention, aplicație mobilă mecanic, backup, LIFO, storno facturi
+- P1: contract API RAR AutoPass, endpointuri oficiale, token și validare Sandbox; Planificare calendar (elevatoare/mecanici DnD), Garanții & reclamații, Notificări reale (ITP/RCA), Portal client complet, Achiziții furnizori + comparare prețuri, Rapoarte (TVA, producție, marjă), Flotă cu aprobări multiple
+- P2: multi-company/warehouse/currency complet, AI stock forecast & retention, aplicație mobilă mecanic, backup, LIFO
 
 ## Next tasks
+- Obțineți documentația contractuală RAR, endpointurile Test/Producție și tokenul de acces
+- Validați un payload într-un mediu RAR Sandbox înainte de activarea transportului extern
 - Planificare calendar + Garanții; rapoarte de bază

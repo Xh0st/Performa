@@ -244,10 +244,10 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
     if st == "inchisa" and w.get("invoice_id"):
         invoice = await db.invoices.find_one({"_id": oid(w["invoice_id"])})
         if invoice:
-            from rar_autopass import queue_submission
+            from rar_autopass import queue_submission_safely
 
             closed = await db.work_orders.find_one({"_id": w["_id"]})
-            await queue_submission(closed, invoice, "work_order_closed")
+            await queue_submission_safely(closed, invoice, "work_order_closed")
     await audit(user, "status", "work_order", wid, st)
     return await get_work_order(wid, user)
 

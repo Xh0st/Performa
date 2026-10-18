@@ -1,0 +1,46 @@
+{
+  "summary": "Tested the new RAR AutoPass module (backend and UI) and ran the P0 regression for storno, supplier returns, inbox PDF and multi-VAT UBL. P0 regression: 20 passed, 1 skipped (test_storno_returns.py). RAR backend: 8 of 10 tests pass. These work: 401 without login; 403 for mecanic; 400 for an invalid environment and 422 for an empty authorization code; the token is never in the PUT/GET responses and is stored encrypted; saving without a token keeps the stored token; test-connection gives a controlled 409 and writes a log; the outbox keeps exactly one idempotent entry across invoice issue and work-order close (trigger_events = invoice_issued + work_order_closed), with state blocked, the requirements listed, odometer value and timestamp, odometer_image_url null, invoice number and operations summary. CRITICAL BUG: the VIN and plate in the payload are always empty. UI desktop: the sidebar link, /rar-autopass, saving, Test/Producție switch, token field cleared with a 'salvat criptat' placeholder, no token leak in any network response, 409 toast on test connection, outbox table — all work. Mobile 390px: the RAR page overflows horizontally (scrollWidth 970). No JS errors.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "rar_autopass.queue_submission (POST /api/invoices/from-work-order/{id}, POST /api/work-orders/{id}/status inchisa)", "issue": "The vehicle lookup uses db.vehicles.find_one({'_id': invoice.get('vehicle_id')}) with a STRING id, but vehicles._id is an ObjectId. The vehicle is never found, so payload.vehicle.vin and plate_number are always '' and every entry gets 'VIN valid cu 17 caractere' in its blocked requirements. The invoice document has no vehicle_id field at all (only a 'vehicle' display string). Confirmed on real data: CL-2026-00070 / SRV000077 has vehicle VIN HKL4E116TAHUYHV4L, but its outbox payload has vin=''. Fix: use oid(work_order['vehicle_id']).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "rar_autopass.queue_submission completion_date", "issue": "Uses closed_at or invoiced_at or now(), and ignores work_order.finished_at (the real completion date). At invoice time it takes today's date, because the WO passed in is the pre-update copy without invoiced_at. After closing, it changes to the closing date, so the completion date differs between the two triggers."},
+      {"endpoint": "POST /api/rar-autopass/test-connection", "issue": "Always adds 'contract API oficial' to the missing list, even when api_contract_configured would be true. This is acceptable for now because transport is intentionally inactive."},
+      {"endpoint": "queue_submission robustness", "issue": "Runs after the invoice is inserted and is not wrapped in try/except. Any exception would return a 500 even though the invoice was already created and stock consumed."},
+      {"endpoint": "/app/memory/test_credentials.md", "issue": "Logging in as contabil@ and receptie@ with Demo2026! returns 'Email sau parolă incorectă'. Either the passwords differ or the doc is outdated. mecanic@ works."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RarAutopassSettings mobile 390px", "issue": "Horizontal page overflow: document scrollWidth is 970 at a 390 viewport, so the panels are cut off on the right. Likely cause: the outbox table has min-w-[920px] and the grid children have no min-w-0, so the grid column grows past the viewport (overflow-x-auto does not take effect).", "selector": "[data-testid='rar-settings-page']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "SupplierReturnDialog", "issues": ["Uses native <select> for supplier, NIR and product, and a native date input (browser default picker) instead of shadcn Select / Calendar"]},
+      {"screen": "StornoDialog mobile", "issues": ["The qty inputs sit in a horizontally scrolling table (560px inside 340px), so on mobile they are off-screen until the user scrolls sideways", "An empty selection shows 'Total stornare: -0,00 RON' (negative zero)"]},
+      {"screen": "Stock page mobile", "issues": ["scrollWidth 542 at 390px, a small horizontal overflow (pre-existing)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_rar_autopass.py", "/app/backend/tests/test_storno_returns.py", "/app/test_reports/pytest/rar_results.xml"],
+  "action_items": [
+    "Fix the vehicle lookup in rar_autopass.queue_submission: db.vehicles.find_one({'_id': oid(work_order['vehicle_id'])})",
+    "Use work_order.finished_at for completion_date and keep it stable across triggers",
+    "Fix the RAR page mobile overflow (add min-w-0 on the grid/Panel or wrap the table so overflow-x-auto works)",
+    "Wrap the queue_submission calls in try/except with logging so an RAR outbox error cannot break invoicing or closing",
+    "Optional: shadcn Select/Calendar in SupplierReturnDialog; avoid -0,00 in the storno total; verify the contabil/receptie credentials in test_credentials.md"
+  ],
+  "critical_code_review_comments": [
+    "rar_autopass.py:85-87: lookup with a string id (see the critical issue)",
+    "routes_finance.py:73: queue_submission gets the pre-update WO, so invoiced_at is missing and completion_date falls back to now()",
+    "rar_autopass_config cleanup: there was no config before the tests; it was deleted after the tests to return to the default state",
+    "test_storno_returns.py test_rbac_mecanic always skips: the password parsing from the credentials file is wrong (the regex strips '!)' badly)"
+  ],
+  "updated_files": ["/app/backend/tests/test_rar_autopass.py (new)", "/app/backend/tests/storno_fixtures.py (teardown now also deletes rar_autopass_outbox for the TEST WO)"],
+  "success_rate": {"backend": "93% (28/30 incl. regression; the 2 failures are the VIN/plate bug and completion_date)", "frontend": "90% (RAR desktop is fully OK; mobile overflow)"},
+  "seed_data_creation": "None left. TEST WO/invoice/vehicle/client, NIRs, products, suppliers, RAR outbox entries, RAR logs and audit entries were deleted; the invoice/nir/work_order counters were restored; rar_autopass_config was removed (none existed initially). Two orphan TEST outbox entries from earlier storno runs were also deleted. The outbox entry CL-2026-00070/SRV000077 was created by someone else (the main agent?) at 18:23 and was left as is.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: pytest /app/backend/tests/test_rar_autopass.py -n 0 and pytest /app/backend/tests/test_storno_returns.py -n 0. Both clean up after themselves. test_rar_autopass saves/restores rar_autopass_config and builds its own WO with reception.at and finished_at. test_payload_vehicle_identity and test_completion_date should pass after the fixes. The work-order status endpoint is POST /api/work-orders/{id}/status. UI fixture for storno/return dialogs: python /app/backend/tests/storno_fixtures.py setup|teardown.",
+  "rca of the issue": "VIN empty: rar_autopass.queue_submission does find_one({'_id': invoice.get('vehicle_id')}) (the invoice has no vehicle_id, so the value is None) and then find_one({'_id': work_order['vehicle_id']}), a string compared against an ObjectId _id. Neither matches, so vehicle is None, vin='' and plate=''. Reproduce: issue a fiscal invoice for any finalized WO and inspect db.rar_autopass_outbox payload.vehicle. Mitigation: use core.oid() on the id."
+}

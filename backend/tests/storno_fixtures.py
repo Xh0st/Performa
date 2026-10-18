@@ -93,6 +93,7 @@ def teardown(st):
         "nirs": db.nirs.delete_many({"supplier_id": {"$in": sups}}).deleted_count,
         "products": db.products.delete_many({"_id": {"$in": [ObjectId(p) for p in pids]}}).deleted_count,
         "suppliers": db.suppliers.delete_many({"_id": {"$in": [ObjectId(p) for p in sups]}}).deleted_count,
+        "rar_outbox": db.rar_autopass_outbox.delete_many({"work_order_id": st.get("wo")}).deleted_count if st.get("wo") else 0,
         "work_orders": db.work_orders.delete_many({"_id": ObjectId(st["wo"])}).deleted_count if st.get("wo") else 0,
         "vehicles": db.vehicles.delete_many({"_id": ObjectId(st["vehicle"])}).deleted_count if st.get("vehicle") else 0,
         "clients": db.clients.delete_many({"_id": ObjectId(st["client"])}).deleted_count if st.get("client") else 0,

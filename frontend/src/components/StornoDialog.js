@@ -20,7 +20,17 @@ export default function StornoDialog({ inv, open, onOpenChange }) {
   const [restock, setRestock] = useState(false);
   const [busy, setBusy] = useState(false);
   const hasParts = inv.lines.some((l) => ["part", "consumable"].includes(l.type) && l.product_id);
-  const total = inv.lines.reduce((s, l) => s + (Number(qty[l.id]) || 0) * l.unit_price * (1 - (l.discount || 0) / 100) * (1 + l.vat_rate / 100), 0);
+  const total = Math.max(
+    0,
+    inv.lines.reduce(
+      (sum, line) => sum
+        + (Number(qty[line.id]) || 0)
+        * line.unit_price
+        * (1 - (line.discount || 0) / 100)
+        * (1 + line.vat_rate / 100),
+      0
+    )
+  );
   const fillAll = () => setQty(Object.fromEntries(inv.lines.map((l) => [l.id, avail(l)])));
   const save = async () => {
     setBusy(true);
@@ -62,7 +72,9 @@ export default function StornoDialog({ inv, open, onOpenChange }) {
             {tr("Piesele stornate reintră în stoc (la costul de ieșire)", "Credited parts return to stock (at issue cost)")}
           </label>
         )}
-        <div className="text-right font-mono text-sm" data-testid="storno-total">{tr("Total stornare", "Credit total")}: −{money(total)}</div>
+        <div className="text-right font-mono text-sm" data-testid="storno-total">
+          {tr("Total stornare", "Credit total")}: {total > 0 ? `−${money(total)}` : money(0)}
+        </div>
         <DialogFooter><Button data-testid="storno-save-button" disabled={busy || total <= 0 || !reason.trim()} onClick={save}>{tr("Emite factura de stornare", "Issue credit note")}</Button></DialogFooter>
       </DialogContent>
     </Dialog>

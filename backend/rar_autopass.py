@@ -1,7 +1,8 @@
 import hashlib
+import logging
 
 from anaf_service import enc
-from core import db, iso
+from core import db, iso, oid
 
 
 CONFIG_ID = "primary"
@@ -10,6 +11,7 @@ ENV_LABELS = {
     "test": "Test / Sandbox",
     "production": "Producție",
 }
+logger = logging.getLogger(__name__)
 
 
 async def get_config() -> dict:
@@ -82,9 +84,12 @@ def operations_summary(lines: list) -> str:
 
 
 async def queue_submission(work_order: dict, invoice: dict, trigger: str) -> None:
-    vehicle = await db.vehicles.find_one({"_id": invoice.get("vehicle_id")})
-    if not vehicle:
-        vehicle = await db.vehicles.find_one({"_id": work_order.get("vehicle_id")})
+    vehicle_id = work_order.get("vehicle_id") or invoice.get("vehicle_id")
+    vehicle = (
+        await db.vehicles.find_one({"_id": oid(str(vehicle_id))})
+        if vehicle_id
+        else None
+    )
     cfg = await get_config()
     vin = str((vehicle or {}).get("vin", "")).strip().upper()
     mileage = work_order.get("mileage_in")
@@ -103,7 +108,12 @@ async def queue_submission(work_order: dict, invoice: dict, trigger: str) -> Non
         requirements.append("token de acces RAR")
 
     invoice_ref = f"{invoice.get('series', '')}{invoice.get('number', '')}"
-    completion = work_order.get("closed_at") or work_order.get("invoiced_at") or iso()
+    completion = (
+        work_order.get("finished_at")
+        or work_order.get("closed_at")
+        or work_order.get("invoiced_at")
+        or iso()
+    )
     payload = {
         "branch_rar_authorization": cfg.get("authorization_code", ""),
         "vehicle": {
@@ -154,6 +164,25 @@ async def queue_submission(work_order: dict, invoice: dict, trigger: str) -> Non
         },
         upsert=True,
     )
+
+
+async def queue_submission_safely(work_order: dict, invoice: dict, trigger: str) -> bool:
+    try:
+        await queue_submission(work_order, invoice, trigger)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("RAR AutoPass outbox enqueue failed")
+        await db.rar_autopass_logs.insert_one(
+            {
+                "operation": "queue_submission",
+                "ok": False,
+                "message": str(exc)[:1500],
+                "work_order_id": str(work_order.get("_id", "")),
+                "invoice_id": str(invoice.get("_id", "")),
+                "at": iso(),
+            }
+        )
+        return False
 
 
 async def work_order_status(work_order_id: str) -> dict | None:

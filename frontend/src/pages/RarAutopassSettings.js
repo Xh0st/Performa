@@ -146,7 +146,7 @@ export default function RarAutopassSettings() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-2">
         <Panel title={tr("Punct de lucru activ", "Active branch")} testid="rar-branch-panel">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label={tr("Denumire punct de lucru", "Branch name")}>
@@ -216,7 +216,7 @@ export default function RarAutopassSettings() {
 
         <Panel
           title={tr("Coada transmisiilor AutoPass", "AutoPass transmission outbox")}
-          className="xl:col-span-2"
+          className="min-w-0 xl:col-span-2"
           testid="rar-outbox-panel"
           actions={(
             <Button
@@ -238,7 +238,7 @@ export default function RarAutopassSettings() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="min-w-0 overflow-x-auto">
               <table className="w-full min-w-[920px] text-sm" data-testid="rar-outbox-table">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
