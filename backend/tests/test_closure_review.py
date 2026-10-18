@@ -129,6 +129,31 @@ def test_invoice_id_with_non_facturata_status_cannot_close(ctx):
     assert r.status_code == 400, f"WO with invoice_id was closed: {r.status_code}"
 
 
+# --- iteration 8: invoice_id data drift - any stored status, any target status -> 400, never listed
+@pytest.mark.parametrize("st", OPERATIONAL + ["inchisa"])
+def test_invoice_id_drift_any_status_rejects_close(ctx, st):
+    s = ctx["s"]
+    wid = ctx["mk"](f"DRIFT{st}", status=st, invoice_id=str(ObjectId()), quotes=APPROVED_Q,
+                    **({"closed_at": iso()} if st == "inchisa" else {}))
+    for target in ("inchisa", "in_lucru", "noua"):
+        r = s.post(f"{BASE}/work-orders/{wid}/status", json={"status": target})
+        assert r.status_code == 400, f"{st}->{target}: {r.status_code} {r.text}"
+    assert s.get(f"{BASE}/work-orders/{wid}").json()["status"] == st
+    assert wid not in ctx["listed"]()
+    assert s.post(f"{BASE}/work-orders/{wid}/closure-review", json={}).status_code == 400
+    assert s.post(f"{BASE}/work-orders/{wid}/reopen", json={}).status_code == 400
+
+
+def test_list_includes_empty_or_null_invoice_id(ctx):
+    w1 = ctx["mk"]("NULLINV", status="inchisa", invoice_id=None, closed_at=iso(), pre_closure_status="aprobata")
+    w2 = ctx["mk"]("EMPTYINV", status="inchisa", invoice_id="", closed_at=iso(), pre_closure_status="aprobata")
+    listed = ctx["listed"]()
+    assert w1 in listed and w2 in listed
+    r = ctx["s"].post(f"{BASE}/work-orders/{w1}/reopen", json={})
+    assert r.status_code == 200 and r.json()["status"] == "aprobata"
+    assert w1 not in ctx["listed"]()
+
+
 def test_list_excludes_invoiced(ctx):
     for row in ctx["listed"]().values():
         assert not row.get("invoice_id"), f"{row['number']} invoiced but listed"

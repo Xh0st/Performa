@@ -1,0 +1,28 @@
+{
+  "summary": "Retest after iteration_7 fixes. Backend: 43/43 passed; 1 legacy skip (the CL-2026-00086 snapshot test skips while the record is 'aprobata'). Both iteration_7 defects are FIXED. (a) invoice_id drift: a WO with invoice_id in any stored status (noua, diagnosticare, asteapta_oferta, aprobata, in_lucru, asteapta_piese, finalizata, inchisa) is rejected with 400 on POST status inchisa/in_lucru/noua. Its status stays unchanged, it never appears in GET /api/closure-exceptions/work-orders, and closure-review/reopen return 400. (b) The list includes inchisa WOs with invoice_id null or empty string and excludes any with an invoice_id. Unbilled WOs from all 7 operational statuses, including ones with an approved quote, close without QC. They are listed with pre_closure_status. Aprobare removes the row and the WO stays inchisa. Redeschidere comandă restores the previous status (e.g. asteapta_piese, aprobata, noua, plus a legacy history fallback) and removes the row. Fiscal invoice gate: 400 with no quote or with a rejected/draft/sent/superseded quote, 400 without QC, 400 when not finalizata. It accepts generated quote -> approved -> QC passed -> finalizata -> 200, and the WO then becomes facturata and immutable. UI on /closure-review: the title is 'Verificare închideri nefacturate'. Each TEST row has a link with href=/work-orders/{id} plus 'Aprobare' and 'Redeschidere comandă' buttons. An in_lucru WO, a facturata WO and an inchisa WO with invoice_id (drift) are NOT listed. Clicking Aprobare removes the row (DB: closure_review aprobat, status inchisa). Clicking Redeschidere removes the row and the WO shows ÎN LUCRU with a status selector. Facturata, approved-inchisa and drift-inchisa WOs show no status selector. Real CL-2026-00086 and CL-2026-00083 are untouched (both 'aprobata', no invoice_id); CL-00086 is correctly absent from the list.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sidebar", "issues": ["Nav label is still 'Verificare închideri' while page title is 'Verificare închideri nefacturate' (cosmetic, optional)."]},
+      {"screen": "/work-orders/{id} when inchisa/facturata", "issues": ["Diagnostic & alocare panel (constatare textarea, elevator, excepție deviz, mecanici checkboxes) still looks editable on locked orders; consider disabling for clarity (not verified whether backend rejects these edits)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_closure_review.py", "/app/backend/tests/test_fiscal_quote_gate.py", "/app/backend/tests/closure_ui_fixture.py", "/app/test_reports/pytest/pytest_iter8.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "change_status: the invoice_id guard runs before the LOCKED check. That is correct and covers data drift.",
+    "closure_exceptions filter invoice_id {$in:[None,'']} also matches a missing field (Mongo null semantics). Verified by test."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_closure_review.py (added drift test parametrized over 8 statuses and a null/empty invoice_id listing test)",
+    "/app/backend/tests/test_fiscal_quote_gate.py (CL-2026-00086 test now read-only consistency check, no longer asserts inchisa)",
+    "/app/backend/tests/closure_ui_fixture.py (added E: inchisa + invoice_id drift record)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Only TEST_ data created and fully cleaned up. Collection counts before and after are identical: work_orders 87, clients 13, vehicles 17, invoices 82, audit_logs 369, efactura_logs 27, warranty_certificates 4, notifications 8, rar_autopass_outbox 7, time_entries 101. Counters were restored (invoice 81, warranty_certificate 5). TEST residue is 0 for WOs, clients, vehicles and audit logs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run with: cd /app/backend/tests && PYTHONPATH=. pytest test_closure_review.py test_fiscal_quote_gate.py. UI fixture: PYTHONPATH=. python closure_ui_fixture.py setup|teardown. CL-2026-00086 and CL-2026-00083 are real records, currently 'aprobata'. Never mutate them."
+}

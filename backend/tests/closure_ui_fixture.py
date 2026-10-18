@@ -32,6 +32,10 @@ def setup():
     ids["D"] = str(db.work_orders.insert_one({"number": f"TEST-UI{tag}-D", "client_id": str(cid), "vehicle_id": str(vid), "status": "facturata",
                                               "invoice_id": str(ObjectId()), "mileage_in": 1000, "complaint": "TEST", "lines": [], "quotes": [],
                                               "qc": {}, "status_history": [], "created_at": iso(), "reception": {}, "mechanic_ids": []}).inserted_id)
+    # E: data drift - inchisa with invoice_id -> must NOT appear in closure review list
+    ids["E"] = str(db.work_orders.insert_one({"number": f"TEST-UI{tag}-E", "client_id": str(cid), "vehicle_id": str(vid), "status": "inchisa",
+                                              "invoice_id": str(ObjectId()), "closed_at": iso(), "mileage_in": 1000, "complaint": "TEST", "lines": [],
+                                              "quotes": [], "qc": {}, "status_history": [], "created_at": iso(), "reception": {}, "mechanic_ids": []}).inserted_id)
     st = {"tag": tag, "cid": str(cid), "vid": str(vid), "ids": ids}
     json.dump(st, open(STATE, "w"))
     print(json.dumps(st))

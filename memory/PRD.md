@@ -70,13 +70,13 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Teste garanții + regresii: 85 teste trecute, cu 2 skip-uri RBAC; PDF-ul a fost verificat vizual
 
 ## Reguli deviz pentru închidere (2026-10-18)
-- Un deviz în așteptare (`draft`/`sent`) blochează finalizarea și facturarea fiscală
-- Sunt permise excepții trasabile pentru: fără deviz generat, deviz respins, operațiune fără cost,
-  diagnoză, constatare și garanție; regula este stocată la finalizarea comenzii
-- Administrare › Verificare închideri listează comenzile finalizate/facturate/închise prin excepție,
-  inclusiv comenzile istorice, iar administratorul le poate marca revizuite
-- Validare manuală: deviz în așteptare blocat; fără deviz și deviz respins permise și revizuite;
-  build frontend reușit, listă mobilă fără overflow
+- Orice comandă nefacturată poate fi închisă direct, indiferent de deviz sau QC; statusul anterior
+  este păstrat pentru redeschidere. O comandă cu `invoice_id` nu poate fi închisă/redeschisă.
+- Administrare › Verificare închideri nefacturate listează exclusiv comenzile nefacturate închise;
+  administratorul poate aplica Aprobare sau Redeschidere comandă, iar rândul dispare din listă.
+- Factura fiscală necesită obligatoriu un deviz emis cu status `approved`, control calitate promovat
+  și status `finalizata`; factura emisă păstrează statusul terminal `facturata`.
+- Retestare completă: 43/43 teste backend și 100% fluxuri UI; datele TEST au fost curățate.
 
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
