@@ -303,7 +303,7 @@ async def closure_exceptions(user=Depends(require("settings"))):
     flagged = []
     for row in rows:
         rule = row.get("closure_quote_rule") or quote_closure_rule(row)
-        if rule["review"]:
+        if rule["review"] and not row.get("closure_review"):
             row["closure_quote_rule"] = rule
             flagged.append(row)
     return await enrich(flagged)
