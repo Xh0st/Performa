@@ -78,6 +78,23 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   și status `finalizata`; factura emisă păstrează statusul terminal `facturata`.
 - Retestare completă: 43/43 teste backend și 100% fluxuri UI; datele TEST au fost curățate.
 
+## Multi-tenant pool model (2026-10-19)
+- Izolare logică strictă pentru datele operaționale prin `tenant_id` și `branch_id`; contextul este
+  extras din JWT și orice acces fără context eșuează controlat.
+- Tenantul demo `demo-tenant-001` și sucursala `demo-branch-001` au fost păstrate și toate datele
+  operaționale existente au fost migrate idempotent către acest context.
+- Rolul proprietarului este `SUPERADMIN`; panoul Platformă permite administrarea tenanturilor,
+  planurilor, cotelor de sucursale, sucursalelor și Tenant Admin-ilor.
+- Doar Superadmin poate crea sucursale. Tenant Admin poate administra exclusiv utilizatorii din
+  contextul său. Cota implicită este o sucursală per tenant.
+- Selectorul global de sucursală este disponibil în interfață, iar schimbarea ramurii reemite
+  contextul de lucru fără a expune date din alte sucursale.
+- Setările, seriile, configurările RAR/e-Factura, contoarele, OAuth-ul și cronurile sunt izolate
+  per tenant și sucursală; tenanturile suspendate/expirate și sucursalele inactive sunt blocate.
+- Hardening final: upsert-urile fără context tenant/sucursală răspund `503`, fără scrieri de date.
+- Verificare: 57 teste multi-tenant trecute; curățarea a confirmat 0 date temporare rămase.
+  Livrare testată de agent, în așteptarea confirmării de acceptanță a utilizatorului.
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
@@ -94,11 +111,19 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Documentație: /app/docs/EFACTURA.md
 
 ## Backlog
-- P0: date reale firmă în Setări (acum placeholder), certificat/OAuth ANAF real
-- P1: contract API RAR AutoPass, endpointuri oficiale, token și validare Sandbox; Notificări reale (ITP/RCA), Portal client complet, Achiziții furnizori + comparare prețuri, Rapoarte executive (TVA, producție, marjă, retenție), Flotă cu aprobări multiple
-- P2: multi-company/warehouse/currency complet, AI stock forecast & retention, aplicație mobilă mecanic, backup, LIFO
+- P0: date reale firmă în Setări (acum placeholder), certificat/OAuth ANAF real; confirmare de
+  acceptanță pentru migrarea multi-tenant.
+- P1: retestare end-to-end invalidare deviz după editarea liniilor; regresie UBL TVA mixt; contract
+  API RAR AutoPass, endpointuri oficiale, token și validare Sandbox; notificări reale (ITP/RCA),
+  portal client complet, achiziții furnizori + comparare prețuri, rapoarte executive (TVA,
+  producție, marjă, retenție), flotă cu aprobări multiple.
+- P2: warehouse/currency complet, AI stock forecast & retention, aplicație mobilă mecanic, backup,
+  LIFO.
 
 ## Next tasks
-- Obțineți documentația contractuală RAR, endpointurile Test/Producție și tokenul de acces
-- Validați un payload într-un mediu RAR Sandbox înainte de activarea transportului extern
-- Rapoarte executive de eficiență, marjă, timp de staționare și retenție/flotă
+- Confirmați în interfață comportamentul tenantului demo, al panoului Superadmin și al selectorului
+  de sucursală.
+- Retestați end-to-end invalidarea devizului după editarea pieselor sau manoperei aprobate.
+- Obțineți documentația contractuală RAR, endpointurile Test/Producție și tokenul de acces.
+- Validați un payload într-un mediu RAR Sandbox înainte de activarea transportului extern.
+- Implementați rapoarte executive de eficiență, marjă, timp de staționare și retenție/flotă.

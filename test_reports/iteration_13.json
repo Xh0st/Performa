@@ -1,0 +1,31 @@
+{
+  "summary": "Final multi-tenant security retest. Required regression (test_multitenant + test_tenancy + test_iter12_mt_p0, -n 0): 46/46 pass. New file test_iter13_mt_final.py: 10/11 pass. It explicitly covers: eFactura disconnect on a non-demo tenant (all 5 token fields are unset, the other tenant and demo are untouched). TenantCollection: $set, $unset, $rename (both directions), update_many, find_one_and_update with $currentDate, and upsert all keep tenant_id/branch_id. Pipeline updates return 400. 10 raw unscoped methods raise AttributeError. Missing scope returns 503 on find. OAuth callback: empty or missing state, and error-only calls, redirect to oauth=error with 0 new logs and no change to any config. A generic exception (non-Fernet secret raises InvalidToken) redirects instead of returning 500, logs only to its own tenant, and state replay is rejected. Tenant SUSPENDED/EXPIRED and branch INACTIVE block me, refresh, login, CRUD, dashboard and settings; reactivating restores access. SUPERADMIN cannot suspend its own context tenant. Cross-tenant: CRUD by id returns 404, vehicle_count aggregate, cash-register aggregate and dashboard are isolated. VIN uniqueness is per tenant and a foreign client_id is rejected. Branch quota is enforced. A tenant admin cannot edit or delete the SUPERADMIN. Auth: httpOnly Secure cookies; CORS uses an explicit origin with credentials and rejects foreign origins. UI: Superadmin tenant creation works; dashboard scrollWidth is 390 at 390px and 768 at 768px; Superadmin page is 390 at 390px; demo admin sees platform-access-denied. No page errors. No P0 multi-tenant bypass found. The single failure is minor hardening: an upsert with no scope raises TypeError (500) instead of 503. It still fails closed and nothing is written.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "core.TenantCollection.update_one/find_one_and_update (upsert=True)", "issue": "When there is no tenant scope, the upsert branch does scope['tenant_id'] on None and raises TypeError (HTTP 500) instead of HTTPException 503. It fails closed and no write happens, but the error is not clean. Fix: call _scope_filter(query) first, or check for scope before building $setOnInsert."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter13_mt_final.py", "/app/backend/tests/cleanup_temp_check.py", "/app/test_reports/pytest/iter13_mt.xml", "/app/test_reports/pytest/iter13_final.xml"],
+  "action_items": [
+    "Optional/minor: make the no-scope upsert path in TenantCollection raise 503 instead of TypeError (test_tenantcollection_update_operators asserts this)."
+  ],
+  "critical_code_review_comments": [
+    "TenantCollection.aggregate only prepends $match on the base collection. $lookup, $unionWith, $graphLookup, $out and $merge stages can read or write other collections unscoped. Current pipelines (clients vehicle_count, cash-register, final-inspection inspectors) do not use them. Consider rejecting these stages in TenantCollection.aggregate to fail closed in future.",
+    "/auth/refresh does not compare the refresh token's tenant_id/branch_id claims with the user doc. The new access token is rebuilt from the DB, so this is low risk.",
+    "The access token is still returned in the JSON body and kept in localStorage alongside httpOnly cookies (an existing design choice that weakens XSS protection)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter13_mt_final.py", "/app/backend/tests/cleanup_temp_check.py"],
+  "success_rate": {"backend": "98% (56/57: 46/46 regression + 10/11 new; the 1 failure is minor hardening)", "frontend": "100%"},
+  "test_credentials": "Used /app/memory/test_credentials.md (owner SUPERADMIN, demo admin) and backend/.env. Values not exposed.",
+  "seed_data_creation": "TEMP-f1/f2 tenants, 3 branches and 2 admins come from a fixture and are removed after the run. TEMP-ui13-tenant was created via the UI and deleted. cleanup_temp_check.py shows 0 TEMP/TEST tenants, branches, users, counters, clients, payments, efactura_config, efactura_logs and cron_errors left. CL-2026-00083/00086 were not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_multitenant.py tests/test_tenancy.py tests/test_iter12_mt_p0.py tests/test_iter13_mt_final.py -q -n 0, then python tests/cleanup_temp_check.py to verify cleanup. test_tenantcollection_update_operators fails only on its last assertion (no-scope upsert should be 503) until core.py is hardened. UI: the dashboard table min-w-[480px] sits inside an overflow-x-auto wrapper, so page scrollWidth stays 390.",
+  "rca of the issue": "Minor: in TenantCollection.update_one/find_one_and_update, the upsert block reads current_scope() and indexes it before _scope_filter() runs, so a missing scope raises TypeError rather than the intended 503."
+}

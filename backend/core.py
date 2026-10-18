@@ -91,6 +91,7 @@ class TenantCollection:
         return await self.collection.distinct(key, self._scope_filter(query), *args, **kwargs)
 
     async def update_one(self, query, update, *args, **kwargs):
+        scoped_query = self._scope_filter(query)
         update = self._sanitize_update(update)
         if kwargs.get("upsert") and self.name not in GLOBAL_COLLECTIONS:
             scope = current_scope()
@@ -100,7 +101,7 @@ class TenantCollection:
                 "tenant_id": scope["tenant_id"],
                 "branch_id": scope["branch_id"],
             }
-        return await self.collection.update_one(self._scope_filter(query), update, *args, **kwargs)
+        return await self.collection.update_one(scoped_query, update, *args, **kwargs)
 
     async def update_many(self, query, update, *args, **kwargs):
         update = self._sanitize_update(update)
@@ -113,6 +114,7 @@ class TenantCollection:
         return await self.collection.delete_many(self._scope_filter(query), *args, **kwargs)
 
     async def find_one_and_update(self, query, update, *args, **kwargs):
+        scoped_query = self._scope_filter(query)
         update = self._sanitize_update(update)
         if kwargs.get("upsert") and self.name not in GLOBAL_COLLECTIONS:
             scope = current_scope()
@@ -122,7 +124,7 @@ class TenantCollection:
                 "tenant_id": scope["tenant_id"],
                 "branch_id": scope["branch_id"],
             }
-        return await self.collection.find_one_and_update(self._scope_filter(query), update, *args, **kwargs)
+        return await self.collection.find_one_and_update(scoped_query, update, *args, **kwargs)
 
     def aggregate(self, pipeline, *args, **kwargs):
         if self.name in GLOBAL_COLLECTIONS:
