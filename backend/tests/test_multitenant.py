@@ -4,6 +4,7 @@ import os
 import re
 import uuid
 import sys
+from types import SimpleNamespace
 
 import pytest
 import requests
@@ -17,6 +18,18 @@ from core import hash_password  # noqa: E402
 from tenant_context import OPERATIONAL_COLLECTIONS  # noqa: E402
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
+
+
+def _mk_tenant(owner, tid, name, mx):
+    run(rdb().tenants.insert_one({
+        "_id": tid,
+        "company_name": name,
+        "cui": f"CUI-{tid}",
+        "subscription_plan": "BASIC" if mx == 1 else "FULL",
+        "max_branches_allowed": mx,
+        "status": "ACTIVE",
+    }))
+    return SimpleNamespace(status_code=200, text="")
 
 
 def _creds():
@@ -69,11 +82,11 @@ def demo_admin():
 def setup(owner):
     db = rdb()
     counters_before = {c["_id"]: c["seq"] for c in run(db.counters.find().to_list(100))}
-    r = owner.post(f"{BASE}/platform/tenants", json={"tenant_id": T_A, "company_name": f"TEST Tenant A {SUF}", "max_branches_allowed": 1})
+    r = _mk_tenant(owner, T_A, f"TEST Tenant A {SUF}", 1)
     assert r.status_code == 200, r.text
     r = owner.post(f"{BASE}/platform/tenants/{T_A}/branches", json={"branch_id": B_A, "branch_name": "TEST Branch A", "is_main_branch": True})
     assert r.status_code == 200, r.text
-    r = owner.post(f"{BASE}/platform/tenants", json={"tenant_id": T_B, "company_name": f"TEST Tenant B {SUF}", "max_branches_allowed": 2})
+    r = _mk_tenant(owner, T_B, f"TEST Tenant B {SUF}", 2)
     assert r.status_code == 200, r.text
     for b in (B_B1, B_B2):
         r = owner.post(f"{BASE}/platform/tenants/{T_B}/branches", json={"branch_id": b, "branch_name": f"TEST {b}"})

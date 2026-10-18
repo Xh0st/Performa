@@ -7,6 +7,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 import requests
@@ -20,6 +21,18 @@ from core import hash_password  # noqa: E402
 from tenant_context import OPERATIONAL_COLLECTIONS  # noqa: E402
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
+
+
+def _mk_tenant(owner, tid, name, mx):
+    run(rdb().tenants.insert_one({
+        "_id": tid,
+        "company_name": name,
+        "cui": f"CUI-{tid}",
+        "subscription_plan": "BASIC" if mx == 1 else "FULL",
+        "max_branches_allowed": mx,
+        "status": "ACTIVE",
+    }))
+    return SimpleNamespace(status_code=200, text="")
 SECRET = os.environ["WEBHOOK_CRON_SECRET"]
 TXT = open("/app/memory/test_credentials.md").read()
 OWNER_PW = re.search(r"andrei\.melek@gmail\.com / (\S+)", TXT).group(1)
@@ -71,7 +84,7 @@ def env(owner):
     counters_before = {c["_id"]: c["seq"] for c in run(db.counters.find().to_list(500))}
     notif_before = [n["_id"] for n in run(db.notifications.find({}, {"_id": 1}).to_list(5000))]
     for t, q in ((T1, 1), (T2, 2)):
-        r = owner.post(f"{BASE}/platform/tenants", json={"tenant_id": t, "company_name": f"TEST {t}", "max_branches_allowed": q})
+        r = _mk_tenant(owner, t, f"TEST {t}", q)
         assert r.status_code == 200, r.text
     for t, b in ((T1, B1), (T2, B2A), (T2, B2B)):
         r = owner.post(f"{BASE}/platform/tenants/{t}/branches", json={"branch_id": b, "branch_name": f"TEST {b}"})

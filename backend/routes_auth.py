@@ -49,6 +49,23 @@ def user_out(u: dict):
     return d
 
 
+async def user_context_out(user: dict) -> dict:
+    output = user_out(user)
+    output["platform_role"] = user.get("platform_role")
+    output["tenant_id"] = user.get("tenant_id", "")
+    output["active_branch_id"] = user.get("active_branch_id", "")
+    if output["tenant_id"]:
+        output["branches"] = [
+            {"id": item["_id"], "name": item["branch_name"]}
+            for item in await raw_db.branches.find({
+                "tenant_id": output["tenant_id"],
+                "status": "ACTIVE",
+                "_id": {"$in": user.get("assigned_branch_ids", [])},
+            }).to_list(100)
+        ]
+    return output
+
+
 @router.post("/auth/login")
 async def login(body: LoginIn, request: Request, response: Response):
     email = body.email.strip().lower()
@@ -111,7 +128,7 @@ async def change_initial_password(
     )
     updated = await raw_db.users.find_one({"_id": current["_id"]})
     await audit(user, "change_initial_password", "user", user["id"])
-    return {"user": user_out(updated), "token": set_cookies(response, updated)}
+    return {"user": await user_context_out(updated), "token": set_cookies(response, updated)}
 
 
 @router.post("/auth/refresh")

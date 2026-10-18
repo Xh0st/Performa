@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the tenant lifecycle (create with auto ID, mandatory initial password, delete) on the backend and in the UI. New file test_iter14_tenant_lifecycle.py: 10/10 pass. Creating a FULL tenant produces an ID matching tenant-<16 hex>, quota 5, status ACTIVE, the CUI in uppercase, exactly 1 main branch and a TENANT_ADMIN. The admin has must_change_password=true, a $2b$ bcrypt hash, is assigned to the main branch and has no platform_role. BASIC gets quota 1, and adding a second branch returns 403. Validations: plan GOLD gives 400; a duplicate CUI (case-insensitive) gives 400; a duplicate admin email (case-insensitive) gives 400; a short password gives 422; an email without a password gives 400 and nothing is persisted. The demo admin (not SUPERADMIN) gets 403 on both create and delete. Initial login works and /auth/me returns must_change_password=true. /clients, /vehicles, /work-orders, /dashboard, /users and /platform/tenants all return 403 until the password is changed, using either a Bearer token or cookies only. change-initial-password: wrong current password gives 401, same password gives 400, short password gives 400, no auth gives 401. The correct change returns 200 with a new token and the hash is not exposed. After that /clients returns 200 and is empty (isolated), a second change gives 400, the old password gives 401 and the new one works. Delete: the SUPERADMIN's own active tenant gives 400; an unknown ID gives 404; wrong case in the confirmation gives 400; a missing body gives 422. An exact confirmation (whitespace trimmed) gives 200 and removes the tenant, users, branches, counters and every OPERATIONAL_COLLECTIONS document (including a client created through the API). The deleted admin's old session then gets 401/403. Regression (test_multitenant, test_tenancy, iter12, iter13): 57/57 pass after I updated the old fixtures to the new create schema (cui now required). UI at 390px: scrollWidth is 390; the create panel has exactly 4 inputs and 1 select (company, CUI, email, password, plan) and no tenant ID input; the button is disabled when fields are empty or the password is short. Tenant created as FULL/5 and shown in the list. Admin login redirects to /change-initial-password, and navigating to /clients redirects back. The mismatch, wrong-current and same-password errors all display. The Ieșire (logout) button works. After a successful save the user lands on the dashboard with a toast and /clients is accessible. Delete dialog: the own tenant's button is disabled; confirm is disabled when the input is empty or the case is wrong; Cancel closes the dialog and the input is reset on reopen; an exact name deletes the row and the tenant disappears from the API list. DB check shows 0 leftover data for the UI tenant. No page errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/platform/tenants/{id}", "issue": "The counters cleanup builds the regex f'^{tenant_id}:' without re.escape. TenantIn still accepts an optional custom tenant_id (only a 3-80 char length check). A SUPERADMIN-created ID that contains regex metacharacters, e.g. '(.*)', would wipe ALL tenants' counters when that tenant is deleted. Fix: use re.escape(tenant_id), and either remove tenant_id from TenantIn or restrict it to a pattern such as ^[A-Za-z0-9_-]+$."},
+      {"endpoint": "POST /api/platform/tenants", "issue": "admin_email and initial_password are still optional in the API, so a tenant can be created without an admin or main branch. admin_email is not validated as an email (plain str). The requirement says all 5 fields are mandatory, but only the UI enforces this."},
+      {"endpoint": "POST /api/auth/change-initial-password", "issue": "Returns user_out(updated), which does not include the enriched /auth/me fields (branches, platform_role normalisation). The frontend calls setUser(data.user), so the branch switcher and context data may be incomplete until the next /auth/me reload. Consider returning the same payload as /auth/me."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter14_tenant_lifecycle.py", "/app/test_reports/pytest/iter14_tenant.xml", "/app/test_reports/pytest/iter14_regression.xml"],
+  "action_items": [
+    "Use re.escape(tenant_id) in the delete_tenant counters regex, and drop or validate the custom tenant_id field in TenantIn.",
+    "Make admin_email (EmailStr) and initial_password required in TenantIn so the API matches the requirement.",
+    "Optional: return the /auth/me-equivalent user from change-initial-password (including branches)."
+  ],
+  "critical_code_review_comments": [
+    "delete_tenant runs several delete_many calls without a transaction. A failure partway through leaves a partially deleted tenant, although the tenant doc is deleted last so a retry is possible. Acceptable, but worth noting.",
+    "change-initial-password has no attempt throttling for wrong current passwords. Low risk because the caller is already authenticated with that password.",
+    "Old test test_iter12_mt_p0::test_tenantcollection_sanitizes_and_forbids_unscoped writes a client into T1 without depending on the fixture. If the fixture fails, the document is orphaned. One such orphan ('TEMP sanit e0eda5') was found and removed."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter14_tenant_lifecycle.py", "/app/backend/tests/test_multitenant.py", "/app/backend/tests/test_tenancy.py", "/app/backend/tests/test_iter12_mt_p0.py", "/app/backend/tests/test_iter13_mt_final.py"],
+  "success_rate": {"backend": "100% (10/10 new + 57/57 regression)", "frontend": "100%"},
+  "test_credentials": "Used /app/memory/test_credentials.md (owner SUPERADMIN, demo admin). Passwords not exposed.",
+  "seed_data_creation": "Temporary TEMP-full/basic-<suf> SRL tenants (pytest) and TEMP-ui14-<suf> SRL (UI) were all deleted. cleanup_temp_check.py shows 0 TEMP/TEST tenants, branches, users, counters, clients, payments, efactura and cron_errors left. The real tenant BOGADY MOTORS SRL was not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Old MT test fixtures now use the _mk_tenant helper (POST with cui, then PUT the quota) because POST ignores max_branches_allowed and requires cui. Run: cd /app/backend && python -m pytest tests/test_multitenant.py tests/test_tenancy.py tests/test_iter12_mt_p0.py tests/test_iter13_mt_final.py tests/test_iter14_tenant_lifecycle.py -q -n 0, then python tests/cleanup_temp_check.py.",
+  "rca of the issue": "No functional bugs found. The old regression fixtures failed (422) only because of the intended TenantIn schema change (cui is now required); the fixtures were updated."
+}

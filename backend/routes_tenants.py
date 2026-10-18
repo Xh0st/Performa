@@ -1,3 +1,4 @@
+import re
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,10 +14,13 @@ router = APIRouter(prefix="/api")
 class TenantIn(BaseModel):
     company_name: str = Field(min_length=2, max_length=180)
     cui: str = Field(min_length=2, max_length=30)
+    admin_email: str = Field(
+        min_length=5,
+        max_length=254,
+        pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$",
+    )
+    initial_password: str = Field(min_length=8, max_length=256)
     subscription_plan: str = "BASIC"
-    admin_email: str | None = None
-    initial_password: str | None = Field(default=None, min_length=8)
-    tenant_id: str | None = Field(default=None, min_length=3, max_length=80)
 
 
 class DeleteTenantIn(BaseModel):
@@ -57,16 +61,12 @@ async def list_tenants(user=Depends(require_superadmin())):
 async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
     if body.subscription_plan not in {"BASIC", "FULL"}:
         raise HTTPException(400, "Planul poate fi BASIC sau FULL")
-    if bool(body.admin_email) != bool(body.initial_password):
-        raise HTTPException(400, "Emailul administratorului și parola inițială sunt obligatorii împreună")
-    tenant_id = body.tenant_id or f"tenant-{uuid4().hex[:16]}"
-    if await raw_db.tenants.find_one({"_id": tenant_id}):
-        raise HTTPException(400, "Tenant existent")
+    tenant_id = f"tenant-{uuid4().hex[:16]}"
     company_cui = body.cui.strip().upper()
     if await raw_db.tenants.find_one({"cui": company_cui}):
         raise HTTPException(400, "CUI deja existent")
-    admin_email = (body.admin_email or "").strip().lower()
-    if admin_email and await raw_db.users.find_one({"email": admin_email}):
+    admin_email = body.admin_email.strip().lower()
+    if await raw_db.users.find_one({"email": admin_email}):
         raise HTTPException(400, "Email administrator deja existent")
     branch_limit = 1 if body.subscription_plan == "BASIC" else 5
     document = {
@@ -78,34 +78,32 @@ async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
         "status": "ACTIVE",
         "created_at": iso(),
     }
-    branch = None
     try:
         await raw_db.tenants.insert_one(document)
-        if admin_email:
-            branch = {
-                "_id": f"branch-{uuid4().hex[:16]}",
-                "tenant_id": tenant_id,
-                "branch_name": f"{document['company_name']} · Sediu principal",
-                "address": "",
-                "rar_authorization_code": "",
-                "is_main_branch": True,
-                "status": "ACTIVE",
-                "created_at": iso(),
-            }
-            await raw_db.branches.insert_one(branch)
-            await raw_db.users.insert_one({
-                "email": admin_email,
-                "name": "Administrator",
-                "role": "admin",
-                "tenant_role": "TENANT_ADMIN",
-                "active": True,
-                "password_hash": hash_password(body.initial_password),
-                "must_change_password": True,
-                "tenant_id": tenant_id,
-                "assigned_branch_ids": [branch["_id"]],
-                "active_branch_id": branch["_id"],
-                "created_at": iso(),
-            })
+        branch = {
+            "_id": f"branch-{uuid4().hex[:16]}",
+            "tenant_id": tenant_id,
+            "branch_name": f"{document['company_name']} · Sediu principal",
+            "address": "",
+            "rar_authorization_code": "",
+            "is_main_branch": True,
+            "status": "ACTIVE",
+            "created_at": iso(),
+        }
+        await raw_db.branches.insert_one(branch)
+        await raw_db.users.insert_one({
+            "email": admin_email,
+            "name": "Administrator",
+            "role": "admin",
+            "tenant_role": "TENANT_ADMIN",
+            "active": True,
+            "password_hash": hash_password(body.initial_password),
+            "must_change_password": True,
+            "tenant_id": tenant_id,
+            "assigned_branch_ids": [branch["_id"]],
+            "active_branch_id": branch["_id"],
+            "created_at": iso(),
+        })
     except Exception:
         await raw_db.users.delete_many({"tenant_id": tenant_id})
         await raw_db.branches.delete_many({"tenant_id": tenant_id})
@@ -147,7 +145,7 @@ async def delete_tenant(
         await raw_db[collection].delete_many({"tenant_id": tenant_id})
     await raw_db.users.delete_many({"tenant_id": tenant_id})
     await raw_db.branches.delete_many({"tenant_id": tenant_id})
-    await raw_db.counters.delete_many({"_id": {"$regex": f"^{tenant_id}:"}})
+    await raw_db.counters.delete_many({"_id": {"$regex": f"^{re.escape(tenant_id)}:"}})
     await raw_db.tenants.delete_one({"_id": tenant_id})
     return {"ok": True}
 

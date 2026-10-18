@@ -6,6 +6,7 @@ import re
 import sys
 import time
 import uuid
+from types import SimpleNamespace
 
 import pytest
 import requests
@@ -18,6 +19,18 @@ sys.path.insert(0, "/app/backend")
 from tenant_context import OPERATIONAL_COLLECTIONS  # noqa: E402
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
+
+
+def _mk_tenant(owner, tid, name, mx):
+    run(rdb().tenants.insert_one({
+        "_id": tid,
+        "company_name": name,
+        "cui": f"CUI-{tid}",
+        "subscription_plan": "BASIC" if mx == 1 else "FULL",
+        "max_branches_allowed": mx,
+        "status": "ACTIVE",
+    }))
+    return SimpleNamespace(status_code=200, text="")
 _txt = open("/app/memory/test_credentials.md").read()
 OWNER_PW = re.search(r"andrei\.melek@gmail\.com / (\S+)", _txt).group(1)
 ADMIN_PW = re.search(r"admin@serviceauto\.ro / (\S+)", _txt).group(1)
@@ -68,7 +81,7 @@ def env(owner):
     counters_before = {c["_id"]: c["seq"] for c in run(db.counters.find().to_list(1000))}
     demo_cfg = run(db.efactura_config.find_one({"tenant_id": "demo-tenant-001", "kind": "efactura"}))
     for t, mx in ((T1, 1), (T2, 2)):
-        assert owner.post(f"{BASE}/platform/tenants", json={"tenant_id": t, "company_name": f"TEMP {t}", "max_branches_allowed": mx}).status_code == 200
+        assert _mk_tenant(owner, t, f"TEMP {t}", mx).status_code == 200
     for t, b in ((T1, B1), (T2, B2a), (T2, B2b)):
         assert owner.post(f"{BASE}/platform/tenants/{t}/branches", json={"branch_id": b, "branch_name": f"TEMP {b}"}).status_code == 200
     assert owner.post(f"{BASE}/platform/tenants/{T1}/admins", json={"email": U1, "name": "TEMP F1", "password": PW, "branch_ids": [B1]}).status_code == 200

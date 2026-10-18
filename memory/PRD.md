@@ -102,6 +102,23 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   selectorul de sucursală rămâne restrâns pentru a preveni overflow-ul.
 - Verificare la 390px: toate acțiunile au fost vizibile și funcționale, fără erori în consolă.
 
+## Ciclul de viață tenant Superadmin (2026-10-19)
+- Superadmin creează tenanturi fără ID introdus manual: ID-ul tenantului și ID-ul sediului principal
+  se generează automat. Formularul cere Nume companie SRL, CUI, email administrator, parolă
+  inițială și planul `BASIC` sau `FULL`.
+- `BASIC` oferă o singură sucursală, iar `FULL` oferă până la cinci. La creare se generează un
+  Tenant Admin, asociat exclusiv sediului principal, cu parolă bcrypt și obligație de schimbare
+  a parolei la prima conectare.
+- Utilizatorii cu parolă inițială nu pot accesa date operaționale până nu o schimbă. Pagina
+  dedicată validează parola curentă, lungimea, confirmarea și interzice reutilizarea parolei.
+- Tenantul poate fi șters doar de Superadmin, cu confirmare prin numele exact al companiei;
+  ștergerea elimină utilizatori, sucursale, date operaționale și contoare. Tenantul activ al
+  Superadminului nu poate fi șters.
+- Securitate: CUI și email administrator sunt validate și unice, ID-urile nu sunt acceptate din
+  payload-ul public, iar ștergerea contoarelor folosește escaping pentru expresii regulate.
+- Verificare: 67 teste de regresie multi-tenant și 10 teste de ciclu tenant au trecut; curățarea
+  a confirmat 0 tenanturi, sucursale, utilizatori sau date temporare rămase.
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
@@ -130,6 +147,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 ## Next tasks
 - Confirmați în interfață comportamentul tenantului demo, al panoului Superadmin și al selectorului
   de sucursală.
+- Confirmați fluxul de creare tenant, prima conectare cu schimbarea parolei și ștergerea cu
+  confirmare în panoul Superadmin.
 - Retestați end-to-end invalidarea devizului după editarea pieselor sau manoperei aprobate.
 - Obțineți documentația contractuală RAR, endpointurile Test/Producție și tokenul de acces.
 - Validați un payload într-un mediu RAR Sandbox înainte de activarea transportului extern.

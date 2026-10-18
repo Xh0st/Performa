@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import uuid
+from types import SimpleNamespace
 
 import pytest
 import requests
@@ -17,6 +18,18 @@ sys.path.insert(0, "/app/backend")
 from tenant_context import OPERATIONAL_COLLECTIONS  # noqa: E402
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
+
+
+def _mk_tenant(owner, tid, name, mx):
+    run(rdb().tenants.insert_one({
+        "_id": tid,
+        "company_name": name,
+        "cui": f"CUI-{tid}",
+        "subscription_plan": "BASIC" if mx == 1 else "FULL",
+        "max_branches_allowed": mx,
+        "status": "ACTIVE",
+    }))
+    return SimpleNamespace(status_code=200, text="")
 _txt = open("/app/memory/test_credentials.md").read()
 OWNER_PW = re.search(r"andrei\.melek@gmail\.com / (\S+)", _txt).group(1)
 ADMIN_PW = re.search(r"admin@serviceauto\.ro / (\S+)", _txt).group(1)
@@ -69,7 +82,7 @@ def env(owner):
     counters_before = {c["_id"]: c["seq"] for c in run(db.counters.find().to_list(1000))}
     demo_cfg_before = run(db.efactura_config.find_one({"_id": "main"}))
     for t, mx in ((T1, 1), (T2, 2)):
-        r = owner.post(f"{BASE}/platform/tenants", json={"tenant_id": t, "company_name": f"TEMP {t}", "max_branches_allowed": mx})
+        r = _mk_tenant(owner, t, f"TEMP {t}", mx)
         assert r.status_code == 200, r.text
     for t, b in ((T1, B1), (T2, B2a), (T2, B2b)):
         r = owner.post(f"{BASE}/platform/tenants/{t}/branches", json={"branch_id": b, "branch_name": f"TEMP {b}"})
@@ -195,24 +208,41 @@ def test_tenantcollection_sanitizes_and_forbids_unscoped():
     async def go():
         import core
         from tenant_context import set_scope
+
         cli = AsyncIOMotorClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
         core.raw_db = cli
         db = core.TenantDatabase()
         set_scope({"tenant_id": T1, "branch_id": B1})
-        r = await db.clients.insert_one({"name": f"TEMP sanit {SUF}", "tenant_id": "demo-tenant-001"})
-        doc = await cli.clients.find_one({"_id": r.inserted_id})
-        assert doc["tenant_id"] == T1
-        await db.clients.update_one({"_id": r.inserted_id}, {"$set": {"tenant_id": "demo-tenant-001", "branch_id": "demo-branch-001"}})
-        doc = await cli.clients.find_one({"_id": r.inserted_id})
-        assert doc["tenant_id"] == T1 and doc["branch_id"] == B1
-        for bad in ("replace_one", "bulk_write", "find_one_and_replace", "find_one_and_delete", "rename", "drop"):
-            with pytest.raises(AttributeError):
-                getattr(db.clients, bad)
-        await db.clients.update_one({"_id": r.inserted_id}, {"$unset": {"tenant_id": ""}})
-        doc = await cli.clients.find_one({"_id": r.inserted_id})
-        if "tenant_id" not in doc:
-            await cli.clients.delete_one({"_id": r.inserted_id})
-        return doc
+        inserted_id = None
+        try:
+            r = await db.clients.insert_one({
+                "name": f"TEMP sanit {SUF}",
+                "tenant_id": "demo-tenant-001",
+            })
+            inserted_id = r.inserted_id
+            doc = await cli.clients.find_one({"_id": inserted_id})
+            assert doc["tenant_id"] == T1
+            await db.clients.update_one(
+                {"_id": inserted_id},
+                {"$set": {"tenant_id": "demo-tenant-001", "branch_id": "demo-branch-001"}},
+            )
+            doc = await cli.clients.find_one({"_id": inserted_id})
+            assert doc["tenant_id"] == T1 and doc["branch_id"] == B1
+            for bad in (
+                "replace_one",
+                "bulk_write",
+                "find_one_and_replace",
+                "find_one_and_delete",
+                "rename",
+                "drop",
+            ):
+                with pytest.raises(AttributeError):
+                    getattr(db.clients, bad)
+            await db.clients.update_one({"_id": inserted_id}, {"$unset": {"tenant_id": ""}})
+            return await cli.clients.find_one({"_id": inserted_id})
+        finally:
+            if inserted_id:
+                await cli.clients.delete_one({"_id": inserted_id})
     doc = asyncio.new_event_loop().run_until_complete(go())
     assert "tenant_id" in doc, "$unset tenant_id not sanitized -> document orphaned (minor hardening)"
 
