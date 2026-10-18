@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
@@ -14,6 +14,7 @@ const REASONS = {
   fara_cost: ["Operațiune fără cost", "No-charge operation"],
   diagnoza: ["Diagnoză", "Diagnosis"],
   constatare: ["Constatare", "Assessment"],
+  inchidere_nefacturata: ["Închidere fără factură", "Closed without invoice"],
 };
 
 export default function ClosureReview() {
@@ -23,8 +24,20 @@ export default function ClosureReview() {
   const review = async (workOrder) => {
     setBusy(workOrder.id);
     try {
-      await api.post(`/work-orders/${workOrder.id}/closure-review`, { note: "Verificat administrativ" });
-      toast.success(tr("Comandă verificată", "Work order reviewed"));
+      await api.post(`/work-orders/${workOrder.id}/closure-review`, { note: "Aprobat administrativ" });
+      toast.success(tr("Închidere aprobată", "Closure approved"));
+      reload();
+    } catch (error) {
+      toast.error(errMsg(error));
+    } finally {
+      setBusy("");
+    }
+  };
+  const reopen = async (workOrder) => {
+    setBusy(workOrder.id);
+    try {
+      await api.post(`/work-orders/${workOrder.id}/reopen`, { note: "Redeschis din verificare închideri" });
+      toast.success(tr("Comandă redeschisă", "Work order reopened"));
       reload();
     } catch (error) {
       toast.error(errMsg(error));
@@ -52,8 +65,8 @@ export default function ClosureReview() {
                   <th className="px-2 py-2">{tr("Comandă", "Work order")}</th>
                   <th>{tr("Client", "Client")}</th>
                   <th>{tr("Motiv", "Reason")}</th>
-                  <th>{tr("Finalizată", "Completed")}</th>
-                  <th>{tr("Revizuire", "Review")}</th>
+                  <th>{tr("Închisă", "Closed")}</th>
+                  <th>{tr("Aprobare", "Approval")}</th>
                   <th />
                 </tr>
               </thead>
@@ -73,21 +86,31 @@ export default function ClosureReview() {
                       </td>
                       <td>{workOrder.client_name}</td>
                       <td>{tr(reason[0], reason[1])}</td>
-                      <td className="font-mono text-xs">{dt(workOrder.finished_at || workOrder.invoiced_at)}</td>
-                      <td>{workOrder.closure_review ? workOrder.closure_review.by : tr("În așteptare", "Pending")}</td>
+                      <td className="font-mono text-xs">{dt(workOrder.closed_at)}</td>
+                      <td>{tr("În așteptare", "Pending")}</td>
                       <td>
-                        {!workOrder.closure_review && (
+                        <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            data-testid={`review-closure-${workOrder.number}`}
+                            data-testid={`approve-closure-${workOrder.number}`}
                             disabled={busy === workOrder.id}
                             onClick={() => review(workOrder)}
                           >
                             <CheckCircle2 className="mr-1 h-4 w-4" />
-                            {tr("Verifică", "Review")}
+                            {tr("Aprobă", "Approve")}
                           </Button>
-                        )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            data-testid={`reopen-closure-${workOrder.number}`}
+                            disabled={busy === workOrder.id}
+                            onClick={() => reopen(workOrder)}
+                          >
+                            <RotateCcw className="mr-1 h-4 w-4" />
+                            {tr("Redeschide", "Reopen")}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );

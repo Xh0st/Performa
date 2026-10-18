@@ -125,7 +125,7 @@ export default function WorkOrderDetail() {
             </NativeSelect>
           </Field>
           <Button data-testid="wo-status-apply-button" disabled={!next} onClick={changeStatus}><ArrowRightLeft className="mr-1 h-4 w-4" />{tr("Aplică", "Apply")}</Button>
-          <span className="text-xs text-muted-foreground">{tr("Finalizată necesită control calitate; Închisă este permisă pentru excepțiile de deviz admise.", "Completed requires QC; Closed is allowed for approved quote exceptions.")}</span>
+          <span className="text-xs text-muted-foreground">{tr("Finalizată necesită control calitate; orice comandă nefacturată poate fi închisă și intră în verificarea administrativă.", "Completed requires QC; any uninvoiced work order can be closed and enters administrative review.")}</span>
         </div>
       ) : null}
 

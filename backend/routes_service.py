@@ -269,7 +269,7 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
     if st == "finalizata" and not w.get("qc", {}).get("passed"):
         raise HTTPException(400, "Controlul de calitate trebuie promovat înainte de finalizare")
     rule = quote_closure_rule(w)
-    if st in {"finalizata", "inchisa"} and not rule["allowed"]:
+    if st == "finalizata" and not rule["allowed"]:
         raise HTTPException(400, "Devizul este în așteptare; aprobați sau respingeți-l înainte de finalizare")
     upd = {"status": st}
     if st == "finalizata":
@@ -278,7 +278,8 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
         await db.time_entries.update_many({"work_order_id": wid, "end": None}, {"$set": {"end": iso()}})
     if st == "inchisa":
         upd["closed_at"] = iso()
-        upd["closure_quote_rule"] = rule
+        upd["pre_closure_status"] = w["status"]
+        upd["closure_quote_rule"] = {"allowed": True, "reason": "inchidere_nefacturata", "review": True}
     await db.work_orders.update_one({"_id": w["_id"]}, {"$set": upd, "$push": {
         "status_history": {"status": st, "at": iso(), "by": user["name"], "note": body.note}}})
     await audit(user, "status", "work_order", wid, st)
@@ -291,25 +292,40 @@ class ClosureReviewIn(BaseModel):
 
 @router.get("/closure-exceptions/work-orders")
 async def closure_exceptions(user=Depends(require("settings"))):
-    rows = await db.work_orders.find({"status": {"$in": ["finalizata", "facturata", "inchisa"]}}).sort("finished_at", -1).to_list(2000)
+    rows = await db.work_orders.find({"status": "inchisa", "closure_review": {"$exists": False}}).sort("closed_at", -1).to_list(2000)
     flagged = []
     for row in rows:
-        rule = row.get("closure_quote_rule") or quote_closure_rule(row)
-        if rule["review"] and not row.get("closure_review"):
-            row["closure_quote_rule"] = rule
-            flagged.append(row)
+        row["closure_quote_rule"] = row.get("closure_quote_rule") or quote_closure_rule(row)
+        flagged.append(row)
     return await enrich(flagged)
 
 
 @router.post("/work-orders/{wid}/closure-review")
 async def review_closure_exception(wid: str, body: ClosureReviewIn, user=Depends(require("settings"))):
     work_order = await load_wo(wid)
-    rule = work_order.get("closure_quote_rule") or quote_closure_rule(work_order)
-    if not rule["review"]:
-        raise HTTPException(400, "Comanda nu necesită revizuire administrativă")
-    review = {"at": iso(), "by": user["name"], "note": body.note.strip()}
+    if work_order["status"] != "inchisa" or work_order.get("invoice_id"):
+        raise HTTPException(400, "Doar comenzile nefacturate închise pot fi aprobate")
+    review = {"at": iso(), "by": user["name"], "note": body.note.strip(), "status": "aprobat"}
     await db.work_orders.update_one({"_id": work_order["_id"]}, {"$set": {"closure_review": review}})
-    await audit(user, "review", "work_order_closure", wid, rule["reason"])
+    await audit(user, "approve", "work_order_closure", wid, "inchidere nefacturată")
+    return await get_work_order(wid, user)
+
+
+@router.post("/work-orders/{wid}/reopen")
+async def reopen_work_order(wid: str, body: ClosureReviewIn, user=Depends(require("settings"))):
+    work_order = await load_wo(wid)
+    if work_order["status"] != "inchisa" or work_order.get("invoice_id"):
+        raise HTTPException(400, "Doar comenzile nefacturate închise pot fi redeschise")
+    previous = work_order.get("pre_closure_status")
+    if not previous:
+        history = [item for item in work_order.get("status_history", []) if item.get("status") != "inchisa"]
+        previous = history[-1].get("status") if history else "noua"
+    await db.work_orders.update_one({"_id": work_order["_id"]}, {
+        "$set": {"status": previous, "reopened_at": iso(), "reopened_by": user["name"]},
+        "$unset": {"closure_review": "", "closed_at": ""},
+        "$push": {"status_history": {"status": previous, "at": iso(), "by": user["name"], "note": body.note.strip() or "Redeschis din verificare închideri"}},
+    })
+    await audit(user, "reopen", "work_order_closure", wid, previous)
     return await get_work_order(wid, user)
 
 
