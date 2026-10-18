@@ -16,7 +16,9 @@ function useLineActions(wo, onChange) {
   const { tr } = useLang();
   const add = async (body) => {
     try {
-      onChange((await api.post(`/work-orders/${wo.id}/lines`, body)).data);
+      const response = await api.post(`/work-orders/${wo.id}/lines`, body);
+      onChange(response.data);
+      if (response.data.quote_invalidated) toast.warning(tr("Devizul aprobat a fost respins; generați o versiune nouă", "Approved quote rejected; generate a new version"));
       toast.success(tr("Poziție adăugată", "Line added"));
       return true;
     } catch (e) {
@@ -26,14 +28,18 @@ function useLineActions(wo, onChange) {
   };
   const del = async (lid) => {
     try {
-      onChange((await api.delete(`/work-orders/${wo.id}/lines/${lid}`)).data);
+      const response = await api.delete(`/work-orders/${wo.id}/lines/${lid}`);
+      onChange(response.data);
+      if (response.data.quote_invalidated) toast.warning(tr("Devizul aprobat a fost respins; generați o versiune nouă", "Approved quote rejected; generate a new version"));
     } catch (e) {
       toast.error(errMsg(e));
     }
   };
   const update = async (lid, body) => {
     try {
-      onChange((await api.put(`/work-orders/${wo.id}/lines/${lid}`, body)).data);
+      const response = await api.put(`/work-orders/${wo.id}/lines/${lid}`, body);
+      onChange(response.data);
+      if (response.data.quote_invalidated) toast.warning(tr("Devizul aprobat a fost respins; generați o versiune nouă", "Approved quote rejected; generate a new version"));
       toast.success(tr("Poziție actualizată", "Line updated"));
       return true;
     } catch (e) {

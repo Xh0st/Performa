@@ -369,6 +369,38 @@ def validate_line_update(update: dict) -> None:
         raise HTTPException(400, "Discountul trebuie să fie între 0 și 100")
 
 
+async def invalidate_approved_quotes(work_order: dict, user: dict) -> bool:
+    if not any(quote.get("status") == "approved" for quote in work_order.get("quotes", [])):
+        return False
+    quotes = []
+    for quote in work_order["quotes"]:
+        item = quote.copy()
+        if item.get("status") == "approved":
+            item["status"] = "rejected"
+            item["decision"] = {
+                **item.get("decision", {}),
+                "invalidated_at": iso(),
+                "invalidated_by": user["name"],
+                "invalidated_reason": "Poziții modificate după aprobarea clientului",
+            }
+        quotes.append(item)
+    update = {"quotes": quotes}
+    operations = {"$set": update}
+    if work_order.get("status") == "aprobata":
+        update["status"] = "asteapta_oferta"
+        operations["$push"] = {
+            "status_history": {
+                "status": "asteapta_oferta",
+                "at": iso(),
+                "by": user["name"],
+                "note": "Deviz invalidat după modificarea pieselor/manoperei",
+            }
+        }
+    await db.work_orders.update_one({"_id": work_order["_id"]}, operations)
+    await audit(user, "invalidate", "quote", str(work_order["_id"]), "poziții modificate")
+    return True
+
+
 async def build_line(body: LineIn):
     s = await get_settings()
     ln = {"id": secrets.token_hex(6), "type": body.type, "description": body.description, "qty": body.qty,
@@ -406,7 +438,10 @@ async def add_line(wid: str, body: LineIn, user=Depends(require("workorders"))):
     if body.mechanic_id and body.mechanic_id not in w.get("mechanic_ids", []):
         upd["$addToSet"] = {"mechanic_ids": body.mechanic_id}
     await db.work_orders.update_one({"_id": w["_id"]}, upd)
-    return await get_work_order(wid, user)
+    invalidated = await invalidate_approved_quotes(w, user)
+    result = await get_work_order(wid, user)
+    result["quote_invalidated"] = invalidated
+    return result
 
 
 @router.put("/work-orders/{wid}/lines/{lid}")
@@ -435,7 +470,10 @@ async def update_line(wid: str, lid: str, body: LineUpdateIn, user=Depends(requi
             {"_id": work_order["_id"]},
             {"$addToSet": {"mechanic_ids": update["mechanic_id"]}},
         )
-    return await get_work_order(wid, user)
+    invalidated = await invalidate_approved_quotes(work_order, user)
+    result = await get_work_order(wid, user)
+    result["quote_invalidated"] = invalidated
+    return result
 
 
 @router.delete("/work-orders/{wid}/lines/{lid}")
@@ -446,7 +484,10 @@ async def delete_line(wid: str, lid: str, user=Depends(require("workorders"))):
     if w["status"] in LINE_LOCKED:
         raise HTTPException(400, "Liniile sunt blocate după finalizarea comenzii")
     await db.work_orders.update_one({"_id": w["_id"]}, {"$pull": {"lines": {"id": lid}}})
-    return await get_work_order(wid, user)
+    invalidated = await invalidate_approved_quotes(w, user)
+    result = await get_work_order(wid, user)
+    result["quote_invalidated"] = invalidated
+    return result
 
 
 # ---------- Quotes (devize) ----------
