@@ -89,10 +89,10 @@ export default function Dashboard() {
         </Panel>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        <Panel title={tr("Productivitate mecanici (luna curentă)", "Mechanic productivity (this month)")} className="xl:col-span-2" testid="dashboard-mechanics">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+      <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-3">
+        <Panel title={tr("Productivitate mecanici (luna curentă)", "Mechanic productivity (this month)")} className="min-w-0 xl:col-span-2" testid="dashboard-mechanics">
+          <div className="min-w-0 overflow-x-auto">
+            <table className="w-full min-w-[480px] text-sm">
               <thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <th className="py-2">{tr("Mecanic", "Mechanic")}</th><th className="text-right">{tr("Ore prezente", "Present h")}</th><th className="text-right">{tr("Ore lucrate", "Worked h")}</th>
                 <th className="text-right">{tr("Ore facturate", "Billed h")}</th><th className="text-right">{tr("Productivitate", "Productivity")}</th><th className="text-right">{tr("Eficiență", "Efficiency")}</th>

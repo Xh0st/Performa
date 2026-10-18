@@ -135,15 +135,19 @@ class TenantCollection:
         raise AttributeError(f"Metoda Mongo ne-scoped este interzisă: {name}")
 
     def _sanitize_update(self, update: dict) -> dict:
+        if isinstance(update, list):
+            raise HTTPException(400, "Update pipeline nepermis în context tenant")
         if self.name in GLOBAL_COLLECTIONS:
             return update
         safe = dict(update)
-        for operator in ("$set", "$setOnInsert"):
-            if operator in safe:
-                safe[operator] = {
-                    key: value for key, value in safe[operator].items()
-                    if key not in {"tenant_id", "branch_id"}
-                }
+        for operator, values in safe.items():
+            if not operator.startswith("$") or not isinstance(values, dict):
+                continue
+            safe[operator] = {
+                key: value for key, value in values.items()
+                if key not in {"tenant_id", "branch_id"}
+                and not (operator == "$rename" and value in {"tenant_id", "branch_id"})
+            }
         return safe
 
 

@@ -58,6 +58,8 @@ async def oauth_start(user=Depends(require("settings"))):
 @router.get("/efactura/oauth/callback")
 async def oauth_callback(code: str = "", state: str = "", error: str = ""):
     front = os.environ["FRONTEND_URL"].split(",")[0].strip()
+    if not state:
+        return RedirectResponse(f"{front}/efactura?oauth=error")
     state_doc = await raw_db.efactura_config.find_one({"kind": "efactura", "oauth_state": state})
     if not state_doc:
         return RedirectResponse(f"{front}/efactura?oauth=error")
@@ -69,9 +71,10 @@ async def oauth_callback(code: str = "", state: str = "", error: str = ""):
     await ef.save_cfg({"oauth_state": ""})
     try:
         await ef.exchange_code(code)
-    except HTTPException as e:
-        await ef.save_cfg({"last_error": e.detail})
-        await ef.log("oauth", False, e.detail, env=cfg["environment"])
+    except Exception as e:  # noqa: BLE001
+        message = e.detail if isinstance(e, HTTPException) else str(e)
+        await ef.save_cfg({"last_error": message[:1500]})
+        await ef.log("oauth", False, message[:1500], env=cfg["environment"])
         return RedirectResponse(f"{front}/efactura?oauth=error")
     return RedirectResponse(f"{front}/efactura?oauth=ok")
 
@@ -84,7 +87,7 @@ async def oauth_refresh(user=Depends(require("settings"))):
 
 @router.post("/efactura/oauth/disconnect")
 async def oauth_disconnect(user=Depends(require("settings"))):
-    await db.efactura_config.update_one({"_id": "main"}, {"$unset": {"access_token": "", "refresh_token": "", "token_expires_at": "",
+    await db.efactura_config.update_one({"kind": "efactura"}, {"$unset": {"access_token": "", "refresh_token": "", "token_expires_at": "",
                                                                      "refresh_expires_at": "", "connected_at": ""}})
     await ef.log("oauth", True, "Deconectat SPV")
     return ef.public_cfg(await ef.get_cfg(), await get_settings())

@@ -62,6 +62,8 @@ async def update_tenant(tenant_id: str, body: TenantQuotaIn, user=Depends(requir
         raise HTTPException(400, "Plan invalid")
     if body.status not in {"ACTIVE", "SUSPENDED", "EXPIRED"}:
         raise HTTPException(400, "Status invalid")
+    if tenant_id == user.get("tenant_id") and body.status != "ACTIVE":
+        raise HTTPException(400, "Nu puteți suspenda tenantul contextului Superadmin activ")
     result = await raw_db.tenants.update_one({"_id": tenant_id}, {"$set": body.model_dump()})
     if not result.matched_count:
         raise HTTPException(404, "Tenant inexistent")

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="15" time="15.885" timestamp="2026-10-18T23:20:22.862617+00:00" hostname="agent-env-100ab832-4aa8-4607-9745-da91f4b33ede"><testcase classname="tests.test_iter12_mt_p0" name="test_superadmin_branch_assignment" time="3.004" /><testcase classname="tests.test_iter12_mt_p0" name="test_platform_403_non_superadmin" time="1.449" /><testcase classname="tests.test_iter12_mt_p0" name="test_superadmin_protected" time="0.587" /><testcase classname="tests.test_iter12_mt_p0" name="test_suspended_tenant_blocks_me_login_refresh" time="1.372" /><testcase classname="tests.test_iter12_mt_p0" name="test_inactive_branch_blocks" time="0.991" /><testcase classname="tests.test_iter12_mt_p0" name="test_settings_rar_efactura_distinct" time="1.587" /><testcase classname="tests.test_iter12_mt_p0" name="test_malicious_settings_body_does_not_move" time="0.141" /><testcase classname="tests.test_iter12_mt_p0" name="test_tenantcollection_sanitizes_and_forbids_unscoped" time="0.149"><failure message="AssertionError: $unset tenant_id not sanitized -&gt; document orphaned (minor hardening)&#10;assert 'tenant_id' in {'_id': ObjectId('6ad55440f7449bf50b026073'), 'name': 'TEMP sanit 8da346', 'branch_id': 'TEMP-b1-8da346'}">def test_tenantcollection_sanitizes_and_forbids_unscoped():
+        async def go():
+            import core
+            from tenant_context import set_scope
+            cli = AsyncIOMotorClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+            core.raw_db = cli
+            db = core.TenantDatabase()
+            set_scope({"tenant_id": T1, "branch_id": B1})
+            r = await db.clients.insert_one({"name": f"TEMP sanit {SUF}", "tenant_id": "demo-tenant-001"})
+            doc = await cli.clients.find_one({"_id": r.inserted_id})
+            assert doc["tenant_id"] == T1
+            await db.clients.update_one({"_id": r.inserted_id}, {"$set": {"tenant_id": "demo-tenant-001", "branch_id": "demo-branch-001"}})
+            doc = await cli.clients.find_one({"_id": r.inserted_id})
+            assert doc["tenant_id"] == T1 and doc["branch_id"] == B1
+            for bad in ("replace_one", "bulk_write", "find_one_and_replace", "find_one_and_delete", "rename", "drop"):
+                with pytest.raises(AttributeError):
+                    getattr(db.clients, bad)
+            await db.clients.update_one({"_id": r.inserted_id}, {"$unset": {"tenant_id": ""}})
+            doc = await cli.clients.find_one({"_id": r.inserted_id})
+            if "tenant_id" not in doc:
+                await cli.clients.delete_one({"_id": r.inserted_id})
+            return doc
+        doc = asyncio.new_event_loop().run_until_complete(go())
+&gt;       assert "tenant_id" in doc, "$unset tenant_id not sanitized -&gt; document orphaned (minor hardening)"
+E       AssertionError: $unset tenant_id not sanitized -&gt; document orphaned (minor hardening)
+E       assert 'tenant_id' in {'_id': ObjectId('6ad55440f7449bf50b026073'), 'name': 'TEMP sanit 8da346', 'branch_id': 'TEMP-b1-8da346'}
+
+tests/test_iter12_mt_p0.py:217: AssertionError</failure></testcase><testcase classname="tests.test_iter12_mt_p0" name="test_counters_independent" time="0.006" /><testcase classname="tests.test_iter12_mt_p0" name="test_cross_tenant_by_id" time="0.754" /><testcase classname="tests.test_iter12_mt_p0" name="test_oauth_callback_scoped" time="1.343" /><testcase classname="tests.test_iter12_mt_p0" name="test_oauth_disconnect_non_demo_tenant" time="0.102"><failure message="AssertionError: disconnect filters _id='main' -&gt; tokens not removed for non-demo tenants&#10;assert 'access_token' not in {'_id': ObjectId('6ad5543fe9cfd7d80a4a7d55'), 'branch_id': 'TEMP-b1-8da346', 'kind': 'efactura', 'tenant_id': 'TEMP-t1-8da346', ...}">a1 = &lt;requests.sessions.Session object at 0xfe3c5975e010&gt;
+
+    def test_oauth_disconnect_non_demo_tenant(a1):
+        run(rdb().efactura_config.update_one({"tenant_id": T1, "kind": "efactura"}, {"$set": {"access_token": "TEMPTOKEN"}}))
+        assert a1.post(f"{BASE}/efactura/oauth/disconnect").status_code == 200
+        doc = run(rdb().efactura_config.find_one({"tenant_id": T1, "kind": "efactura"}))
+&gt;       assert "access_token" not in doc, "disconnect filters _id='main' -&gt; tokens not removed for non-demo tenants"
+E       AssertionError: disconnect filters _id='main' -&gt; tokens not removed for non-demo tenants
+E       assert 'access_token' not in {'_id': ObjectId('6ad5543fe9cfd7d80a4a7d55'), 'branch_id': 'TEMP-b1-8da346', 'kind': 'efactura', 'tenant_id': 'TEMP-t1-8da346', ...}
+
+tests/test_iter12_mt_p0.py:274: AssertionError</failure></testcase><testcase classname="tests.test_iter12_mt_p0" name="test_cron_isolation_inprocess" time="0.115" /><testcase classname="tests.test_iter12_mt_p0" name="test_cron_http_endpoints" time="3.280" /><testcase classname="tests.test_iter12_mt_p0" name="test_branch_switch_multi" time="0.803" /></testsuite></testsuites>

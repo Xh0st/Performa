@@ -1,0 +1,46 @@
+{
+  "summary": "Retest of the multi-tenant P0 fixes after iteration 11. Both regression suites pass: test_multitenant.py and test_tenancy.py, 31/31. I wrote a new probe suite, tests/test_iter12_mt_p0.py, against 2 TEMP tenants and 3 branches; 13 of its 15 tests pass. All P0 items from iteration 11 are confirmed fixed. A SUSPENDED tenant and an INACTIVE branch are blocked (403) on /auth/me, on operational endpoints, on refresh and on login, and access comes back after reactivation. The OAuth callback finds the right tenant/branch from oauth_state: it no longer returns 503, it redirects, and it only changes that tenant's config. The demo config is not touched. The cron loop runs every active branch, and an exception in one branch is written to cron_errors without stopping the others. Settings, RAR and e-Factura each keep one config per tenant (one document per tenant per kind) and do not overlap. Counters use the key tenant:branch:name and count from 1 independently; the demo counter did not change. A tenant_id/branch_id sent in an update body (PUT /settings, or $set through TenantCollection) is stripped. Unscoped Mongo methods raise AttributeError. A non-superadmin gets 403 when trying to edit or delete a SUPERADMIN account, and 403 on every /platform endpoint. Requests from another tenant to DELETE/GET/PUT a client, GET product moves or PUT a product return 404, and no audit entry is written. The superadmin APIs for creating a tenant admin and assigning branches work and reject branches from another tenant (400). Branch switching rejects foreign branches (403). UI: /platform/tenants works for SUPERADMIN on mobile and shows 'access denied' for the demo admin and the multi-branch user. The branch selector is visible on desktop and mobile; switching branches reloads the page and the client list changes. The mobile header does not overflow (logout button at x=374 of 390). Two new bugs remain: e-Factura disconnect does nothing for non-demo tenants, and $unset is not sanitized. All TEMP/TEST data was cleaned up (0 records left); demo data and CL-2026-00083/00086 were not touched.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/efactura/oauth/disconnect", "issue": "It filters on {'_id': 'main'}. Only the migrated demo config has that _id; configs for new tenants get an ObjectId _id. For any non-demo tenant, disconnect returns 200 but access_token/refresh_token stay stored, so the SPV tokens are never revoked locally. Fix: filter on {'kind': 'efactura'} (scoped).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "core.TenantCollection._sanitize_update", "issue": "Only $set/$setOnInsert are sanitized. $unset (and $rename) on tenant_id/branch_id goes through and leaves the document orphaned or unscoped. No route currently sends user-controlled $unset, so this is hardening. Fix: strip tenant_id/branch_id from every update operator, and reject pipeline/list updates."},
+      {"endpoint": "routes_dashboard.py:63", "issue": "db.settings.find_one({'_id': 'company'}): settings for non-demo tenants have an ObjectId _id, so the dashboard elevators/occupancy read as empty for every new tenant. There is no data leak because the query is scoped. Fix: use get_settings() / {'kind': 'company'}."},
+      {"endpoint": "GET /api/efactura/oauth/callback", "issue": "(a) With an empty state, the lookup {'oauth_state': ''} matches any tenant that has finished OAuth (state is reset to ''). An unauthenticated caller can then make the server write a 'state invalid' log into that tenant's efactura_logs. Reject an empty state before the lookup. (b) A config without client_secret raises KeyError in _token_call, which becomes a 500 instead of an error redirect; catch generic exceptions."},
+      {"endpoint": "PUT /api/platform/tenants/{id}", "issue": "Nothing stops a superadmin from suspending demo-tenant-001, the tenant the SUPERADMIN account belongs to. That would lock the superadmin out of their own account, since login requires an ACTIVE tenant. Consider exempting platform_role SUPERADMIN, or blocking this action."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard (mobile 390px)", "issues": ["section[data-testid=dashboard-mechanics] overflows horizontally (scrollWidth 489 > 390): the panel header and table container are wider than the viewport. Add min-w-0 to the grid child or wrap the table in overflow-x-auto inside a constrained width. The header itself is fine."]},
+      {"screen": "/platform/tenants", "issues": ["The UI only creates tenants and branches. There is no UI for creating a tenant admin, assigning user branches, or editing tenant status/plan/quota; the APIs exist and work."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_multitenant.py", "/app/backend/tests/test_tenancy.py", "/app/backend/tests/test_iter12_mt_p0.py", "/app/test_reports/pytest/iter12_mt.xml", "/app/test_reports/pytest/iter12_p0.xml"],
+  "action_items": [
+    "HIGH: In routes_efactura.oauth_disconnect, change the filter {'_id': 'main'} to {'kind': 'efactura'} so tokens are removed for every tenant.",
+    "MINOR: Use {'kind': 'company'} (get_settings) in routes_dashboard instead of {'_id': 'company'}. Also check seed.py: it still uses _id 'company', which only works for demo.",
+    "MINOR: Extend TenantCollection._sanitize_update to strip tenant_id/branch_id from $unset/$rename/$inc and the other operators, and reject list (pipeline) updates.",
+    "MINOR: In the OAuth callback, reject an empty state before the raw_db lookup and catch non-HTTPException errors (redirect with oauth=error).",
+    "MINOR: Prevent suspending the tenant of the SUPERADMIN account, or exempt SUPERADMIN from the tenant-status check.",
+    "DESIGN: Fix the horizontal overflow of the dashboard mechanics section on mobile.",
+    "OPTIONAL: Add superadmin UI for tenant admin creation, branch assignment and tenant status/quota."
+  ],
+  "critical_code_review_comments": [
+    "Fail-closed design confirmed: TenantCollection raises 503 when there is no scope, and __getattr__ blocks unscoped methods. Aggregations prepend a scoped $match; no $lookup/$unionWith found.",
+    "Cron scope sets system_scope=True without platform_role, so the bypass in _scope_filter does not apply and cron queries stay scoped. Correct. But the system_scope flag is now unused or confusing; consider removing it.",
+    "Login/refresh/me check the active branch only. A multi-branch user whose active branch is set INACTIVE is locked out completely, even though another assigned branch is ACTIVE. Consider falling back to the first ACTIVE assigned branch.",
+    "The access token is kept in localStorage (erp_token) as well as the httpOnly cookie, which weakens XSS protection. This is an existing design choice."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter12_mt_p0.py"],
+  "success_rate": {"backend": "95% (44/46: 31/31 regression + 13/15 new probes; 2 failures are real bugs)", "frontend": "100% for the requested flows (one minor mobile dashboard overflow, outside the header)"},
+  "test_credentials": "Used /app/memory/test_credentials.md (owner/SUPERADMIN, demo admin) and WEBHOOK_CRON_SECRET from backend/.env. TEMP users were created and deleted by the test fixture.",
+  "seed_data_creation": "TEMP-t1/t2 tenants, 3 branches and 2 tenant admins are created and cleaned up by the fixture in test_iter12_mt_p0.py. mt_ui_fixture.py was run for setup and cleanup. A verification query found 0 TEMP/TEST records left.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_multitenant.py tests/test_tenancy.py -q, then python -m pytest tests/test_iter12_mt_p0.py -q -n 0 (needs -n 0 because pytest.ini uses xdist). The tests expected to fail until fixed are test_oauth_disconnect_non_demo_tenant and test_tenantcollection_sanitizes_and_forbids_unscoped ($unset). The cron isolation test monkeypatches routes_efactura._run_job in-process (no ANAF calls). The OAuth callback test calls the real ANAF token endpoint with fake creds (gets 400) and expects a redirect. UI: python tests/mt_ui_fixture.py setup|cleanup; on mobile, wait for data-testid=logout-button (header-user-name is hidden on mobile). In this browser tool, avoid str() (shadowed) and f-strings with nested quotes.",
+  "rca of the issue": "Disconnect bug: when settings, RAR and e-Factura became one config per tenant keyed by 'kind', the migration added kind to the legacy doc (_id 'main'), but oauth_disconnect still filters on the legacy _id. On new tenants the upsert creates an ObjectId _id, so the scoped filter {_id:'main', tenant_id:X} matches nothing. Repro: create a tenant, PUT /efactura/config, set access_token, POST /efactura/oauth/disconnect -> 200 but the token is still there. Fix: filter on {'kind':'efactura'}. routes_dashboard has the same legacy-_id pattern ({'_id':'company'})."
+}
