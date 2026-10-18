@@ -40,7 +40,12 @@ export default function Login() {
         <img src={HERO} alt="Atelier service auto" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/20" />
         <div className="absolute bottom-0 left-0 right-0 p-12 text-white">
-          <div className="mb-3 font-mono text-xs uppercase tracking-[0.3em] text-orange-400">ERP · Service Auto · România</div>
+          <div
+            className="mb-3 font-mono text-xs uppercase tracking-[0.3em] text-orange-400"
+            data-testid="login-brand-name"
+          >
+            ERP · Performa Auto · România
+          </div>
           <h1 className="font-heading text-5xl font-extrabold uppercase leading-[0.95] tracking-tight xl:text-6xl">
             {tr("Atelierul tău,", "Your workshop,")}<br />{tr("sub control total.", "fully under control.")}
           </h1>
@@ -53,7 +58,12 @@ export default function Login() {
       <div className="grid-bg flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm rounded-md border bg-card p-8 shadow-2xl fade-up" data-testid="login-form">
           <div className="mb-8 flex items-center justify-between">
-            <div className="flex h-11 w-11 items-center justify-center rounded bg-primary text-primary-foreground"><Wrench className="h-5 w-5" /></div>
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded bg-primary text-primary-foreground"
+              data-testid="login-brand-mark"
+            >
+              <Wrench className="h-5 w-5" />
+            </div>
             <Button type="button" variant="outline" size="sm" className="font-mono" data-testid="login-language-toggle" onClick={() => setLang(lang === "ro" ? "en" : "ro")}>
               {lang.toUpperCase()}
             </Button>

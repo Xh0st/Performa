@@ -30,7 +30,12 @@ export default function PdfFrame({ path, filename = "factura.pdf", className = "
         <a className="inline-flex items-center gap-1 text-primary" href={url} target="_blank" rel="noreferrer" data-testid="pdf-open-tab-link"><ExternalLink className="h-3 w-3" />{tr("Deschide în tab nou", "Open in new tab")}</a>
         <a className="inline-flex items-center gap-1 text-primary" href={url} download={filename} data-testid="pdf-download-link"><Download className="h-3 w-3" />{tr("Descarcă PDF", "Download PDF")}</a>
       </div>
-      <iframe title="PDF e-Factura" src={url} className={`w-full rounded border bg-white ${className}`} />
+      <iframe
+        title="PDF e-Factura"
+        data-testid="pdf-document-frame"
+        src={url}
+        className={`w-full rounded border bg-white ${className}`}
+      />
     </div>
   );
 }

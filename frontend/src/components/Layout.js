@@ -38,9 +38,19 @@ function SideNav({ onNav }) {
   return (
     <nav className="flex h-full flex-col gap-5 overflow-y-auto px-3 py-5">
       <div className="flex items-center gap-2 px-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded bg-primary font-heading text-lg font-extrabold text-primary-foreground">SA</div>
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded bg-primary font-heading text-lg font-extrabold text-primary-foreground"
+          data-testid="app-brand-mark"
+        >
+          PA
+        </div>
         <div>
-          <div className="font-heading text-lg font-extrabold uppercase leading-none tracking-wide">Service Auto</div>
+          <div
+            className="font-heading text-lg font-extrabold uppercase leading-none tracking-wide"
+            data-testid="app-brand-name"
+          >
+            Performa Auto
+          </div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">ERP · RO</div>
         </div>
       </div>

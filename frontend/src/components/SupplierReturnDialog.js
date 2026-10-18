@@ -95,7 +95,14 @@ export default function SupplierReturnDialog({ open, onOpenChange, onSaved, pres
             </NativeSelect>
           </Field>
           <Field label={tr("Motiv retur", "Reason")}><Input data-testid="return-reason-input" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder={tr("ex. piesă greșită, defectă", "e.g. wrong / defective part")} /></Field>
-          <Field label={tr("Data", "Date")}><Input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></Field>
+          <Field label={tr("Data", "Date")}>
+            <Input
+              data-testid="return-date-input"
+              type="date"
+              value={f.date}
+              onChange={(e) => setF({ ...f, date: e.target.value })}
+            />
+          </Field>
         </div>
         <div className="max-h-[40vh] overflow-y-auto">
           {f.nir_id ? <NirLines nirId={f.nir_id} qty={qty} setQty={setQty} /> : <FreeLines lines={lines} setLines={setLines} />}
