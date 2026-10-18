@@ -68,7 +68,9 @@ def setup(s, tag=None):
          "product_id": "", "code": "", "unit": "ore"},
     ]
     wid = db.work_orders.insert_one({"number": f"TEST-WO-{tag}", "client_id": str(cid), "vehicle_id": str(vid), "status": "finalizata",
-                                     "mileage_in": 1000, "lines": lines, "quotes": [], "qc": {}, "status_history": [], "created_at": iso(),
+                                         "mileage_in": 1000, "lines": lines, "quotes": [],
+                                         "qc": {"passed": True, "at": iso(), "inspector_name": "TEST Inspector"},
+                                         "status_history": [], "created_at": iso(),
                                      "reception": {}, "mechanic_ids": []}).inserted_id
     inv = s.post(f"{BASE}/invoices/from-work-order/{wid}", json={"type": "fiscal"}).json()
     st.update(supplier=sup["id"], supplier2=other["id"], p1=p1["id"], p2=p2["id"], p1_code=p1["code"], p2_code=p2["code"], nir1=n1["id"],

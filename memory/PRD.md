@@ -7,8 +7,8 @@ User choices: prima livrare = nucleul de service (Dashboard, CRM, Parc auto, Rec
 Follow-up request (2026-10-17): decodare automată VIN la crearea vehiculului, marcă = selectare din listă, model = selectare din listă.
 
 ## Architecture
-- Backend FastAPI (/app/backend): core.py (DB, JWT, RBAC MODULE_ROLES, calc_totals), routes_auth (auth, users, settings, audit), routes_crm (clients, vehicles, expirations, vehicle-catalog, VIN decode), routes_service (mechanics, work orders, quotes, QC, timers, elevators, public quote), routes_stock (products, suppliers, NIR, FIFO), routes_finance (invoices, e-Factura UBL CIUS-RO, payments, cash register), routes_dashboard, routes_ai (Gemini streaming), efactura.py, vehicle_catalog.py (makes/models catalog, WMI, NHTSA vPIC), seed.py (demo data).
-- Frontend React (/app/frontend/src): Layout cu sidebar filtrat pe permisiuni, RO/EN + dark/light, pagini Dashboard, Clients, ClientDetail, Vehicles, Reception (wizard), WorkOrders (kanban DnD + listă), WorkOrderDetail (linii, devize, CC, pontaj, recepție, istoric), Mechanics, Stock, Invoices, InvoiceDetail, Cash, AiAssistant, Users, Settings, PublicQuote (/approve/:token), PrintDoc (/print/:kind/:id).
+- Backend FastAPI (/app/backend): core.py (DB, JWT, RBAC MODULE_ROLES, calc_totals), routes_auth (auth, users, settings, audit), routes_crm (clients, vehicles, expirations, vehicle-catalog, VIN decode), routes_service (mechanics, work orders, quotes, QC, timers, elevators, public quote), routes_stock (products, suppliers, NIR, FIFO), routes_finance (invoices, e-Factura UBL CIUS-RO, payments, cash register), routes_planning, routes_reports, routes_dashboard, routes_ai, efactura.py, anexa5.py, vehicle_catalog.py, seed.py.
+- Frontend React (/app/frontend/src): Layout cu sidebar filtrat pe permisiuni, RO/EN + dark/light, pagini Dashboard, Clients, ClientDetail, Vehicles, Reception (wizard), WorkOrders (kanban DnD + listă), WorkOrderDetail (linii, devize, CC, pontaj, recepție, istoric), PlanningCalendar, FinalInspectionReport, Mechanics, Stock, Invoices, InvoiceDetail, Cash, AiAssistant, Users, Settings, PublicQuote (/approve/:token), PrintDoc (/print/:kind/:id).
 
 ## User personas
 Administrator, Director, Șef service, Consilier service, Recepționer, Magazioner, Mecanic/Electrician/Tinichigiu/Vopsitor, Contabil, Casier, Manager flotă, Client (aprobare deviz public).
@@ -46,11 +46,25 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   endpointurilor oficiale de test/producție și a tokenului de acces
 - Teste RAR/stornare/retur/TVA mixt: 30 teste funcționale trecute, cu 2 skip-uri RBAC
 
+## Calendar și Anexa 5 RAR (2026-10-18)
+- Planificare calendar completă cu vizualizări zi, săptămână, lună și rampe/elevatoare,
+  alocare de client, vehicul, rampă, consilier și mecanici, mutare/redimensionare DnD
+- Validare de disponibilitate pentru rampă și mecanic, capacitate calculată pe durata reală,
+  statusuri operaționale și conversie idempotentă în comandă de lucru la „În lucru"
+- Confirmarea programării și reminder-ul de 24h sunt jurnalizate local; cronul rulează la 15 minute
+- Controlul calității finale folosește cele 7 categorii Anexa 5 și codurile C/N/NA;
+  o inspecție neconformă sau nevalidată blochează finalizarea/facturarea fiscală
+- Rapoarte › Registru Inspecții Finale: filtre perioadă/inspector, tabel cu 13 coloane,
+  export PDF A4 landscape, CSV și Excel; PDF-ul include font Unicode pentru diacritice
+- Teste de regresie: 54 teste trecute, cu 2 skip-uri RBAC; build frontend reușit
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
 - RAR AutoPass: outbox-ul și validarea precondițiilor sunt active, însă transportul către RAR
   este blocat până la contractul API oficial și tokenul furnizate de client
+- Programări: confirmările și reminder-ele de 24h sunt jurnalizate cu status `simulated`;
+  nu se expediază SMS sau email până la configurarea unui furnizor
 
 ## RO e-Factura (2026-10-17)
 - Administrare › eFactura / Setări API: OAuth 2.0 ANAF (Client ID/Secret criptat Fernet, Redirect URI, state CSRF), comutare Simulare/Test/Producție (api.anaf.ro/test|prod), status conexiune, jurnal, auto-trimitere
@@ -61,10 +75,10 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 
 ## Backlog
 - P0: date reale firmă în Setări (acum placeholder), certificat/OAuth ANAF real
-- P1: contract API RAR AutoPass, endpointuri oficiale, token și validare Sandbox; Planificare calendar (elevatoare/mecanici DnD), Garanții & reclamații, Notificări reale (ITP/RCA), Portal client complet, Achiziții furnizori + comparare prețuri, Rapoarte (TVA, producție, marjă), Flotă cu aprobări multiple
+- P1: contract API RAR AutoPass, endpointuri oficiale, token și validare Sandbox; Garanții & reclamații, Notificări reale (ITP/RCA), Portal client complet, Achiziții furnizori + comparare prețuri, Rapoarte executive (TVA, producție, marjă, retenție), Flotă cu aprobări multiple
 - P2: multi-company/warehouse/currency complet, AI stock forecast & retention, aplicație mobilă mecanic, backup, LIFO
 
 ## Next tasks
 - Obțineți documentația contractuală RAR, endpointurile Test/Producție și tokenul de acces
 - Validați un payload într-un mediu RAR Sandbox înainte de activarea transportului extern
-- Planificare calendar + Garanții; rapoarte de bază
+- Garanții piese/manoperă și dosare de reclamație; rapoarte executive de eficiență, marjă și retenție

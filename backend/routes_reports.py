@@ -1,3 +1,4 @@
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
@@ -39,10 +40,10 @@ async def anexa_rows(start: str, end: str, inspector: str = "") -> list:
     client_ids = {item.get("client_id") for item in docs}
     vehicle_ids = {item.get("vehicle_id") for item in docs}
     clients = {str(item["_id"]): item for item in await db.clients.find({"_id": {"$in": [
-        __import__("bson").ObjectId(value) for value in client_ids if value
+        ObjectId(value) for value in client_ids if value
     ]}}).to_list(5000)}
     vehicles = {str(item["_id"]): item for item in await db.vehicles.find({"_id": {"$in": [
-        __import__("bson").ObjectId(value) for value in vehicle_ids if value
+        ObjectId(value) for value in vehicle_ids if value
     ]}}).to_list(5000)}
     cfg = await get_config()
     rows = []
@@ -67,7 +68,7 @@ async def anexa_rows(start: str, end: str, inspector: str = "") -> list:
             "etanseitate": code_for(items, "etanșeitate"),
             "proba": code_for(items, "proba_drum"),
             "presenter": client.get("representative") or client.get("name", ""),
-            "inspector": f"{cfg['branch_name']} · {name}",
+            "inspector": f"{cfg['branch_name']} · {name} · semnătură înregistrată",
         }
         row["columns"] = [
             "nr", "order", "date", "vehicle", "noxe", "frane", "geometrie", "faruri",
@@ -85,8 +86,13 @@ async def final_inspections(start: str, end: str, inspector: str = "", user=Depe
 
 @router.get("/reports/final-inspections/inspectors")
 async def inspection_inspectors(user=Depends(require("reports"))):
-    names = await db.work_orders.distinct("qc.inspector_name", {"qc.inspector_name": {"$ne": ""}})
-    return sorted(name for name in names if name)
+    rows = await db.work_orders.aggregate([
+        {"$match": {"qc.at": {"$exists": True}}},
+        {"$project": {"name": {"$ifNull": ["$qc.inspector_name", "$qc.by"]}}},
+        {"$match": {"name": {"$ne": ""}}},
+        {"$group": {"_id": "$name"}},
+    ]).to_list(1000)
+    return sorted(row["_id"] for row in rows if row.get("_id"))
 
 
 @router.get("/reports/final-inspections/{kind}")
@@ -94,12 +100,17 @@ async def export_final_inspections(kind: str, start: str, end: str, inspector: s
     rows = await anexa_rows(start, end, inspector)
     branch = (await get_config())["branch_name"]
     if kind == "pdf":
-        return Response(build_pdf(rows, start, end, branch), media_type="application/pdf")
+        content = build_pdf(rows, start, end, branch)
+        media_type = "application/pdf"
     if kind == "csv":
-        return Response(build_csv(rows), media_type="text/csv; charset=utf-8")
+        content = build_csv(rows)
+        media_type = "text/csv; charset=utf-8"
     if kind == "xlsx":
-        return Response(
-            build_xlsx(rows),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-    raise HTTPException(404, "Format export invalid")
+        content = build_xlsx(rows)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    if kind not in {"pdf", "csv", "xlsx"}:
+        raise HTTPException(404, "Format export invalid")
+    filename = f"anexa5_{start}_{end}.{kind}"
+    return Response(content, media_type=media_type, headers={
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    })

@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { CalendarDays, Plus, RotateCcw } from "lucide-react";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
-import { format, getDay, parse, startOfWeek } from "date-fns";
+import { addDays, endOfWeek, format, getDay, parse, startOfDay, startOfMonth, startOfWeek } from "date-fns";
 import { ro } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -12,6 +12,7 @@ import { useLang } from "@/lib/prefs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Field, Loading, NativeSelect, PageHeader, Panel } from "@/components/common";
 
@@ -44,24 +45,25 @@ const EMPTY = {
 };
 
 function toLocal(value) {
-  return value ? value.slice(0, 16) : "";
+  return value ? format(new Date(value), "yyyy-MM-dd'T'HH:mm") : "";
 }
 
 function rangeFor(date, view) {
   const base = new Date(date);
   if (view === "month") {
-    return [new Date(base.getFullYear(), base.getMonth(), 1), new Date(base.getFullYear(), base.getMonth() + 1, 1)];
+    const monthStart = startOfMonth(base);
+    const visibleEnd = endOfWeek(
+      new Date(base.getFullYear(), base.getMonth() + 1, 0),
+      { weekStartsOn: 1 }
+    );
+    return [startOfWeek(monthStart, { weekStartsOn: 1 }), startOfDay(addDays(visibleEnd, 1))];
   }
   if (view === "day") {
-    const end = new Date(base);
-    end.setDate(base.getDate() + 1);
-    return [base, end];
+    const dayStart = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+    return [dayStart, addDays(dayStart, 1)];
   }
-  const start = new Date(base);
-  start.setDate(base.getDate() - (base.getDay() || 7) + 1);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 7);
-  return [start, end];
+  const weekStart = startOfWeek(base, { weekStartsOn: 1 });
+  return [weekStart, addDays(weekStart, 7)];
 }
 
 export default function PlanningCalendar() {
@@ -76,9 +78,10 @@ export default function PlanningCalendar() {
   const [start, end] = rangeFor(date, bayMode ? "day" : view);
   const query = `start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
   const { data: appointments, reload } = useApi(`/appointments?${query}`, [query]);
-  const { data: capacity } = useApi(`/appointments/capacity?${query}`, [query]);
+  const { data: capacity, reload: reloadCapacity } = useApi(`/appointments/capacity?${query}`, [query]);
   const { data: clients } = useApi("/clients");
   const { data: vehicles } = useApi(form.client_id ? `/vehicles?client_id=${form.client_id}` : null, [form.client_id]);
+  const { data: mechanics } = useApi("/mechanics");
 
   const events = useMemo(() => (appointments || []).map((item) => ({
     ...item,
@@ -125,6 +128,7 @@ export default function PlanningCalendar() {
       toast.success(tr("Programare salvată", "Appointment saved"));
       setDialog(false);
       reload();
+      reloadCapacity();
     } catch (error) {
       toast.error(errMsg(error));
     } finally {
@@ -139,6 +143,7 @@ export default function PlanningCalendar() {
         ends_at: nextEnd.toISOString(),
       });
       reload();
+      reloadCapacity();
     } catch (error) {
       toast.error(errMsg(error));
     }
@@ -150,6 +155,7 @@ export default function PlanningCalendar() {
       setCurrent(response.data);
       toast.success(status === "in_lucru" ? tr("Comandă de lucru creată", "Work order created") : tr("Status actualizat", "Status updated"));
       reload();
+      reloadCapacity();
     } catch (error) {
       toast.error(errMsg(error));
     }
@@ -199,6 +205,15 @@ export default function PlanningCalendar() {
             resizable
             popup
             culture="ro"
+            messages={{
+              today: "Astăzi",
+              previous: "Înapoi",
+              next: "Înainte",
+              day: "Zi",
+              week: "Săptămână",
+              month: "Lună",
+            }}
+            scrollToTime={new Date(1970, 0, 1, 8)}
             startAccessor="start"
             endAccessor="end"
             onSelectSlot={openNew}
@@ -220,6 +235,7 @@ export default function PlanningCalendar() {
             <Field label={tr("Se termină", "Ends")}><Input data-testid="planning-end-input" type="datetime-local" value={form.ends_at} onChange={(event) => setForm({ ...form, ends_at: event.target.value })} /></Field>
             <Field label={tr("Rampă / elevator", "Bay / lift")}><NativeSelect data-testid="planning-elevator-select" value={form.elevator} onChange={(event) => setForm({ ...form, elevator: event.target.value })}><option value="">—</option>{capacity.elevators.map((item) => <option key={item}>{item}</option>)}</NativeSelect></Field>
             <Field label={tr("Consilier service", "Service advisor")}><Input data-testid="planning-advisor-input" value={form.advisor} onChange={(event) => setForm({ ...form, advisor: event.target.value })} /></Field>
+            <Field label={tr("Mecanici alocați", "Assigned mechanics")} className="sm:col-span-2"><div className="flex flex-wrap gap-3">{(mechanics || []).map((mechanic) => <label key={mechanic.id} className="flex items-center gap-2 text-sm"><Checkbox data-testid={`planning-mechanic-${mechanic.id}`} checked={form.mechanic_ids.includes(mechanic.id)} onCheckedChange={(checked) => setForm({ ...form, mechanic_ids: checked ? [...form.mechanic_ids, mechanic.id] : form.mechanic_ids.filter((id) => id !== mechanic.id) })} />{mechanic.name}</label>)}</div></Field>
             <Field label={tr("Titlu intervenție", "Service title")} className="sm:col-span-2"><Input data-testid="planning-title-input" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
             <Field label={tr("Observații", "Notes")} className="sm:col-span-2"><Textarea data-testid="planning-notes-input" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
           </div>

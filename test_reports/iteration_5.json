@@ -1,0 +1,56 @@
+{
+  "summary": "Tested Calendar/Planning, the appointment lifecycle and reminder cron, QC Anexa 5 and the Anexa 5 register (backend + UI). Backend: new pytest suite test_planning_anexa5.py, 24 tests, 18 pass and 6 fail. These work: RBAC (401/403/200), rejecting reversed intervals, vehicle-belongs-to-client check on POST, elevator and mechanic conflicts (409), edit/move, in_lucru converting to exactly one WO (also under 4 parallel calls), confirmation notification status=simulated, cron returning 401 on missing or bad auth and 200 with the secret, X-Webhook-Id duplicate=true and a single reminder per appointment, the QC rule (mecanic gets 403 on the chief signature, N or missing items/signatures means not passed, finalizata and fiscal invoice blocked without a passed QC), and the Anexa 5 report (422/400 validation, 13 columns, C/N/NA codes, inspector filter, PDF A4 landscape 842x595 with correct diacritics checked visually, CSV with BOM, XLSX with 13 headers). UI: /planning is visible, Zi/Săptămână/Lună/Rampe views render (4 elevator columns), create via dialog, 409 conflict toast, drag & drop to another day persists, status În lucru creates the WO and shows the Comandă button, QcTab shows the 7 categories with C/N/NA and saves Promovat/Nepromovat with signatures, the Anexa 5 page has filters with errors, 13 th columns, CSV/XLSX downloads, and on mobile the table scrolls inside its container (doc width 390). Main bugs: (1) TIMEZONE: the calendar shows/edits times in UTC and saving the dialog shifts the appointment by the browser offset, (2) the PDF/Print button in the Anexa 5 UI is broken (opens a frontend route and redirects to the dashboard), (3) the day/week range starts at the current time, so earlier appointments are hidden, (4) the QC can be downgraded to N after finalization and a fiscal invoice is still issued.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/invoices/from-work-order/{id} + PUT /api/work-orders/{id}/qc", "issue": "QC can be saved again with N after the WO is already finalizata; the status stays finalizata and the fiscal invoice is issued (200). Invoicing only checks status, not qc.passed. save_qc also does not block editing on facturata/inchisa WOs.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/appointments/capacity", "issue": "used_minutes = 60 per appointment, regardless of length; total = elevators*8h no matter how long the interval is (week/month). A 2h appointment on 4 elevators shows 3% instead of 6%."},
+      {"endpoint": "PUT /api/appointments/{id}", "issue": "Does not check that vehicle_id belongs to client_id (POST does). Also allows editing appointments that are anulat/finalizat."},
+      {"endpoint": "POST/PUT /api/appointments", "issue": "starts_at/ends_at are not parsed as datetime: 'abc'/'abd' is accepted (200). Comparisons are string-based, so offsets other than Z (e.g. +03:00) break conflict detection and the 23-25h reminder window."},
+      {"endpoint": "POST /api/appointments/{id}/status", "issue": "No status transition validation (finalizat -> programat allowed). Conversion is not atomic (no find_one_and_update on work_order_id); the parallel test did not produce a duplicate, but a race is theoretically possible."},
+      {"endpoint": "GET /api/reports/final-inspections/{csv|xlsx|pdf}", "issue": "No Content-Disposition header (filename). XLSX: header is bold white font without fill -> invisible text on white background."},
+      {"endpoint": "anexa5.build_pdf", "issue": "Cells are plain strings, not Paragraph: long headers ('Faruri / geamuri / parbrize') and 'Unitate · inspector' run past the column edges; the inspector signature is not shown in the PDF (name only)."},
+      {"endpoint": "GET /api/reports/final-inspections/inspectors", "issue": "Uses distinct qc.inspector_name only; legacy QCs (qc.by without inspector_name) appear in the report but cannot be filtered."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PlanningCalendar openNew/openEdit (toLocal)", "issue": "toLocal(value.slice(0,16)) puts a UTC ISO string into datetime-local, which is then read as local time. Reproduced in Europe/Bucharest: created at 10:00, the edit dialog shows 07:00, and Save with no changes moves it to 07:00 (-3h each save). New default and slot selection are also in UTC.", "selector": "[data-testid=planning-start-input],[data-testid=planning-end-input]", "priority": "CRITICAL"},
+      {"component": "FinalInspectionReport print()", "issue": "PDF/Print and Print buttons do window.open('/reports/final-inspections/pdf?...') = frontend route without /api and without auth -> redirects to the dashboard; PDF never opens from the UI.", "selector": "[data-testid=anexa-export-pdf],[data-testid=anexa-print-button]", "priority": "HIGH"},
+      {"component": "PlanningCalendar rangeFor", "issue": "Day/Bays: start = new Date() (current time), not midnight. Request at 21:49 -> start=18:49Z..+24h, so today's earlier appointments are not loaded. Week: Monday at the current time -> Monday morning missing, next Monday included. Month: only the 1st..1st of next month, while the view shows adjacent days.", "selector": "[data-testid=planning-calendar]", "priority": "HIGH"},
+      {"component": "Planning dialog", "issue": "No mechanic selector (mechanic_ids always []), so a mechanic conflict cannot be created or tested from the UI.", "selector": "[data-testid=planning-dialog]", "priority": "MEDIUM"},
+      {"component": "Planning capacity", "issue": "capacity useApi is not reloaded after save/move/status; the occupancy counter stays stale.", "selector": "[data-testid=planning-capacity]", "priority": "LOW"},
+      {"component": "FinalInspectionReport defaults", "issue": "today = new Date().toISOString() (UTC); in Romania between 00:00 and 03:00 the default end date is yesterday.", "selector": "[data-testid=anexa-end-input]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/planning", "issues": ["The react-big-calendar toolbar (Today/Back/Next/Day/Week/Month) is in English and has very low contrast on the dark theme", "Day/Bays view: the .rbc-today light-blue background on dark theme; the time gutter labels are nearly invisible", "Time grid starts at 00:00 with no scroll to working hours (scrollToTime)", "Native datetime-local instead of the shadcn date/time picker"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_planning_anexa5.py", "/app/backend/tests/planning_ui_fixture.py", "/app/test_reports/pytest/pytest_planning_anexa5.xml"],
+  "action_items": [
+    "PlanningCalendar: format datetime-local values with local time (date-fns format(new Date(iso), \"yyyy-MM-dd'T'HH:mm\")) in openNew/openEdit; re-verify in a UTC+2/+3 timezone",
+    "FinalInspectionReport: PDF/Print through api.get(blob) + URL.createObjectURL + window.open (or downloadFile 'pdf')",
+    "rangeFor: use startOfDay/startOfWeek(weekStartsOn:1)/the month grid's visible range (or onRangeChange from react-big-calendar)",
+    "Invoicing: require w.qc.passed in invoice_from_wo; in save_qc block on LOCKED and revert finalizata -> in_lucru if the QC fails",
+    "Capacity: compute real minutes (ends-starts) and total = elevators * working hours * days in the interval",
+    "PUT /appointments: check vehicle-client ownership; parse starts_at/ends_at with datetime.fromisoformat and normalize to UTC",
+    "XLSX: add PatternFill to the header; add Content-Disposition to exports; Paragraph wrapping in the PDF",
+    "Add a mechanic multiselect in the planning dialog",
+    "Update /app/memory/test_credentials.md: receptie@ and contabil@ no longer have the password Demo2026! (bcrypt checkpw False); andrei.melek/admin@ work with Admin2026!"
+  ],
+  "critical_code_review_comments": [
+    "routes_planning: datetimes are stored and compared as strings; no tz normalization",
+    "create_work_order_from_appointment is not atomic (read work_order_id then insert); use find_one_and_update with a work_order_id=='' condition",
+    "routes_reports: __import__('bson').ObjectId inline; OLD_KEYS maps both noxe and etanșeitate to 'niveluri' (duplicated legacy value)",
+    "QcTab: the frontend preloads chief_signature, so a mecanic who opens an already-signed QC gets 403 on Save (expected, but needs a clear message/disabled state)"
+  ],
+  "updated_files": ["/app/backend/tests/test_planning_anexa5.py", "/app/backend/tests/planning_ui_fixture.py"],
+  "success_rate": {"backend": "75% (18/24)", "frontend": "~70% (core flows OK; timezone, PDF print, range bugs)"},
+  "test_credentials": "andrei.melek@gmail.com, sef.service, mecanic, director work. receptie@serviceauto.ro and contabil@serviceauto.ro do NOT match the password in test_credentials.md (bcrypt hash mismatch); RBAC was tested with director instead. login_attempts records created by the test were deleted.",
+  "seed_data_creation": "None persistent. All TEST data (clients, vehicles, appointments, WOs including CL-2026-00095, the invoice from the QC downgrade test, notifications appointment_*, cron_runs TEST_*, audit) deleted; counters work_order=94/invoice=77 consistent with the max used; efactura auto_send restored. The real appointment 6ad513457ac56ea03906a808 and the 7 existing notifications were left untouched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/test_planning_anexa5.py -n 0 (module fixture with full cleanup + counter restore). UI fixture: python tests/planning_ui_fixture.py setup|teardown (TEST_UI Client/TSTUI01 + WO TEST-WO-UI-QC). To reproduce the timezone bug in Playwright: cdp=await page.context.new_cdp_session(page); await cdp.send('Emulation.setTimezoneOverride',{'timezoneId':'Europe/Bucharest'}). The container clock is 2026-10-18. The 6 tests that fail now are real bugs (garbage datetime, PUT ownership, capacity, QC downgrade->invoice, XLSX header, Content-Disposition)."
+}

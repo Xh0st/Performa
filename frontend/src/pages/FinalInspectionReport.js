@@ -5,8 +5,9 @@ import { useLang } from "@/lib/prefs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, NativeSelect, PageHeader, Panel } from "@/components/common";
+import { format } from "date-fns";
 
-const today = new Date().toISOString().slice(0, 10);
+const today = format(new Date(), "yyyy-MM-dd");
 const firstDay = `${today.slice(0, 8)}01`;
 
 export default function FinalInspectionReport() {
@@ -26,7 +27,16 @@ export default function FinalInspectionReport() {
     }
   };
   const exportFile = (kind) => downloadFile(`/reports/final-inspections/${kind}?${params}`, `anexa5_${filters.start}_${filters.end}.${kind}`);
-  const print = () => window.open(`/reports/final-inspections/pdf?${params}`, "_blank");
+  const print = async () => {
+    try {
+      const response = await api.get(`/reports/final-inspections/pdf?${params}`, { responseType: "blob" });
+      const url = URL.createObjectURL(response.data);
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (requestError) {
+      setError(errMsg(requestError));
+    }
+  };
   return (
     <div data-testid="final-inspection-report-page">
       <PageHeader eyebrow={tr("Rapoarte · control calitate · conformitate RAR", "Reports · quality control · RAR compliance")} title={tr("Registru inspecții finale", "Final inspections register")} />

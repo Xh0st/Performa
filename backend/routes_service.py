@@ -437,6 +437,8 @@ class QCIn(BaseModel):
 @router.put("/work-orders/{wid}/qc")
 async def save_qc(wid: str, body: QCIn, user=Depends(require("workorders"))):
     w = await load_wo(wid)
+    if w["status"] in LOCKED:
+        raise HTTPException(400, "Controlul final este blocat după facturare sau închidere")
     complete = all(body.items.get(key) in ("C", "N", "NA") for key in QC_ITEMS)
     conforming = complete and all(body.items.get(key) in ("C", "NA") for key in QC_ITEMS)
     if body.chief_signature and user["role"] not in ("admin", "director", "sef_service"):

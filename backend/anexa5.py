@@ -4,10 +4,11 @@ from pathlib import Path
 
 import font_roboto
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Font, PatternFill
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -46,16 +47,33 @@ def build_pdf(rows: list, start: str, end: str, branch: str) -> bytes:
     styles["Normal"].fontName = FONT_NAME
     title = Paragraph("REGISTRUL DE EVIDENȚĂ A INSPECȚIILOR FINALE — ANEXA 5 RAR", styles["Title"])
     meta = Paragraph(f"Punct de lucru: {branch} · Perioada: {start} — {end}", styles["Normal"])
-    data = [HEADERS] + table_values(rows)
+    header_style = ParagraphStyle(
+        "AnexaHeader",
+        fontName=FONT_BOLD,
+        fontSize=5.3,
+        leading=6.1,
+        alignment=TA_CENTER,
+        textColor=colors.white,
+        wordWrap="CJK",
+    )
+    cell_style = ParagraphStyle(
+        "AnexaCell",
+        fontName=FONT_NAME,
+        fontSize=5.5,
+        leading=6.5,
+        alignment=TA_CENTER,
+        wordWrap="CJK",
+    )
+    data = [[Paragraph(header, header_style) for header in HEADERS]]
+    data.extend([
+        [Paragraph(str(value), cell_style) for value in values]
+        for values in table_values(rows)
+    ])
     widths = [9, 22, 18, 30, 11, 11, 14, 22, 22, 16, 16, 34, 34]
     table = Table(data, colWidths=[value * mm for value in widths], repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), FONT_BOLD),
-        ("FONTNAME", (0, 1), (-1, -1), FONT_NAME),
-        ("FONTSIZE", (0, 0), (-1, -1), 5.6),
-        ("LEADING", (0, 0), (-1, -1), 6.5),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#94a3b8")),
@@ -84,6 +102,7 @@ def build_xlsx(rows: list) -> bytes:
         sheet.append(row)
     for cell in sheet[1]:
         cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="1E293B")
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     for column in sheet.columns:
         letter = column[0].column_letter

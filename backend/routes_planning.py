@@ -1,7 +1,6 @@
-import asyncio
 import hmac
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -31,9 +30,27 @@ class AppointmentStatusIn(BaseModel):
     status: str
 
 
-def valid_interval(starts_at: str, ends_at: str):
-    if not starts_at or not ends_at or starts_at >= ends_at:
+def normalized_datetime(value: str) -> str:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(400, "Data programării este invalidă") from exc
+    if parsed.tzinfo is None:
+        raise HTTPException(400, "Data programării trebuie să includă fusul orar")
+    return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def valid_interval(starts_at: str, ends_at: str) -> tuple[str, str]:
+    start = normalized_datetime(starts_at)
+    end = normalized_datetime(ends_at)
+    if start >= end:
         raise HTTPException(400, "Intervalul programării este invalid")
+    return start, end
+
+
+def normalized_appointment(body: AppointmentIn) -> AppointmentIn:
+    start, end = valid_interval(body.starts_at, body.ends_at)
+    return body.model_copy(update={"starts_at": start, "ends_at": end})
 
 
 async def conflicts(body: AppointmentIn, skip_id: str = ""):
@@ -75,14 +92,14 @@ async def enrich(rows: list) -> list:
 
 @router.get("/appointments")
 async def list_appointments(start: str, end: str, user=Depends(require("planning"))):
-    valid_interval(start, end)
+    start, end = valid_interval(start, end)
     rows = await db.appointments.find({"starts_at": {"$lt": end}, "ends_at": {"$gt": start}}).to_list(3000)
     return await enrich(rows)
 
 
 @router.post("/appointments")
 async def create_appointment(body: AppointmentIn, user=Depends(require("planning"))):
-    valid_interval(body.starts_at, body.ends_at)
+    body = normalized_appointment(body)
     client = await get_or_404("clients", body.client_id)
     vehicle = await get_or_404("vehicles", body.vehicle_id)
     if vehicle.get("client_id") != body.client_id:
@@ -109,8 +126,13 @@ async def create_appointment(body: AppointmentIn, user=Depends(require("planning
 
 @router.put("/appointments/{aid}")
 async def update_appointment(aid: str, body: AppointmentIn, user=Depends(require("planning"))):
-    valid_interval(body.starts_at, body.ends_at)
-    await get_or_404("appointments", aid)
+    body = normalized_appointment(body)
+    appointment = await get_or_404("appointments", aid)
+    if appointment["status"] in {"anulat", "finalizat"}:
+        raise HTTPException(400, "Programarea finalizată sau anulată nu mai poate fi modificată")
+    vehicle = await get_or_404("vehicles", body.vehicle_id)
+    if vehicle.get("client_id") != body.client_id:
+        raise HTTPException(400, "Vehiculul nu aparține clientului selectat")
     await conflicts(body, aid)
     await db.appointments.update_one({"_id": oid(aid)}, {"$set": body.model_dump() | {"updated_at": iso()}})
     return (await enrich([await get_or_404("appointments", aid)]))[0]
@@ -155,8 +177,15 @@ async def create_work_order_from_appointment(appointment: dict, user: dict) -> s
     }
     result = await db.work_orders.insert_one(doc)
     work_order_id = str(result.inserted_id)
-    await db.appointments.update_one({"_id": appointment["_id"]}, {"$set": {"work_order_id": work_order_id}})
-    return work_order_id
+    claimed = await db.appointments.update_one(
+        {"_id": appointment["_id"], "work_order_id": ""},
+        {"$set": {"work_order_id": work_order_id}},
+    )
+    if claimed.modified_count:
+        return work_order_id
+    await db.work_orders.delete_one({"_id": result.inserted_id})
+    current = await get_or_404("appointments", str(appointment["_id"]))
+    return current["work_order_id"]
 
 
 @router.post("/appointments/{aid}/status")
@@ -164,6 +193,16 @@ async def appointment_status(aid: str, body: AppointmentStatusIn, user=Depends(r
     if body.status not in STATUSES:
         raise HTTPException(400, "Status programare invalid")
     appointment = await get_or_404("appointments", aid)
+    transitions = {
+        "programat": {"sosit", "in_lucru", "neprezentat", "anulat"},
+        "sosit": {"in_lucru", "anulat"},
+        "in_lucru": {"finalizat", "anulat"},
+        "finalizat": set(),
+        "neprezentat": set(),
+        "anulat": set(),
+    }
+    if body.status != appointment["status"] and body.status not in transitions[appointment["status"]]:
+        raise HTTPException(400, "Tranziție status programare nepermisă")
     work_order_id = appointment.get("work_order_id", "")
     if body.status == "in_lucru":
         work_order_id = await create_work_order_from_appointment(appointment, user)
@@ -177,7 +216,7 @@ async def appointment_status(aid: str, body: AppointmentStatusIn, user=Depends(r
 
 @router.get("/appointments/capacity")
 async def appointment_capacity(start: str, end: str, user=Depends(require("planning"))):
-    valid_interval(start, end)
+    start, end = valid_interval(start, end)
     settings = await get_settings()
     elevators = settings.get("elevators", [])
     rows = await db.appointments.find({
@@ -185,14 +224,22 @@ async def appointment_capacity(start: str, end: str, user=Depends(require("plann
         "starts_at": {"$lt": end},
         "ends_at": {"$gt": start},
     }).to_list(3000)
-    total_minutes = max(1, len(elevators) * 8 * 60)
-    used_minutes = sum(60 for _ in rows)
+    start_at = datetime.fromisoformat(start)
+    end_at = datetime.fromisoformat(end)
+    used_minutes = 0
+    for row in rows:
+        appointment_start = datetime.fromisoformat(row["starts_at"])
+        appointment_end = datetime.fromisoformat(row["ends_at"])
+        overlap = min(end_at, appointment_end) - max(start_at, appointment_start)
+        used_minutes += max(0, round(overlap.total_seconds() / 60))
+    days = max(1, (end_at.date() - start_at.date()).days)
+    total_minutes = max(1, len(elevators) * 8 * 60 * days)
     return {"elevators": elevators, "count": len(rows), "occupancy": min(100, round(used_minutes / total_minutes * 100))}
 
 
 async def send_reminders() -> None:
-    lower = (now() + timedelta(hours=23)).isoformat()
-    upper = (now() + timedelta(hours=25)).isoformat()
+    lower = normalized_datetime((now() + timedelta(hours=23)).isoformat())
+    upper = normalized_datetime((now() + timedelta(hours=25)).isoformat())
     rows = await db.appointments.find({"status": "programat", "starts_at": {"$gte": lower, "$lte": upper}}).to_list(1000)
     for appointment in rows:
         if await db.notifications.find_one({"kind": "appointment_reminder", "appointment_id": str(appointment["_id"])}):
