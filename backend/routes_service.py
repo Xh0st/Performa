@@ -264,14 +264,12 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
     st = body.status
     if st not in WO_STATUSES or st == "facturata":
         raise HTTPException(400, "Status invalid (Facturată se setează automat la emiterea facturii)")
-    if w["status"] in LOCKED and st != "inchisa":
-        raise HTTPException(400, "Comanda este facturată și nu mai poate fi modificată")
-    if st == "inchisa" and w["status"] != "facturata":
-        raise HTTPException(400, "Doar comenzile facturate pot fi închise")
+    if w["status"] in LOCKED:
+        raise HTTPException(400, "Comanda este facturată sau închisă și nu mai poate fi modificată")
     if st == "finalizata" and not w.get("qc", {}).get("passed"):
         raise HTTPException(400, "Controlul de calitate trebuie promovat înainte de finalizare")
     rule = quote_closure_rule(w)
-    if st == "finalizata" and not rule["allowed"]:
+    if st in {"finalizata", "inchisa"} and not rule["allowed"]:
         raise HTTPException(400, "Devizul este în așteptare; aprobați sau respingeți-l înainte de finalizare")
     upd = {"status": st}
     if st == "finalizata":
@@ -280,15 +278,9 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
         await db.time_entries.update_many({"work_order_id": wid, "end": None}, {"$set": {"end": iso()}})
     if st == "inchisa":
         upd["closed_at"] = iso()
+        upd["closure_quote_rule"] = rule
     await db.work_orders.update_one({"_id": w["_id"]}, {"$set": upd, "$push": {
         "status_history": {"status": st, "at": iso(), "by": user["name"], "note": body.note}}})
-    if st == "inchisa" and w.get("invoice_id"):
-        invoice = await db.invoices.find_one({"_id": oid(w["invoice_id"])})
-        if invoice:
-            from rar_autopass import queue_submission_safely
-
-            closed = await db.work_orders.find_one({"_id": w["_id"]})
-            await queue_submission_safely(closed, invoice, "work_order_closed")
     await audit(user, "status", "work_order", wid, st)
     return await get_work_order(wid, user)
 

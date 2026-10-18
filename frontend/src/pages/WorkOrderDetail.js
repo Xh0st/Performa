@@ -116,7 +116,7 @@ export default function WorkOrderDetail() {
       </div>
       {!!wo.warranty_alerts?.length && <div className="mb-4 flex items-center gap-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300" data-testid="work-order-warranty-alert"><ShieldAlert className="h-4 w-4" />{tr("Vehiculul are garanții active", "Vehicle has active warranties")}: {wo.warranty_alerts.map((item) => item.number).join(", ")}</div>}
 
-      {!locked || wo.status === "facturata" ? (
+      {!locked ? (
         <div className="mb-4 flex flex-wrap items-end gap-2 rounded border bg-card p-3">
           <Field label={tr("Schimbă status", "Change status")} className="w-60">
             <NativeSelect data-testid="wo-status-select" value={next} onChange={(e) => setNext(e.target.value)}>
@@ -125,7 +125,7 @@ export default function WorkOrderDetail() {
             </NativeSelect>
           </Field>
           <Button data-testid="wo-status-apply-button" disabled={!next} onClick={changeStatus}><ArrowRightLeft className="mr-1 h-4 w-4" />{tr("Aplică", "Apply")}</Button>
-          <span className="text-xs text-muted-foreground">{tr("Finalizată necesită control calitate promovat; Închisă doar după facturare.", "Completed requires passed QC; Closed only after invoicing.")}</span>
+          <span className="text-xs text-muted-foreground">{tr("Finalizată necesită control calitate; Închisă este permisă pentru excepțiile de deviz admise.", "Completed requires QC; Closed is allowed for approved quote exceptions.")}</span>
         </div>
       ) : null}
 
