@@ -10,6 +10,7 @@ from core import db, ser, iso, require, audit, get_or_404, get_settings
 from efactura import build_ubl
 import anaf_service as ef
 import efactura_inbox as inbox
+from efactura_pdf import render_pdf
 
 router = APIRouter(prefix="/api")
 
@@ -166,6 +167,14 @@ async def inbox_sync(user=Depends(require("stock"))):
 @router.get("/efactura/inbox/{mid}")
 async def inbox_get(mid: str, user=Depends(require("stock"))):
     return await inbox.inbox_detail(mid)
+
+
+@router.get("/efactura/inbox/{mid}/pdf")
+async def inbox_pdf(mid: str, user=Depends(require("stock"))):
+    m = await get_or_404("efactura_inbox", mid)
+    pdf = render_pdf(m["xml"], m)
+    name = "".join(c for c in m["parsed"]["series_number"] if c.isalnum() or c in "-_") or "factura"
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="efactura_{name}.pdf"'})
 
 
 @router.post("/efactura/inbox/{mid}/create-nir")

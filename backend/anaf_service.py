@@ -176,7 +176,7 @@ def validate_ubl(inv: dict, xml: str):
             errs.append(f"Linia {i}: unitate de măsură în afara Codelist UN/ECE")
         if int(ln.get("vat_rate", 21)) not in VAT_RATES:
             errs.append(f"Linia {i}: cotă TVA invalidă ({ln.get('vat_rate')})")
-        if ln["qty"] <= 0:
+        if (abs(ln["qty"]) if inv.get("kind") == "credit_note" else ln["qty"]) <= 0:
             errs.append(f"Linia {i}: cantitate invalidă")
     t = inv["totals"]
     if abs(sum(ln["net"] for ln in inv["lines"]) - t["net"]) > 0.01:
@@ -191,8 +191,9 @@ def validate_ubl(inv: dict, xml: str):
 
 
 async def anaf_public_validate(xml: str):
+    url = VALIDATE_URL.replace("FACT1", "FCN") if "<CreditNote" in xml[:300] else VALIDATE_URL
     async with httpx.AsyncClient(timeout=30) as c:
-        r = await c.post(VALIDATE_URL, content=xml.encode(), headers={"Content-Type": "text/plain"})
+        r = await c.post(url, content=xml.encode(), headers={"Content-Type": "text/plain"})
     try:
         data = r.json()
         msgs = [m.get("message", str(m)) for m in data.get("Messages", [])]
@@ -222,7 +223,7 @@ async def send_invoice(inv: dict):
         return
     settings = await get_settings()
     try:
-        r = await anaf_request("POST", "/upload", {"standard": "UBL", "cif": cif_digits(settings.get("cui"))}, xml.encode())
+        r = await anaf_request("POST", "/upload", {"standard": "CN" if inv.get("kind") == "credit_note" else "UBL", "cif": cif_digits(settings.get("cui"))}, xml.encode())
         root = ET.fromstring(r.content)
         idx = root.attrib.get("index_incarcare")
         if root.attrib.get("ExecutionStatus") == "0" and idx:

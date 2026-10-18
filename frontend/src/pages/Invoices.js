@@ -39,10 +39,10 @@ export default function Invoices() {
               <tbody>
                 {data.map((i) => (
                   <tr key={i.id} data-testid={`invoice-row-${i.series}${i.number}`} onClick={() => nav(`/invoices/${i.id}`)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
-                    <td className="px-2 font-mono text-xs font-semibold text-primary">{i.series}{i.number}</td><td className="px-2">{date(i.issue_date)}</td>
+                    <td className="px-2 font-mono text-xs font-semibold text-primary">{i.series}{i.number}{i.kind === "credit_note" && <span data-testid={`invoice-storno-tag-${i.series}${i.number}`} className="ml-1 rounded-sm bg-violet-500/15 px-1 text-[10px] text-violet-500">STORNO {i.original_ref}</span>}{i.storno_status && <span className="ml-1 text-[10px] text-violet-500">{i.storno_status === "total" ? tr("stornată", "credited") : tr("storno parțial", "part. credited")}</span>}</td><td className="px-2">{date(i.issue_date)}</td>
                     <td className={`px-2 ${i.status !== "paid" && i.due_date < new Date().toISOString().slice(0, 10) ? "text-rose-500" : ""}`}>{date(i.due_date)}</td>
                     <td className="px-2">{i.buyer.name}</td><td className="px-2 font-mono text-xs">{i.work_order_number}</td>
-                    <td className="px-2 text-right font-mono">{money(i.totals.gross)}</td><td className="px-2 text-right font-mono">{money(i.totals.gross - i.paid_amount)}</td>
+                    <td className="px-2 text-right font-mono">{money(i.totals.gross)}</td><td className="px-2 text-right font-mono">{i.kind === "credit_note" ? "—" : money(i.totals.gross - i.paid_amount - (i.credited_amount || 0))}</td>
                     <td className="px-2 text-center">{i.type === "fiscal" && <Badge map={PAY_STATUS} value={i.status} />}</td>
                     <td className="px-2 text-center">{i.type === "fiscal" && <Badge map={EF_STATUS} value={i.efactura?.status} />}</td>
                   </tr>

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Printer, Wallet } from "lucide-react";
+import { Printer, Wallet, Undo2 } from "lucide-react";
 import EfacturaPanel from "@/components/EfacturaPanel";
+import StornoDialog from "@/components/StornoDialog";
 import { api, errMsg, useApi, downloadFile } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { useAuth } from "@/context/AuthContext";
@@ -17,7 +18,7 @@ export const DOCS = { chitanta: ["Chitanță", "Receipt"], bon_pos: ["Bon POS", 
 
 function PayDialog({ inv, open, onOpenChange, onSaved }) {
   const { tr } = useLang();
-  const due = Math.round((inv.totals.gross - inv.paid_amount) * 100) / 100;
+  const due = Math.round((inv.totals.gross - inv.paid_amount - (inv.credited_amount || 0)) * 100) / 100;
   const [f, setF] = useState({ amount: due, method: "numerar", reference: "" });
   const save = async () => {
     try {
@@ -55,17 +56,33 @@ export default function InvoiceDetail() {
   const { can } = useAuth();
   const { data: inv, setData, reload } = useApi(`/invoices/${id}`);
   const [pay, setPay] = useState(false);
+  const [storno, setStorno] = useState(false);
   if (!inv) return <Loading />;
   const fiscal = inv.type === "fiscal";
+  const isCn = inv.kind === "credit_note";
+  const canStorno = fiscal && !isCn && can("invoices") && inv.storno_status !== "total";
 
   return (
     <div data-testid="invoice-detail-page">
-      <PageHeader eyebrow={fiscal ? tr("Factură fiscală", "Fiscal invoice") : tr("Factură proformă", "Proforma invoice")} title={`${inv.series}${inv.number}`} testid="invoice-number"
+      <PageHeader eyebrow={isCn ? tr("Factură de stornare (notă de credit)", "Credit note") : fiscal ? tr("Factură fiscală", "Fiscal invoice") : tr("Factură proformă", "Proforma invoice")} title={`${inv.series}${inv.number}`} testid="invoice-number"
         actions={<>
           {fiscal && <Badge map={PAY_STATUS} value={inv.status} testid="invoice-pay-status" />}
           <Button variant="outline" size="sm" data-testid="print-invoice-button" onClick={() => window.open(`/print/invoice/${id}`, "_blank")}><Printer className="mr-1 h-4 w-4" />{tr("Tipărește", "Print")}</Button>
-          {fiscal && can("payments") && inv.status !== "paid" && <Button size="sm" data-testid="record-payment-button" onClick={() => setPay(true)}><Wallet className="mr-1 h-4 w-4" />{tr("Încasează", "Collect")}</Button>}
+          {canStorno && <Button variant="outline" size="sm" data-testid="storno-invoice-button" onClick={() => setStorno(true)}><Undo2 className="mr-1 h-4 w-4" />{tr("Stornează", "Credit")}</Button>}
+          {fiscal && !isCn && can("payments") && inv.status !== "paid" && <Button size="sm" data-testid="record-payment-button" onClick={() => setPay(true)}><Wallet className="mr-1 h-4 w-4" />{tr("Încasează", "Collect")}</Button>}
         </>} />
+      {isCn && (
+        <div data-testid="credit-note-banner" className="mb-4 rounded border border-violet-500/40 bg-violet-500/10 p-3 text-sm">
+          {tr("Stornează factura", "Credits invoice")} <Link className="font-mono font-semibold text-primary" data-testid="credit-note-original-link" to={`/invoices/${inv.original_invoice_id}`}>{inv.original_ref}</Link> · {tr("Motiv", "Reason")}: {inv.storno_reason}
+          {inv.restocked && <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400">· {tr("piesele au reintrat în stoc", "parts returned to stock")}</span>}
+        </div>
+      )}
+      {!!inv.credit_notes?.length && (
+        <div data-testid="invoice-credit-notes" className="mb-4 flex flex-wrap items-center gap-2 rounded border border-violet-500/40 bg-violet-500/5 p-3 text-sm">
+          <b>{inv.storno_status === "total" ? tr("Stornată total", "Fully credited") : tr("Stornată parțial", "Partially credited")}:</b>
+          {inv.credit_notes.map((c) => <Link key={c.id} to={`/invoices/${c.id}`} className="font-mono text-primary" data-testid={`credit-note-link-${c.ref}`}>{c.ref} ({money(c.gross)})</Link>)}
+        </div>
+      )}
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <Panel>
           <div className="mb-4 grid gap-4 text-sm md:grid-cols-2">
@@ -79,19 +96,20 @@ export default function InvoiceDetail() {
           </tr></thead><tbody>
             {inv.lines.map((l, i) => (
               <tr key={l.id} className="h-9 border-b border-border/50"><td className="font-mono text-xs">{i + 1}</td><td>{l.description} <span className="font-mono text-[11px] text-muted-foreground">{l.code}</span></td>
-                <td className="text-right font-mono">{num(l.qty)} {l.unit}</td><td className="text-right font-mono">{money(l.unit_price)}</td><td className="text-right font-mono">{money(l.net)}</td><td className="text-right font-mono">{money(l.vat)}</td></tr>
+                <td className="text-right font-mono">{num(l.qty)} {l.unit}{l.credited_qty > 0 && <div className="text-[10px] text-violet-500">−{num(l.credited_qty)} {tr("stornat", "credited")}</div>}</td><td className="text-right font-mono">{money(l.unit_price)}</td><td className="text-right font-mono">{money(l.net)}</td><td className="text-right font-mono">{money(l.vat)}</td></tr>
             ))}
           </tbody></table>
           <div className="ml-auto mt-4 grid max-w-xs gap-1 text-sm">
             <div className="flex justify-between"><span>{tr("Total fără TVA", "Net")}</span><span className="font-mono">{money(inv.totals.net)}</span></div>
             <div className="flex justify-between"><span>TVA</span><span className="font-mono">{money(inv.totals.vat)}</span></div>
             <div className="flex justify-between border-t pt-1 text-base font-bold"><span>Total</span><span className="font-mono text-primary" data-testid="invoice-total">{money(inv.totals.gross)}</span></div>
-            {fiscal && <div className="flex justify-between text-muted-foreground"><span>{tr("Încasat", "Paid")}</span><span className="font-mono" data-testid="invoice-paid">{money(inv.paid_amount)}</span></div>}
+            {inv.credited_amount > 0 && <div className="flex justify-between text-violet-500"><span>{tr("Stornat", "Credited")}</span><span className="font-mono" data-testid="invoice-credited">−{money(inv.credited_amount)}</span></div>}
+            {fiscal && !isCn && <div className="flex justify-between text-muted-foreground"><span>{tr("Încasat", "Paid")}</span><span className="font-mono" data-testid="invoice-paid">{money(inv.paid_amount)}</span></div>}
           </div>
         </Panel>
         <div className="space-y-4">
           {fiscal && <EfacturaPanel inv={inv} setData={setData} reload={reload} />}
-          {fiscal && (
+          {fiscal && !isCn && (
             <Panel title={tr("Încasări", "Payments")}>
               {inv.payments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between border-b border-border/50 py-2 text-sm">
@@ -105,7 +123,8 @@ export default function InvoiceDetail() {
           )}
         </div>
       </div>
-      {fiscal && <PayDialog key={inv.paid_amount} inv={inv} open={pay} onOpenChange={setPay} onSaved={reload} />}
+      {fiscal && !isCn && <PayDialog key={`${inv.paid_amount}-${inv.credited_amount || 0}`} inv={inv} open={pay} onOpenChange={setPay} onSaved={reload} />}
+      {canStorno && <StornoDialog key={inv.credited_amount || 0} inv={inv} open={storno} onOpenChange={setStorno} />}
     </div>
   );
 }

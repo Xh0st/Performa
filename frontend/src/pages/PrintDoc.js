@@ -116,7 +116,8 @@ function Invoice({ inv }) {
   const b = inv.buyer;
   return (
     <>
-      <Header s={s} title={inv.type === "fiscal" ? "Factură" : "Factură proformă"} number={`${inv.series} ${inv.number}`} dateStr={date(inv.issue_date)} />
+      <Header s={s} title={inv.kind === "credit_note" ? "Factură storno" : inv.type === "fiscal" ? "Factură" : "Factură proformă"} number={`${inv.series} ${inv.number}`} dateStr={date(inv.issue_date)} />
+      {inv.kind === "credit_note" && <p className="mb-3 text-[12px]"><b>Stornare la factura nr. {inv.original_ref}</b> din {date(inv.original_issue_date)} · Motiv: {inv.storno_reason}</p>}
       <div className="mb-4 grid grid-cols-2 gap-6 text-[12px]">
         <div><div className="font-bold uppercase">Cumpărător</div>{b.name}<br />{b.cui ? `CUI: ${b.cui}` : `CNP: ${b.cnp}`} {b.reg_com && `· Reg. Com.: ${b.reg_com}`}<br />{addr(b.address, b.city)}</div>
         <div><b>Scadență:</b> {date(inv.due_date)}<br /><b>Comandă lucru:</b> {inv.work_order_number}<br /><b>Vehicul:</b> {inv.vehicle}<br /><b>Km:</b> {num(inv.mileage, 0)}<br /><b>Monedă:</b> {inv.currency}</div>
@@ -154,6 +155,20 @@ function NirDoc({ s, n }) {
   );
 }
 
+function ReturnDoc({ s, r }) {
+  return (
+    <>
+      <Header s={s} title="Aviz retur către furnizor" number={r.number} dateStr={date(r.date)} />
+      <div className="mb-4 text-[12px]"><b>Furnizor:</b> {r.supplier_name} {r.supplier_cui && `(CUI ${r.supplier_cui})`} · <b>NIR origine:</b> {r.nir_number || "—"} · <b>Factură furnizor:</b> {r.nir_invoice_no || "—"}<br /><b>Motiv retur:</b> {r.reason}</div>
+      <table className="w-full border-collapse"><thead><tr>{["Nr.", "Cod", "Denumire", "UM", "Cant.", "Preț achiziție", "Valoare", "TVA"].map((h) => <th key={h} className={S.th}>{h}</th>)}</tr></thead>
+        <tbody>{r.lines.map((l, i) => <tr key={i}><td className={S.td}>{i + 1}</td><td className={S.td}>{l.code}</td><td className={S.td}>{l.name}</td><td className={S.td}>{l.unit}</td>
+          <td className={S.tdr}>{num(l.qty)}</td><td className={S.tdr}>{f2(l.unit_cost)}</td><td className={S.tdr}>{f2(l.value)}</td><td className={S.tdr}>{f2(l.vat)}</td></tr>)}</tbody></table>
+      <Totals t={{ net: r.total, vat: r.total_vat, gross: r.total + r.total_vat }} />
+      <Sign labels={["Predat — Gestionar", "Primit — Delegat furnizor"]} />
+    </>
+  );
+}
+
 function RegisterDoc({ s, r }) {
   return (
     <>
@@ -170,7 +185,7 @@ function RegisterDoc({ s, r }) {
   );
 }
 
-const PATHS = { reception: (id) => `/work-orders/${id}`, quote: (id) => `/work-orders/${id}`, invoice: (id) => `/invoices/${id}`, receipt: (id) => `/payments/${id}`, nir: (id) => `/nirs/${id}`, register: (id) => `/cash-register?day=${id}` };
+const PATHS = { reception: (id) => `/work-orders/${id}`, quote: (id) => `/work-orders/${id}`, invoice: (id) => `/invoices/${id}`, receipt: (id) => `/payments/${id}`, nir: (id) => `/nirs/${id}`, return: (id) => `/supplier-returns/${id}`, register: (id) => `/cash-register?day=${id}` };
 
 export default function PrintDoc() {
   const { kind, id } = useParams();
@@ -188,6 +203,7 @@ export default function PrintDoc() {
         {s && data && kind === "receipt" && <ReceiptDoc s={s} p={data} />}
         {s && data && kind === "nir" && <NirDoc s={s} n={data} />}
         {s && data && kind === "register" && <RegisterDoc s={s} r={data} />}
+        {s && data && kind === "return" && <ReturnDoc s={s} r={data} />}
       </div>
     </div>
   );

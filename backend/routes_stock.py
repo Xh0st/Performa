@@ -49,6 +49,19 @@ class NirIn(BaseModel):
     lines: List[NirLine]
 
 
+class ReturnLine(BaseModel):
+    product_id: str
+    qty: float
+
+
+class ReturnIn(BaseModel):
+    supplier_id: str
+    nir_id: str = ""
+    reason: str = ""
+    date: str = ""
+    lines: List[ReturnLine]
+
+
 @router.get("/products")
 async def list_products(q: str = "", low: bool = False, user=Depends(require("workorders"))):
     flt = {}
@@ -121,6 +134,28 @@ async def consume_fifo(product_id: str, qty: float, ref: str) -> float:
     return round(cost, 2)
 
 
+async def consume_for_return(product_id: str, qty: float, ref: str, nir_number: str = "") -> float:
+    lot = await db.stock_lots.find_one({"product_id": product_id, "ref": nir_number, "qty_remaining": {"$gt": 0}}) if nir_number else None
+    take = min(qty, lot["qty_remaining"]) if lot else 0
+    cost = 0.0
+    if take > 0:
+        await db.stock_lots.update_one({"_id": lot["_id"]}, {"$inc": {"qty_remaining": -take}})
+        await db.products.update_one({"_id": oid(product_id)}, {"$inc": {"stock_qty": -take}})
+        await db.stock_moves.insert_one({"product_id": product_id, "kind": "out", "qty": take, "unit_cost": lot["unit_cost"], "ref": ref, "at": iso()})
+        cost = take * lot["unit_cost"]
+    if qty - take > 0:
+        cost += await consume_fifo(product_id, round(qty - take, 4), ref)
+    return round(cost, 2)
+
+
+async def returned_by_nir(nid: str) -> dict:
+    out = {}
+    async for r in db.supplier_returns.find({"nir_id": nid}, {"lines": 1}):
+        for ln in r["lines"]:
+            out[ln["product_id"]] = round(out.get(ln["product_id"], 0) + ln["qty"], 4)
+    return out
+
+
 @router.get("/nirs")
 async def list_nirs(user=Depends(require("stock"))):
     return [ser(n) for n in await db.nirs.find().sort("date", -1).to_list(1000)]
@@ -128,7 +163,73 @@ async def list_nirs(user=Depends(require("stock"))):
 
 @router.get("/nirs/{nid}")
 async def get_nir(nid: str, user=Depends(require("stock"))):
-    return ser(await get_or_404("nirs", nid))
+    n = ser(await get_or_404("nirs", nid))
+    returned = await returned_by_nir(nid)
+    for ln in n["lines"]:
+        ln["returned_qty"] = returned.get(ln["product_id"], 0)
+    return n
+
+
+@router.get("/supplier-returns")
+async def list_returns(user=Depends(require("stock"))):
+    return [ser(r) for r in await db.supplier_returns.find().sort("created_at", -1).to_list(1000)]
+
+
+@router.get("/supplier-returns/{rid}")
+async def get_return(rid: str, user=Depends(require("stock"))):
+    return ser(await get_or_404("supplier_returns", rid))
+
+
+@router.post("/supplier-returns")
+async def create_return(body: ReturnIn, user=Depends(require("stock"))):
+    sup = await get_or_404("suppliers", body.supplier_id)
+    if not body.reason.strip():
+        raise HTTPException(400, "Motivul returului este obligatoriu")
+    qty_by = {}
+    for ln in body.lines:
+        if ln.qty <= 0:
+            raise HTTPException(400, "Cantitate invalidă")
+        qty_by[ln.product_id] = round(qty_by.get(ln.product_id, 0) + ln.qty, 4)
+    if not qty_by:
+        raise HTTPException(400, "Returul nu are linii")
+    nir, nir_lines = None, {}
+    if body.nir_id:
+        nir = await get_or_404("nirs", body.nir_id)
+        if nir["supplier_id"] != body.supplier_id:
+            raise HTTPException(400, "NIR-ul selectat nu aparține furnizorului")
+        returned = await returned_by_nir(body.nir_id)
+        for ln in nir["lines"]:
+            e = nir_lines.setdefault(ln["product_id"], {"qty": 0.0, "unit_cost": ln["unit_cost"]})
+            e["qty"] += ln["qty"]
+    products = {}
+    for pid, qty in qty_by.items():
+        p = await get_or_404("products", pid)
+        products[pid] = p
+        if qty > p.get("stock_qty", 0) + 1e-6:
+            raise HTTPException(400, f"{p['code']}: stoc insuficient ({p.get('stock_qty', 0)} disponibil)")
+        if nir:
+            if pid not in nir_lines:
+                raise HTTPException(400, f"{p['code']} nu se află pe NIR {nir['number']}")
+            avail = round(nir_lines[pid]["qty"] - returned.get(pid, 0), 4)
+            if qty > avail + 1e-6:
+                raise HTTPException(400, f"{p['code']}: cantitate maximă returnabilă din NIR {avail}")
+    seq = await next_seq("supplier_return")
+    number = f"RET-{now().year}-{seq:05d}"
+    lines = []
+    for pid, qty in qty_by.items():
+        p = products[pid]
+        cost = await consume_for_return(pid, qty, number, nir["number"] if nir else "")
+        unit_cost = nir_lines[pid]["unit_cost"] if nir else round(cost / qty, 4)
+        val = round(qty * unit_cost, 2)
+        lines.append({"product_id": pid, "code": p["code"], "name": p["name"], "unit": p.get("unit", "buc"), "qty": qty, "unit_cost": unit_cost,
+                      "value": val, "vat": round(val * p.get("vat_rate", 21) / 100, 2), "stock_cost": cost})
+    doc = {"number": number, "supplier_id": body.supplier_id, "supplier_name": sup["name"], "supplier_cui": sup.get("cui", ""),
+           "nir_id": body.nir_id, "nir_number": nir["number"] if nir else "", "nir_invoice_no": nir.get("invoice_no", "") if nir else "",
+           "reason": body.reason.strip(), "date": body.date or iso(), "lines": lines, "total": round(sum(x["value"] for x in lines), 2),
+           "total_vat": round(sum(x["vat"] for x in lines), 2), "created_by": user["name"], "created_at": iso()}
+    r = await db.supplier_returns.insert_one(doc)
+    await audit(user, "create", "supplier_return", str(r.inserted_id), number)
+    return ser(await db.supplier_returns.find_one({"_id": r.inserted_id}))
 
 
 @router.post("/nirs")

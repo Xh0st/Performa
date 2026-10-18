@@ -1,10 +1,11 @@
-import random
+import uuid
 from datetime import timedelta, date
+from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel
 from core import db, ser, oid, iso, now, require, audit, get_or_404, next_seq, get_settings, calc_totals
-from routes_stock import consume_fifo
+from routes_stock import consume_fifo, receive_stock
 from efactura import build_ubl
 
 router = APIRouter(prefix="/api")
@@ -77,7 +78,94 @@ async def get_invoice(iid: str, user=Depends(require("invoices"))):
     inv.get("efactura", {}).pop("xml", None)
     inv["efactura"]["has_receipt"] = bool(await db.efactura_files.find_one({"invoice_id": iid}, {"_id": 1}))
     inv["payments"] = [ser(p) for p in await db.payments.find({"invoice_id": iid}).sort("date", 1).to_list(200)]
+    if inv.get("kind") != "credit_note":
+        credited = await credited_by_line(iid)
+        for ln in inv["lines"]:
+            ln["credited_qty"] = credited.get(ln.get("id"), 0)
     return inv
+
+
+async def credited_by_line(iid: str) -> dict:
+    out = {}
+    async for cn in db.invoices.find({"original_invoice_id": iid}, {"lines": 1}):
+        for ln in cn["lines"]:
+            out[ln["original_line_id"]] = round(out.get(ln["original_line_id"], 0) + abs(ln["qty"]), 4)
+    return out
+
+
+class StornoLine(BaseModel):
+    line_id: str
+    qty: float
+
+
+class StornoIn(BaseModel):
+    reason: str = ""
+    restock: bool = False
+    lines: List[StornoLine]
+
+
+async def _sold_cost(product_id: str, ref: str) -> float:
+    mv = await db.stock_moves.find_one({"product_id": product_id, "ref": ref, "kind": "out"})
+    if mv:
+        return mv["unit_cost"]
+    p = await db.products.find_one({"_id": oid(product_id)}, {"avg_cost": 1})
+    return p.get("avg_cost", 0) if p else 0
+
+
+@router.post("/invoices/{iid}/storno")
+async def storno_invoice(iid: str, body: StornoIn, user=Depends(require("invoices"))):
+    inv = await get_or_404("invoices", iid)
+    if inv["type"] != "fiscal" or inv.get("kind") == "credit_note":
+        raise HTTPException(400, "Doar facturile fiscale pot fi stornate")
+    if not body.reason.strip():
+        raise HTTPException(400, "Motivul stornării este obligatoriu")
+    credited = await credited_by_line(iid)
+    orig = {ln.get("id"): ln for ln in inv["lines"]}
+    lines = []
+    for sl in body.lines:
+        if sl.qty <= 0:
+            continue
+        ln = orig.get(sl.line_id)
+        if not ln:
+            raise HTTPException(400, "Linie inexistentă pe factura originală")
+        avail = round(ln["qty"] - credited.get(sl.line_id, 0), 4)
+        if sl.qty > avail + 1e-6:
+            raise HTTPException(400, f"{ln['description']}: cantitate maximă stornabilă {avail}")
+        lines.append({**ln, "id": str(uuid.uuid4()), "original_line_id": sl.line_id, "qty": -sl.qty})
+    if not lines:
+        raise HTTPException(400, "Selectați cel puțin o linie de stornat")
+    totals = calc_totals(lines)
+    seq = await next_seq("invoice")
+    orig_ref = f"{inv['series']}{inv['number']}"
+    today = date.today().isoformat()
+    cn = {"type": "fiscal", "kind": "credit_note", "series": inv["series"], "number": f"{seq:06d}", "issue_date": today, "due_date": today,
+          "currency": inv.get("currency", "RON"), "work_order_id": inv.get("work_order_id"), "work_order_number": inv.get("work_order_number"),
+          "client_id": inv.get("client_id"), "vehicle": inv.get("vehicle"), "mileage": inv.get("mileage"), "seller": inv["seller"], "buyer": inv["buyer"],
+          "lines": lines, "totals": totals, "paid_amount": 0.0, "status": "credit", "cogs": 0.0, "original_invoice_id": iid,
+          "original_ref": orig_ref, "original_issue_date": inv["issue_date"], "storno_reason": body.reason.strip(), "restocked": body.restock,
+          "efactura": {"status": "not_sent", "history": []}, "created_by": user["name"], "created_at": iso()}
+    r = await db.invoices.insert_one(cn)
+    ref = f"{cn['series']}{cn['number']}"
+    cogs = 0.0
+    if body.restock:
+        for ln in lines:
+            if ln["type"] in ("part", "consumable") and ln.get("product_id"):
+                cost = await _sold_cost(ln["product_id"], orig_ref)
+                await receive_stock(ln["product_id"], abs(ln["qty"]), cost, ref, iso(), f"RETUR {orig_ref}")
+                cogs -= abs(ln["qty"]) * cost
+        await db.invoices.update_one({"_id": r.inserted_id}, {"$set": {"cogs": round(cogs, 2)}})
+    for ln in lines:
+        credited[ln["original_line_id"]] = credited.get(ln["original_line_id"], 0) + abs(ln["qty"])
+    full = all(credited.get(ln.get("id"), 0) >= ln["qty"] - 1e-6 for ln in inv["lines"])
+    credited_amount = round(inv.get("credited_amount", 0) + abs(totals["gross"]), 2)
+    settled = inv.get("paid_amount", 0) + credited_amount >= inv["totals"]["gross"] - 0.001
+    await db.invoices.update_one({"_id": inv["_id"]}, {"$set": {"credited_amount": credited_amount, "storno_status": "total" if full else "partial",
+                                                                  "status": "paid" if settled else inv["status"]},
+                                                         "$push": {"credit_notes": {"id": str(r.inserted_id), "ref": ref, "gross": totals["gross"], "at": iso()}}})
+    await audit(user, "storno", "invoice", iid, f"{ref} storno {orig_ref}")
+    from routes_efactura import schedule_auto_send
+    schedule_auto_send(await db.invoices.find_one({"_id": r.inserted_id}))
+    return ser(await db.invoices.find_one({"_id": r.inserted_id}, {"efactura.xml": 0}))
 
 
 @router.get("/invoices/{iid}/efactura/xml")
@@ -104,13 +192,13 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
     if body.method not in DOC_BY_METHOD:
         raise HTTPException(400, "Metodă de plată invalidă")
     inv = await get_or_404("invoices", body.invoice_id)
-    if inv["type"] != "fiscal":
-        raise HTTPException(400, "Încasările se înregistrează pe facturi fiscale")
-    due = round(inv["totals"]["gross"] - inv.get("paid_amount", 0), 2)
+    if inv["type"] != "fiscal" or inv.get("kind") == "credit_note":
+        raise HTTPException(400, "Încasările se înregistrează pe facturi fiscale (nu pe facturi de stornare)")
+    due = round(inv["totals"]["gross"] - inv.get("paid_amount", 0) - inv.get("credited_amount", 0), 2)
     if body.amount <= 0 or body.amount > due + 0.001:
         raise HTTPException(400, f"Suma trebuie să fie între 0 și {due:.2f} RON")
     paid = round(inv.get("paid_amount", 0) + body.amount, 2)
-    status = "paid" if paid >= inv["totals"]["gross"] - 0.001 else "partial"
+    status = "paid" if paid + inv.get("credited_amount", 0) >= inv["totals"]["gross"] - 0.001 else "partial"
     upd = await db.invoices.update_one({"_id": inv["_id"], "paid_amount": inv.get("paid_amount", 0)},
                                        {"$set": {"paid_amount": paid, "status": status}})
     if upd.modified_count == 0:

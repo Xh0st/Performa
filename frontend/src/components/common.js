@@ -17,6 +17,7 @@ export const PAY_STATUS = {
   unpaid: ["Neîncasată", "Unpaid", "bg-rose-500/10 text-rose-500 border-rose-500/30"],
   partial: ["Parțial", "Partial", "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"],
   paid: ["Încasată", "Paid", "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"],
+  credit: ["Stornare", "Credit note", "bg-violet-500/10 text-violet-500 border-violet-500/30"],
 };
 
 export const EF_STATUS = {

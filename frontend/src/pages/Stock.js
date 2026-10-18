@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Printer, AlertTriangle } from "lucide-react";
+import { Plus, Search, Trash2, Printer, AlertTriangle, FileText, Undo2 } from "lucide-react";
 import { api, errMsg, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { money, num, date, today } from "@/lib/format";
@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PageHeader, Panel, Loading, Field, NativeSelect, Empty } from "@/components/common";
 import EfacturaInbox from "@/components/EfacturaInbox";
+import SupplierReturnDialog from "@/components/SupplierReturnDialog";
+import NirEfacturaView from "@/components/NirEfacturaView";
 
 const P_EMPTY = { code: "", name: "", oe_code: "", aftermarket_code: "", brand: "", category: "piese", unit: "buc", location: "", warehouse: "Depozit Central", sale_price: 0, min_stock: 0, vat_rate: 21, warranty_months: 24 };
 
@@ -139,6 +141,9 @@ export default function Stock() {
   const [pd, setPd] = useState({ open: false, initial: null });
   const [nirOpen, setNirOpen] = useState(false);
   const [moves, setMoves] = useState(null);
+  const [ret, setRet] = useState(null);
+  const [efNir, setEfNir] = useState(null);
+  const { data: returns, reload: reloadR } = useApi("/supplier-returns");
   const { data: products, reload } = useApi(`/products?q=${encodeURIComponent(q)}&low=${low}`, [q, low]);
   const { data: nirs, reload: reloadN } = useApi("/nirs");
   const { data: suppliers, reload: reloadS } = useApi("/suppliers");
@@ -150,12 +155,14 @@ export default function Stock() {
       <PageHeader eyebrow={tr("Magazie · FIFO · loturi · multi-gestiune", "Warehouse · FIFO · lots · multi-location")} title={tr("Stocuri & NIR", "Stock & GRN")}
         actions={<>
           <Button variant="outline" data-testid="add-product-button" onClick={() => setPd({ open: true, initial: null })}><Plus className="mr-1 h-4 w-4" />{tr("Produs", "Product")}</Button>
+          <Button variant="outline" data-testid="add-return-button" onClick={() => setRet({ preset: null })}><Undo2 className="mr-1 h-4 w-4" />{tr("Retur furnizor", "Supplier return")}</Button>
           <Button data-testid="add-nir-button" onClick={() => setNirOpen(true)}><Plus className="mr-1 h-4 w-4" />NIR</Button>
         </>} />
       <Tabs defaultValue="products">
         <TabsList>
           <TabsTrigger value="products" data-testid="stock-tab-products">{tr("Produse", "Products")}</TabsTrigger>
           <TabsTrigger value="nir" data-testid="stock-tab-nir">NIR</TabsTrigger>
+          <TabsTrigger value="returns" data-testid="stock-tab-returns">{tr("Retururi furnizor", "Supplier returns")}</TabsTrigger>
           <TabsTrigger value="suppliers" data-testid="stock-tab-suppliers">{tr("Furnizori", "Suppliers")}</TabsTrigger>
           <TabsTrigger value="einbox" data-testid="stock-tab-efactura">{tr("Facturi e-Factura primite", "Received e-Invoices")}</TabsTrigger>
         </TabsList>
@@ -205,10 +212,34 @@ export default function Stock() {
                   <tr key={n.id} className="h-10 border-b border-border/50">
                     <td className="px-2 font-mono text-xs text-primary">{n.number}</td><td className="px-2">{date(n.date)}</td><td className="px-2">{n.supplier_name}</td>
                     <td className="px-2 font-mono text-xs">{n.invoice_no} {n.aviz_no}</td><td className="px-2 text-right font-mono">{money(n.total)}</td>
-                    <td className="px-2 text-right"><Button variant="ghost" size="icon" data-testid={`print-nir-${n.number}`} onClick={() => window.open(`/print/nir/${n.id}`, "_blank")}><Printer className="h-4 w-4" /></Button></td>
+                    <td className="whitespace-nowrap px-2 text-right">
+                      {n.efactura_message_id && <Button variant="ghost" size="sm" data-testid={`nir-efactura-pdf-${n.number}`} onClick={() => setEfNir(n)}><FileText className="mr-1 h-4 w-4" />PDF e-Factura</Button>}
+                      <Button variant="ghost" size="icon" title={tr("Retur din acest NIR", "Return from this GRN")} data-testid={`nir-return-${n.number}`} onClick={() => setRet({ preset: n })}><Undo2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" data-testid={`print-nir-${n.number}`} onClick={() => window.open(`/print/nir/${n.id}`, "_blank")}><Printer className="h-4 w-4" /></Button></td>
                   </tr>
                 ))}
               </tbody></table>
+            )}
+          </Panel>
+        </TabsContent>
+        <TabsContent value="returns">
+          <Panel testid="supplier-returns-panel">
+            {!returns?.length ? <Empty text={tr("Niciun retur înregistrat.", "No returns yet.")} /> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="returns-table"><thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-2 py-2">{tr("Număr", "Number")}</th><th className="px-2">{tr("Data", "Date")}</th><th className="px-2">{tr("Furnizor", "Supplier")}</th>
+                  <th className="px-2">NIR</th><th className="px-2">{tr("Motiv", "Reason")}</th><th className="px-2 text-right">{tr("Articole", "Items")}</th><th className="px-2 text-right">{tr("Valoare", "Value")}</th><th />
+                </tr></thead><tbody>
+                  {returns.map((r) => (
+                    <tr key={r.id} data-testid={`return-row-${r.number}`} className="h-10 border-b border-border/50">
+                      <td className="px-2 font-mono text-xs text-primary">{r.number}</td><td className="px-2">{date(r.date)}</td><td className="px-2">{r.supplier_name}</td>
+                      <td className="px-2 font-mono text-xs">{r.nir_number || "FIFO"}</td><td className="px-2 text-xs">{r.reason}</td>
+                      <td className="px-2 text-right font-mono">{r.lines.reduce((s, l) => s + l.qty, 0)}</td><td className="px-2 text-right font-mono">{money(r.total)}</td>
+                      <td className="px-2 text-right"><Button variant="ghost" size="icon" data-testid={`print-return-${r.number}`} onClick={() => window.open(`/print/return/${r.id}`, "_blank")}><Printer className="h-4 w-4" /></Button></td>
+                    </tr>
+                  ))}
+                </tbody></table>
+              </div>
             )}
           </Panel>
         </TabsContent>
@@ -228,6 +259,8 @@ export default function Stock() {
         </TabsContent>
       </Tabs>
       <ProductDialog open={pd.open} initial={pd.initial} onOpenChange={(o) => setPd({ ...pd, open: o })} onSaved={reload} />
+      {ret && <SupplierReturnDialog key={ret.preset?.id || "new"} open preset={ret.preset} onOpenChange={(o) => !o && setRet(null)} onSaved={() => { reload(); reloadN(); reloadR(); }} />}
+      <NirEfacturaView nir={efNir} onClose={() => setEfNir(null)} />
       <NirDialog open={nirOpen} onOpenChange={setNirOpen} onSaved={() => { reload(); reloadN(); }} />
       <Sheet open={!!moves} onOpenChange={(o) => !o && setMoves(null)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-lg" data-testid="product-moves-sheet">

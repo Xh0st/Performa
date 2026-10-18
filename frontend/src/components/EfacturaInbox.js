@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Upload, AlertTriangle, Link2, FilePlus2 } from "lucide-react";
+import { RefreshCw, Upload, AlertTriangle, Link2, FilePlus2, FileText } from "lucide-react";
+import PdfFrame from "@/components/PdfFrame";
 import { api, errMsg, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { money, num, date } from "@/lib/format";
@@ -17,6 +18,7 @@ function Detail({ id, onClose, onDone }) {
   const [map, setMap] = useState({});
   const [result, setResult] = useState(null);
   const [dup, setDup] = useState(null);
+  const [pdf, setPdf] = useState(false);
   if (!m) return null;
   const p = m.parsed;
   const duplicate = dup || m.duplicate_nir;
@@ -54,6 +56,10 @@ function Detail({ id, onClose, onDone }) {
           [tr("Total fără TVA", "Net"), money(p.net)], ["TVA", money(p.vat)], ["Total", money(p.gross)], [tr("Furnizor în sistem", "Supplier in system"), m.supplier ? m.supplier.name : tr("Nu – va fi creat", "No – will be created")]].map(([l, v]) => (
           <div key={l}><div className="eyebrow">{l}</div><div className="font-mono text-xs">{v || "—"}</div></div>
         ))}
+      </div>
+      <div className="mt-3">
+        <Button variant="outline" size="sm" data-testid="inbox-pdf-toggle-button" onClick={() => setPdf(!pdf)}><FileText className="mr-1 h-4 w-4" />{pdf ? tr("Ascunde PDF", "Hide PDF") : tr("Vizualizează PDF factură", "View invoice PDF")}</Button>
+        {pdf && <div className="mt-2"><PdfFrame path={`/efactura/inbox/${id}/pdf`} filename={`efactura_${p.series_number}.pdf`} className="h-[55vh]" /></div>}
       </div>
       {duplicate && !done && (
         <div data-testid="inbox-duplicate-alert" className="mt-4 flex flex-wrap items-center gap-3 rounded border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
