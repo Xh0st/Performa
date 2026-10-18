@@ -28,8 +28,23 @@ export function AuthProvider({ children }) {
     window.location.reload();
     return refreshed.data;
   };
+  const changeInitialPassword = async (currentPassword, newPassword) => {
+    const { data } = await api.post("/auth/change-initial-password", {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    localStorage.setItem("erp_token", data.token);
+    setUser(data.user);
+    return data.user;
+  };
   const can = (m) => !!user && user.permissions?.includes(m);
-  return <AuthCtx.Provider value={{ user, login, logout, switchBranch, can }}>{children}</AuthCtx.Provider>;
+  return (
+    <AuthCtx.Provider
+      value={{ user, login, logout, switchBranch, changeInitialPassword, can }}
+    >
+      {children}
+    </AuthCtx.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthCtx);

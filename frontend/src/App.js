@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import "@/App.css";
 import { Toaster } from "@/components/ui/sonner";
 import { PrefsProvider, useLang } from "@/lib/prefs";
@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Layout from "@/components/Layout";
 import { Loading } from "@/components/common";
 import Login from "@/pages/Login";
+import InitialPassword from "@/pages/InitialPassword";
 import Dashboard from "@/pages/Dashboard";
 import Clients from "@/pages/Clients";
 import ClientDetail from "@/pages/ClientDetail";
@@ -33,8 +34,12 @@ import PrintDoc from "@/pages/PrintDoc";
 
 function Protected({ children }) {
   const { user } = useAuth();
+  const location = useLocation();
   if (user === null) return <Loading />;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.must_change_password && location.pathname !== "/change-initial-password") {
+    return <Navigate to="/change-initial-password" replace />;
+  }
   return children;
 }
 
@@ -61,6 +66,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/change-initial-password" element={<Protected><InitialPassword /></Protected>} />
             <Route path="/approve/:token" element={<PublicQuote />} />
             <Route path="/print/:kind/:id" element={<Protected><PrintDoc /></Protected>} />
             <Route element={<Protected><Layout /></Protected>}>

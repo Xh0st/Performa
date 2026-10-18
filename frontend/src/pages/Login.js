@@ -18,15 +18,15 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={user.must_change_password ? "/change-initial-password" : "/"} replace />;
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      await login(email, password);
-      nav("/");
+      const loggedInUser = await login(email, password);
+      nav(loggedInUser.must_change_password ? "/change-initial-password" : "/");
     } catch (err) {
       setError(errMsg(err));
     } finally {

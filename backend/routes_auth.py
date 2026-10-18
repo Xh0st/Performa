@@ -27,6 +27,11 @@ class LoginIn(BaseModel):
     password: str
 
 
+class InitialPasswordChangeIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
 def set_cookies(response: Response, user: dict):
     user_id = str(user["_id"])
     tenant_id = user.get("tenant_id", "")
@@ -77,6 +82,36 @@ async def logout(response: Response):
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
+
+
+@router.post("/auth/change-initial-password")
+async def change_initial_password(
+    body: InitialPasswordChangeIn,
+    response: Response,
+    user: dict = Depends(get_current_user),
+):
+    if not user.get("must_change_password"):
+        raise HTTPException(400, "Parola inițială a fost deja schimbată")
+    if len(body.new_password) < 8:
+        raise HTTPException(400, "Parola nouă trebuie să aibă minim 8 caractere")
+    current = await raw_db.users.find_one({"_id": oid(user["id"])})
+    if not current or not verify_password(body.current_password, current["password_hash"]):
+        raise HTTPException(401, "Parola curentă este incorectă")
+    if verify_password(body.new_password, current["password_hash"]):
+        raise HTTPException(400, "Alegeți o parolă nouă, diferită de parola inițială")
+    await raw_db.users.update_one(
+        {"_id": current["_id"]},
+        {
+            "$set": {
+                "password_hash": hash_password(body.new_password),
+                "must_change_password": False,
+                "password_changed_at": iso(),
+            }
+        },
+    )
+    updated = await raw_db.users.find_one({"_id": current["_id"]})
+    await audit(user, "change_initial_password", "user", user["id"])
+    return {"user": user_out(updated), "token": set_cookies(response, updated)}
 
 
 @router.post("/auth/refresh")

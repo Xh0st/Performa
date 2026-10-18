@@ -259,6 +259,13 @@ async def get_current_user(request: Request) -> dict:
             "branch_id": u["active_branch_id"],
             "platform_role": user.get("platform_role"),
         })
+    allowed_initial_password_paths = {
+        "/api/auth/change-initial-password",
+        "/api/auth/logout",
+        "/api/auth/me",
+    }
+    if user.get("must_change_password") and request.url.path not in allowed_initial_password_paths:
+        raise HTTPException(403, "Schimbați parola inițială pentru a continua")
     u["permissions"] = permissions_for(u["role"])
     return u
 
