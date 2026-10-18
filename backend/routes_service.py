@@ -268,11 +268,12 @@ async def change_status(wid: str, body: StatusIn, user=Depends(require("workorde
         raise HTTPException(400, "Comanda facturată nu poate fi închisă sau redeschisă")
     if w["status"] in LOCKED:
         raise HTTPException(400, "Comanda este facturată sau închisă și nu mai poate fi modificată")
+    has_approved_quote = any(quote.get("status") == "approved" for quote in w.get("quotes", []))
+    if st in {"aprobata", "finalizata"} and not has_approved_quote:
+        raise HTTPException(400, "Statusul Aprobată/Finalizată necesită un deviz emis și aprobat")
     if st == "finalizata" and not w.get("qc", {}).get("passed"):
         raise HTTPException(400, "Controlul de calitate trebuie promovat înainte de finalizare")
     rule = quote_closure_rule(w)
-    if st == "finalizata" and not rule["allowed"]:
-        raise HTTPException(400, "Devizul este în așteptare; aprobați sau respingeți-l înainte de finalizare")
     upd = {"status": st}
     if st == "finalizata":
         upd["finished_at"] = iso()

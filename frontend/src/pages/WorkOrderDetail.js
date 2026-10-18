@@ -78,6 +78,7 @@ export default function WorkOrderDetail() {
   const [next, setNext] = useState("");
   if (!wo) return <Loading />;
   const locked = ["facturata", "inchisa"].includes(wo.status);
+  const hasApprovedQuote = (wo.quotes || []).some((quote) => quote.status === "approved");
 
   const changeStatus = async () => {
     try {
@@ -121,11 +122,14 @@ export default function WorkOrderDetail() {
           <Field label={tr("Schimbă status", "Change status")} className="w-60">
             <NativeSelect data-testid="wo-status-select" value={next} onChange={(e) => setNext(e.target.value)}>
               <option value="">—</option>
-              {Object.keys(STATUS).filter((k) => k !== "facturata" && k !== wo.status).map((k) => <option key={k} value={k}>{tr(STATUS[k][0], STATUS[k][1])}</option>)}
+              {Object.keys(STATUS).filter((k) => {
+                if (k === "facturata" || k === wo.status) return false;
+                return !["aprobata", "finalizata"].includes(k) || hasApprovedQuote;
+              }).map((k) => <option key={k} value={k}>{tr(STATUS[k][0], STATUS[k][1])}</option>)}
             </NativeSelect>
           </Field>
           <Button data-testid="wo-status-apply-button" disabled={!next} onClick={changeStatus}><ArrowRightLeft className="mr-1 h-4 w-4" />{tr("Aplică", "Apply")}</Button>
-          <span className="text-xs text-muted-foreground">{tr("Finalizată necesită control calitate; orice comandă nefacturată poate fi închisă și intră în verificarea administrativă.", "Completed requires QC; any uninvoiced work order can be closed and enters administrative review.")}</span>
+          <span className="text-xs text-muted-foreground">{tr("Aprobată și Finalizată necesită deviz aprobat; Finalizată necesită și control calitate. Orice comandă nefacturată poate fi închisă.", "Approved and completed require an approved quote; completed also requires QC. Any uninvoiced work order can be closed.")}</span>
         </div>
       ) : null}
 
