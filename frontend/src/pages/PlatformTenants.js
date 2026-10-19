@@ -54,6 +54,7 @@ export default function PlatformTenants() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [resetTarget, setResetTarget] = useState(null);
   const [temporaryPassword, setTemporaryPassword] = useState(null);
+  const [resetBusy, setResetBusy] = useState(false);
 
   if (!user || user.platform_role !== "SUPERADMIN") {
     return (
@@ -105,6 +106,7 @@ export default function PlatformTenants() {
 
   const resetTenantAdminPassword = async () => {
     if (!resetTarget) return;
+    setResetBusy(true);
     try {
       const response = await api.post(
         `/platform/tenants/${resetTarget.id}/admin/reset-password`,
@@ -113,18 +115,25 @@ export default function PlatformTenants() {
       toast.success("Parola temporară a fost generată");
     } catch (error) {
       toast.error(errMsg(error));
+    } finally {
+      setResetBusy(false);
     }
   };
 
   const closeResetDialog = () => {
     setResetTarget(null);
     setTemporaryPassword(null);
+    setResetBusy(false);
   };
 
   const copyTemporaryPassword = async () => {
     if (!temporaryPassword?.temporary_password) return;
-    await navigator.clipboard.writeText(temporaryPassword.temporary_password);
-    toast.success("Parola temporară a fost copiată");
+    try {
+      await navigator.clipboard.writeText(temporaryPassword.temporary_password);
+      toast.success("Parola temporară a fost copiată");
+    } catch (error) {
+      toast.error("Copierea parolei a fost blocată de browser");
+    }
   };
 
   return (
@@ -386,7 +395,7 @@ export default function PlatformTenants() {
                   va fi obligat să o schimbe la următoarea conectare.
                 </DialogDescription>
               </DialogHeader>
-              <DialogFooter>
+              <DialogFooter className="gap-2 sm:space-x-0">
                 <Button
                   variant="outline"
                   data-testid="reset-tenant-password-cancel-button"
@@ -396,9 +405,10 @@ export default function PlatformTenants() {
                 </Button>
                 <Button
                   data-testid="reset-tenant-password-generate-button"
+                  disabled={resetBusy}
                   onClick={resetTenantAdminPassword}
                 >
-                  Generează parola temporară
+                  {resetBusy ? "Se generează…" : "Generează parola temporară"}
                 </Button>
               </DialogFooter>
             </>
@@ -416,7 +426,7 @@ export default function PlatformTenants() {
                 value={temporaryPassword.temporary_password}
                 readOnly
               />
-              <DialogFooter>
+              <DialogFooter className="gap-2 sm:space-x-0">
                 <Button
                   variant="outline"
                   data-testid="copy-tenant-temporary-password-button"

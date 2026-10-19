@@ -1,3 +1,5 @@
+import os
+
 from core import iso, raw_db
 from tenant_context import (
     DEMO_BRANCH_ID,
@@ -116,7 +118,7 @@ async def migrate_demo_tenant() -> None:
             "active_branch_id": DEMO_BRANCH_ID,
         }},
     )
-    owner = await raw_db.users.find_one({"email": "andrei.melek@gmail.com"})
+    owner = await raw_db.users.find_one({"email": os.environ["ADMIN_EMAIL"].lower()})
     if owner:
         await raw_db.users.update_one(
             {"_id": owner["_id"]},

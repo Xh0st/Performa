@@ -2,10 +2,11 @@ import re
 import secrets
 from uuid import uuid4
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core import audit, hash_password, iso, oid, raw_db, require_superadmin, ser
+from core import audit, db, hash_password, iso, oid, raw_db, require_superadmin, ser
 from tenant_context import OPERATIONAL_COLLECTIONS
 
 
@@ -55,7 +56,7 @@ class TenantQuotaIn(BaseModel):
 
 async def primary_tenant_admin(tenant: dict) -> dict | None:
     primary_admin_id = tenant.get("primary_admin_user_id")
-    if primary_admin_id:
+    if primary_admin_id and ObjectId.is_valid(primary_admin_id):
         primary_admin = await raw_db.users.find_one({"_id": oid(primary_admin_id)})
         if primary_admin and primary_admin.get("tenant_id") == tenant["_id"]:
             return primary_admin
@@ -178,6 +179,9 @@ async def reset_primary_admin_password(tenant_id: str, user=Depends(require_supe
             }
         },
     )
+    await db.login_attempts.delete_many({
+        "identifier": {"$regex": f":{re.escape(admin['email'])}$"},
+    })
     await audit(user, "reset_tenant_admin_password", "tenant", tenant_id, admin["email"])
     return {"admin_email": admin["email"], "temporary_password": temporary_password}
 

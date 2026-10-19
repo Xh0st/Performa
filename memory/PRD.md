@@ -119,6 +119,22 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Verificare: 67 teste de regresie multi-tenant și 10 teste de ciclu tenant au trecut; curățarea
   a confirmat 0 tenanturi, sucursale, utilizatori sau date temporare rămase.
 
+## Migrare Superadmin și resetare Tenant Admin (2026-10-19)
+- Tenantul demo istoric a fost migrat idempotent la un ID generat automat `tenant-e93a5f22c8ba4a11`,
+  afișat ca `SUPERADMIN`; sediul principal și cele 9 conturi asociate au primit contextul nou.
+- Migrarea a mutat datele operaționale, setările, jurnalele, configurațiile e-Factura/RAR și seriile,
+  apoi a eliminat referințele rămase către ID-urile demo vechi. Tenanturile comerciale existente au
+  rămas neatinse.
+- Lista Superadmin afișează emailul administratorului principal al fiecărui tenant, fără hash-uri sau
+  alte date sensibile. Asocierea administratorului principal este robustă și are fallback controlat.
+- Superadmin poate genera o parolă temporară pentru Tenant Admin al unui alt tenant; parola apare o
+  singură dată, este stocată exclusiv bcrypt, șterge blocajele de login și impune schimbarea parolei
+  înainte de acces operațional. Tenantul propriu Superadmin nu poate fi resetat din această acțiune.
+- UI: dialogul de resetare previne generarea dublă, permite copierea sigură cu tratarea erorilor și
+  funcționează fără overflow pe mobil.
+- Verificare: 79 teste backend au trecut, build frontend reușit și curățarea a confirmat 0 date
+  temporare rămase; fluxurile de migrare, resetare și schimbare obligatorie au fost testate și în UI.
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
@@ -149,6 +165,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   de sucursală.
 - Confirmați fluxul de creare tenant, prima conectare cu schimbarea parolei și ștergerea cu
   confirmare în panoul Superadmin.
+- Confirmați în UI lista Superadmin actualizată, emailul Tenant Admin și resetarea parolei temporare
+  pentru tenanturile comerciale.
 - Retestați end-to-end invalidarea devizului după editarea pieselor sau manoperei aprobate.
 - Obțineți documentația contractuală RAR, endpointurile Test/Producție și tokenul de acces.
 - Validați un payload într-un mediu RAR Sandbox înainte de activarea transportului extern.

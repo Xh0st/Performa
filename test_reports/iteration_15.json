@@ -1,0 +1,41 @@
+{
+  "summary": "Tested the SUPERADMIN migration, admin_email in the tenant list and the primary Tenant Admin password reset, on backend, DB and UI. New test_iter15_superadmin_reset.py: 12/12 pass. Regression (multitenant, tenancy, iter12, iter13, iter14): 67/67 pass. MIGRATION: no documents in any collection still reference demo-tenant-001/demo-branch-001 (tenant_id, branch_id, active_branch_id, assigned_branch_ids), and no old counters remain. tenant-e93a5f22c8ba4a11 has company_name SUPERADMIN, is ACTIVE and has migrated_from_tenant_id set. branch-e93a5f22c8ba4a11 is the main branch. 9 users are now in the new context. The owner has platform_role SUPERADMIN and is primary_admin_user_id. 11 counters were moved with their sequence numbers preserved (invoice 83, work_order 98, etc.). 25 operational collections, including settings, audit_logs and efactura_config, sit under the new tenant/branch with 0 documents on the wrong branch. Clients, vehicles, work-orders, invoices, settings and audit are accessible. The demo admin is in the new context. Hash snapshots taken before and after testing show tenant-92e564e6004a450d (BOGADY MOTORS SRL) and tenant-8541282f554641b8 (PERFORMA DEMO) unchanged (tenant, branches and users). LIST: GET /platform/tenants returns admin_email and admin_user_id for every tenant, with no password_hash. Non-superadmin gets 403. A tenant with no admin returns admin_email ''. RESET: demo admin and Tenant Admin get 403; no auth gets 401; the Superadmin's own tenant gets 400; an unknown tenant gets 404; a tenant with no admin gets 404. Success: the response contains only admin_email and temporary_password. The password is stored as a $2b$ bcrypt hash and never in plaintext, including in the audit entry. must_change_password is set to true and an audit entry reset_tenant_admin_password is written. The admin's old session gets 403 on /clients but 200 on /auth/me. The old password gets 401. Logging in with the temporary password gives 403 on clients, vehicles, work-orders, dashboard, users and platform/tenants. change-initial-password returns 401 for a wrong current password and 400 when the new password equals the old one. A correct change returns 200, after which /clients returns 200 and the temporary password gets 401. Two consecutive resets produce different passwords. UI (1920 and 390): emails show for all 4 tenants. The SUPERADMIN reset button is disabled. Cancel closes the dialog. Generate shows the password in a read-only input, and copy writes exactly the same value to the clipboard. 'Am notat parola' closes the dialog and the password disappears from the DOM; reopening shows the generate step again, not the old password. The password generated in the UI works for login and is subject to the forced change. At 390px, scrollWidth is 390 (the table scrolls inside its card) and the dialog is 390px wide. No page errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/platform/tenants", "issue": "primary_tenant_admin calls oid(primary_admin_user_id). If any tenant has a malformed primary_admin_user_id, oid raises 404 and the entire tenant list fails. Use ObjectId.is_valid and fall back instead."},
+      {"endpoint": "POST /api/platform/tenants/{id}/admin/reset-password", "issue": "Does not clear login_attempts lockouts for the admin email. If the admin is locked out (5 failed attempts from the same IP), the temporary password will not work for up to 15 minutes. Consider db.login_attempts.delete_many on identifiers ending in ':<email>'."},
+      {"endpoint": "reset-password / sessions", "issue": "Existing JWTs are not revoked; they are only blocked by the must_change_password gate. The old session can still call /auth/me and /auth/logout. This is acceptable per the spec, but there is no token versioning."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PlatformTenants reset dialog", "issue": "The Generate button has no loading/disabled state. A double click fires 2 resets, and if the responses arrive out of order the displayed password may not be the active one.", "selector": "[data-testid='reset-tenant-password-generate-button']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reset dialog at 390px", "issues": ["The 'Am notat parola' and 'Copiază parola' buttons are stacked with no vertical gap (they touch)."]},
+      {"screen": "PlatformTenants", "issues": ["copyTemporaryPassword has no try/catch. If the clipboard is denied (non-secure context or permissions), the promise rejection is unhandled and no error toast appears."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter15_superadmin_reset.py", "/app/backend/tests/iter15_migration_snapshot.py", "/app/backend/tests/iter15_ui_fixture.py", "/app/test_reports/pytest/iter15.xml", "/app/test_reports/pytest/iter15_regression.xml"],
+  "action_items": [
+    "Add a loading/disabled state to reset-tenant-password-generate-button to prevent double resets.",
+    "Wrap navigator.clipboard.writeText in try/catch and show an error toast.",
+    "Make primary_tenant_admin tolerant of an invalid primary_admin_user_id (no 404 on the whole list).",
+    "Optional: clear login_attempts for the admin email on reset; add gap-2 to DialogFooter on mobile."
+  ],
+  "critical_code_review_comments": [
+    "migrate_demo_tenant still hardcodes the owner email 'andrei.melek@gmail.com' instead of using ADMIN_EMAIL from env.",
+    "The audit entries for resets of deleted temporary tenants remain in the SUPERADMIN audit_logs (entity_id = deleted tenant id). This is the expected audit trail, not leftover data.",
+    "test_iter13_mt_final.py still uses the literal 'demo-tenant-001' as a 'foreign tenant' value in its sanitisation tests. It passes, but the tenant no longer exists, so the test is less meaningful."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter15_superadmin_reset.py", "/app/backend/tests/iter15_migration_snapshot.py", "/app/backend/tests/iter15_ui_fixture.py"],
+  "success_rate": {"backend": "100% (12/12 new + 67/67 regression)", "frontend": "100% functional"},
+  "test_credentials": "Used /app/memory/test_credentials.md (owner SUPERADMIN, demo admin). Passwords and temporary passwords are not exposed.",
+  "seed_data_creation": "TEMP-rst-<suf> SRL (pytest) and TEMP-ui15 SRL (UI) were created and then deleted. Verified 0 TEMP tenants/users/branches/counters left and 0 '-detached' users. Only 3 tenants remain: the 2 protected tenants and SUPERADMIN.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_iter15_superadmin_reset.py tests/test_multitenant.py tests/test_tenancy.py tests/test_iter12_mt_p0.py tests/test_iter13_mt_final.py tests/test_iter14_tenant_lifecycle.py -q -n 0. iter15_migration_snapshot.py prints the migration state and hashes for the protected tenants (before: d37b14778c1b894c / 72374cc29cfa591f).",
+  "rca of the issue": "No functional bugs. Only minor robustness and UX issues are reported."
+}
