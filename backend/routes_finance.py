@@ -57,7 +57,7 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
            "due_date": (issue + timedelta(days=s.get("payment_terms_days", 15))).isoformat(),
            "currency": "RON", "work_order_id": wid, "work_order_number": w["number"], "client_id": w["client_id"],
            "vehicle": f"{v['make']} {v['model']} · {v['plate']} · VIN {v['vin']}", "mileage": w.get("mileage_in"),
-           "seller": {k: s.get(k, "") for k in ("name", "cui", "reg_com", "address", "city", "county_code", "iban", "bank", "phone", "email", "capital")},
+           "seller": {k: s.get(k, "") for k in ("name", "cui", "reg_com", "address", "city", "county_code", "iban", "bank", "phone", "email", "capital", "subscription_plan", "custom_logo_data_url")},
            "buyer": {"name": c["name"], "cui": c.get("cui", ""), "cnp": c.get("cnp", ""), "reg_com": c.get("reg_com", ""),
                      "address": c.get("address", ""), "city": c.get("city", ""), "county_code": c.get("county", ""),
                      "phone": c.get("phone", ""), "email": c.get("email", "")},
@@ -98,6 +98,11 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
 @router.get("/invoices/{iid}")
 async def get_invoice(iid: str, user=Depends(require("invoices"))):
     inv = ser(await get_or_404("invoices", iid))
+    settings = await get_settings()
+    inv.setdefault("seller", {})
+    inv["seller"].setdefault("subscription_plan", settings.get("subscription_plan", "BASIC"))
+    if settings.get("subscription_plan") != "BASIC":
+        inv["seller"].setdefault("custom_logo_data_url", settings.get("custom_logo_data_url", ""))
     inv.get("efactura", {}).pop("xml", None)
     inv["efactura"]["has_receipt"] = bool(await db.efactura_files.find_one({"invoice_id": iid}, {"_id": 1}))
     inv["payments"] = [ser(p) for p in await db.payments.find({"invoice_id": iid}).sort("date", 1).to_list(200)]

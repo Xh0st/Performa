@@ -65,10 +65,11 @@ async def certificate_pdf(iid: str, user=Depends(require("warranties"))):
     if not certificate:
         raise HTTPException(404, "Certificatul de garanție nu există")
     settings = await get_settings()
+    custom_logo = settings.get("custom_logo_data_url", "") if settings.get("subscription_plan") != "BASIC" else ""
     content = build_certificate(
         certificate,
         include_footer=settings.get("subscription_plan") == "BASIC",
-        custom_logo_data_url=settings.get("custom_logo_data_url", ""),
+        custom_logo_data_url=custom_logo,
     )
     return Response(content, media_type="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="{certificate["number"]}.pdf"',

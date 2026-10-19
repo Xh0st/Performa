@@ -131,8 +131,8 @@ function Quote({ s, w, v }) {
   );
 }
 
-function Invoice({ inv }) {
-  const s = inv.seller;
+function Invoice({ inv, settings }) {
+  const s = { ...inv.seller, ...settings };
   const b = inv.buyer;
   return (
     <>
@@ -219,7 +219,7 @@ export default function PrintDoc() {
         {error && <div>{error}</div>}
         {s && data && kind === "reception" && <Reception s={s} w={data} />}
         {s && data && kind === "quote" && <Quote s={s} w={data} v={sp.get("v")} />}
-        {s && data && kind === "invoice" && <Invoice inv={data} />}
+        {s && data && kind === "invoice" && <Invoice inv={data} settings={s} />}
         {s && data && kind === "receipt" && <ReceiptDoc s={s} p={data} />}
         {s && data && kind === "nir" && <NirDoc s={s} n={data} />}
         {s && data && kind === "register" && <RegisterDoc s={s} r={data} />}

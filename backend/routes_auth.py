@@ -260,6 +260,12 @@ async def write_settings(body: dict, user=Depends(require("settings"))):
             raise HTTPException(403, "Subdomeniul dedicat este disponibil doar în planurile FULL sau ENTERPRISE")
         if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", custom_subdomain):
             raise HTTPException(400, "Subdomeniu invalid")
+        duplicate = await raw_db.settings.find_one({
+            "custom_subdomain": custom_subdomain,
+            "tenant_id": {"$ne": user["tenant_id"]},
+        })
+        if duplicate:
+            raise HTTPException(400, "Subdomeniul este deja folosit de alt tenant")
         body["custom_subdomain"] = custom_subdomain
     await db.settings.update_one({"kind": "company"}, {"$set": body, "$setOnInsert": {"kind": "company"}}, upsert=True)
     await audit(user, "update", "settings", "company")

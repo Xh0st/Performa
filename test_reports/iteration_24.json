@@ -1,0 +1,50 @@
+{
+  "summary": "Extended P1 regression for document branding and the BASIC/FULL/ENTERPRISE plan matrix. I created 3 TEMP25 tenants through the superadmin API and copied demo documents into each one (fiscal invoice, proforma, credit note, NIR, work order with quote, warranty certificate, e-Factura inbox XML). New suite test_iter25_plan_matrix_branding.py: 23/26 passed. The 3 failures are real bugs. A 4th real bug is in the iter16 regression run, and I found 2 more bugs in the Settings and invoice print UI. PASSED: settings.plan_limits is 1/500MB/500, 5/10GB/5000 and 999/50GB/unlimited, and tenant max_branches_allowed matches. Branch quota: BASIC is blocked at the 2nd branch, FULL at the 6th, and ENTERPRISE accepted 7 branches. BASIC gets 403 for appointments, products, e-Factura config/inbox, RAR, logo PUT/DELETE and custom_subdomain; FULL and ENTERPRISE get 200, and permissions include planning and stock. BASIC allows at most 3 active users through /api/users; FULL and ENTERPRISE have no such limit. Monthly work-order quota, with a controlled DB seed: BASIC 500th order OK and 501st 403; FULL 5000th OK and 5001st 403; ENTERPRISE accepts orders after 5001. PDFs, checked with PyMuPDF text and embedded-image dimensions: BASIC Anexa 5, warranty and the e-Factura builder have the Performa text, the Performa logo image (458x201) and the exact footer 'Generat cu Performa - performa.net'. The BASIC e-Factura inbox PDF endpoint correctly returns 403. FULL and ENTERPRISE Anexa 5, warranty and e-Factura inbox PDFs embed the TEMP custom logo (64x32), have no footer and no Performa logo. ENTERPRISE without a logo falls back to the Performa logo, without footer. PrintDoc for quote and NIR shows the correct brand for each plan. Settings at desktop 1920 and mobile 390: plan label and limits are correct; BASIC logo and subdomain inputs are disabled; FULL and ENTERPRISE upload shows the preview and it persists after reload; no horizontal overflow. FAILED: (1) PrintDoc for fiscal invoice, proforma and credit note ignores plan and custom logo in the header. (2) Removing the logo in Settings leaves the stale preview until reload. (3) PDFs for a tenant downgraded to BASIC with a leftover custom logo use that custom logo and drop the Performa header. (4) The monthly work-order quota is counted per branch, not per tenant. (5) The superadmin tenant-admin endpoint bypasses the BASIC 3-user limit. (6) Duplicate custom_subdomain is accepted across tenants. Storage limits (500MB/10GB/50GB) are only displayed and never enforced. All TEMP data was cleaned up: 0 TEMP tenants, users, branches or docs remain, and only the 3 original tenants exist.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "core.enforce_work_order_quota (POST /api/work-orders, appointment→create-work-order)", "issue": "The count uses the tenant-scoped db.work_orders, which also filters on branch_id, so the monthly limit applies to each branch instead of the whole tenant. A FULL tenant with 5 branches can create 25,000 orders a month. Reproduced: with 501 work orders in the BASIC tenant, the quota check for a different branch_id did not raise. Fix: count with raw_db.work_orders using tenant_id and the created_at month only.", "priority": "HIGH"},
+      {"endpoint": "GET /api/reports/final-inspections/pdf, /api/warranties/invoices/{id}/certificate, /api/efactura/inbox/{id}/pdf", "issue": "custom_logo_data_url is passed without checking the plan. A FULL tenant downgraded to BASIC with a leftover logo gets the custom logo, and draw_brand drops the 'Performa' text. Only the footer is correct. Fix: pass custom_logo_data_url only when plan != BASIC (or check this inside draw_brand).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/platform/tenants/{id}/admins", "issue": "Does not enforce the BASIC limit of 3 active users. It created a 4th active user, so the BASIC tenant had 4 active users."},
+      {"endpoint": "PUT /api/settings (custom_subdomain)", "issue": "No uniqueness check across tenants: a second tenant can save the same subdomain (iter16 test_subdomain_uniqueness_across_tenants fails with 200)."},
+      {"endpoint": "Plan storage_mb", "issue": "500MB/10GB/50GB is returned in plan_limits but never enforced. No upload or Base64 path (logos, reception photos, signatures, e-Factura files) checks tenant storage."},
+      {"endpoint": "POST /api/auth/login, /api/auth/change-initial-password", "issue": "user_out() calls permissions_for(role) without a plan, so the response lists BASIC permissions (no planning or stock) for FULL users. The frontend calls /auth/me again, so the impact is API-only."},
+      {"endpoint": "PUT /api/platform/tenants/{id} (downgrade)", "issue": "Downgrading FULL to BASIC sets max_branches_allowed=1 but leaves all 5 branches active. Extra branches and users above 3 stay usable."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PrintDoc Invoice (factură, proformă, storno)", "issue": "Header uses s=inv.seller, a snapshot without subscription_plan or custom_logo_data_url. BASIC: the 'Performa' brand name is missing and the logo alt is the company name. FULL/ENTERPRISE: the Performa logo is shown instead of the uploaded custom logo (verified: FULL proforma src=/performa-logo-dark.png while the logo is set). The footer is correct because it uses settings. Fix: pass settings to Header for the plan and logo (e.g. Header s={{...s, ...inv.seller}}), or snapshot the plan and logo on the invoice.", "selector": "[data-testid='print-document-brand-logo'], [data-testid='print-document-brand-name']", "priority": "HIGH"},
+      {"component": "Settings logo remove", "issue": "After 'Elimină logo' the toast says the logo was removed, but settings-custom-logo-preview and the delete button stay visible until reload. Cause: setF({...current, ...data}) merges, and the response no longer has custom_logo_data_url, so the old value remains. Fix: set custom_logo_data_url to undefined, or replace state with data.", "selector": "[data-testid='settings-custom-logo-delete-button']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings > Plan & branding", "issues": ["FULL limits read '5 locație'; it should be '5 locații' (Romanian plural).", "The file input value is not reset after upload or delete, so re-selecting the same file does not fire onChange.", "Native 'Choose File / No file chosen' text is shown in English when the UI language is RO."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter25_plan_matrix_branding.py", "/app/backend/tests/iter25_fixture.py", "/app/test_reports/pytest/pytest_iter25.xml"],
+  "action_items": [
+    "PrintDoc Invoice header: use the tenant settings plan and custom logo, not the inv.seller snapshot, for factură, proformă and storno.",
+    "enforce_work_order_quota: count per tenant across all branches with raw_db and tenant_id.",
+    "PDF endpoints (Anexa5, warranty, e-Factura): ignore custom_logo_data_url when plan is BASIC.",
+    "Settings deleteLogo: clear custom_logo_data_url in local state.",
+    "Enforce the BASIC 3-user cap in POST /platform/tenants/{id}/admins.",
+    "Enforce custom_subdomain uniqueness across tenants (unique index or check).",
+    "Decide on storage_mb enforcement (currently display-only).",
+    "Optional: user_out permissions should include the tenant plan; fix the '5 locație' plural.",
+    "Update stale iter16 tests: the '1.000' quota message is now 500, the TenantUpdateIn payload is outdated (422), and the demo tenant is now FULL so the warranty, BASIC and e-Factura 403 assertions are obsolete."
+  ],
+  "critical_code_review_comments": [
+    "draw_brand drops the 'Performa' text whenever custom_logo_data_url is truthy, even if the Base64 is invalid and it falls back to the Performa logo. This gives an inconsistent header.",
+    "The PDF builders decide the footer from the plan but the logo from the field's presence. The decision should be centralised in one helper, e.g. brand_options(settings).",
+    "Invoice seller snapshot: the logo and plan at issue time are not stored, so reprints change with the current plan. Decide whether that is intended."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter25_plan_matrix_branding.py", "/app/backend/tests/iter25_fixture.py"],
+  "success_rate": {"backend": "88% (23/26 in iter25 suite; 3 failures are real bugs)", "frontend": "75% (Settings OK; invoice-family PrintDoc branding and logo delete state fail)"},
+  "seed_data_creation": "3 TEMP25 tenants (BASIC/FULL/ENTERPRISE) with copied docs, seeded work orders for the quota tests, TEMP25 users and branches. All removed: `python iter25_fixture.py teardown` plus the iter16/iter18 cleanup fixtures; verified 0 leftovers.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run `cd /app/backend/tests && python iter25_fixture.py setup`, then pytest test_iter25_plan_matrix_branding.py (not idempotent: the quota tests seed work orders, so run setup fresh each time), then `python iter25_fixture.py teardown`. The fixture writes tokens to /tmp/iter25.json; UI tests set localStorage 'erp_token' from it. PDF logo check: PyMuPDF get_images dims are (458,201) for Performa and (64,32) for the test logo. The demo/SUPERADMIN tenant is FULL; 'PERFORMA DEMO' is BASIC.",
+  "test_credentials": "andrei.melek@gmail.com (SUPERADMIN, FULL tenant) from /app/memory/test_credentials.md. TEMP tenant admins were created and deleted."
+}

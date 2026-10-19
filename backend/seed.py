@@ -177,7 +177,7 @@ async def seed_demo():
             inv = {"type": "fiscal", "series": "SRV", "number": f"{iseq:06d}", "issue_date": issue.isoformat(),
                    "due_date": (issue + timedelta(days=15)).isoformat(), "currency": "RON", "work_order_id": wid, "work_order_number": number,
                    "client_id": cid, "vehicle": f"{vh['make']} {vh['model']} · {vh['plate']} · VIN {vh['vin']}", "mileage": km,
-                   "seller": {k: s.get(k, "") for k in ("name", "cui", "reg_com", "address", "city", "county_code", "iban", "bank", "phone", "email", "capital")},
+                   "seller": {k: s.get(k, "") for k in ("name", "cui", "reg_com", "address", "city", "county_code", "iban", "bank", "phone", "email", "capital", "subscription_plan", "custom_logo_data_url")},
                    "buyer": {"name": cl["name"], "cui": cl["cui"], "cnp": cl["cnp"], "reg_com": cl["reg_com"], "address": cl["address"],
                              "city": cl["city"], "county_code": cl["county"], "phone": cl["phone"], "email": cl["email"]},
                    "lines": lines, "totals": totals, "paid_amount": 0.0, "status": "unpaid",

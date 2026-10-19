@@ -60,7 +60,7 @@ export default function SettingsPage() {
   const deleteLogo = async () => {
     try {
       const { data } = await api.delete("/settings/logo");
-      setF((current) => ({ ...current, ...data, elevators_text: (data.elevators || []).join(", ") }));
+      setF((current) => ({ ...current, ...data, custom_logo_data_url: undefined, custom_logo_mime: undefined, elevators_text: (data.elevators || []).join(", ") }));
       toast.success(tr("Logo personalizat eliminat", "Custom logo removed"));
     } catch (error) { toast.error(errMsg(error)); }
   };

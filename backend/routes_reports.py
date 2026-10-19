@@ -101,13 +101,14 @@ async def export_final_inspections(kind: str, start: str, end: str, inspector: s
     branch = (await get_config())["branch_name"]
     if kind == "pdf":
         settings = await get_settings()
+        custom_logo = settings.get("custom_logo_data_url", "") if settings.get("subscription_plan") != "BASIC" else ""
         content = build_pdf(
             rows,
             start,
             end,
             branch,
             include_footer=settings.get("subscription_plan") == "BASIC",
-            custom_logo_data_url=settings.get("custom_logo_data_url", ""),
+            custom_logo_data_url=custom_logo,
         )
         media_type = "application/pdf"
     if kind == "csv":

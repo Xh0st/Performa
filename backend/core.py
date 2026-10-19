@@ -261,7 +261,10 @@ async def enforce_work_order_quota() -> None:
     if limit is None:
         return
     month = now().strftime("%Y-%m")
-    count = await db.work_orders.count_documents({"created_at": {"$regex": f"^{month}"}})
+    count = await raw_db.work_orders.count_documents({
+        "tenant_id": scope["tenant_id"],
+        "created_at": {"$regex": f"^{month}"},
+    })
     if count >= limit:
         raise HTTPException(403, f"Planul permite maximum {limit} comenzi de lucru pe lună")
 

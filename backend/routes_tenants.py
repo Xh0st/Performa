@@ -174,6 +174,13 @@ async def update_tenant(tenant_id: str, body: TenantUpdateIn, user=Depends(requi
         "status": body.status,
     }})
     await raw_db.users.update_one({"_id": admin["_id"]}, {"$set": {"email": email}})
+    if body.subscription_plan == "BASIC":
+        branches = await raw_db.branches.find({"tenant_id": tenant_id, "status": "ACTIVE"}).sort("created_at", 1).to_list(1000)
+        for branch in branches[1:]:
+            await raw_db.branches.update_one({"_id": branch["_id"]}, {"$set": {"status": "INACTIVE"}})
+        users = await raw_db.users.find({"tenant_id": tenant_id, "active": True}).sort("created_at", 1).to_list(1000)
+        for account in users[3:]:
+            await raw_db.users.update_one({"_id": account["_id"]}, {"$set": {"active": False}})
     await audit(user, "update_tenant", "tenant", tenant_id, body.company_name.strip())
     return await tenant_out(await raw_db.tenants.find_one({"_id": tenant_id}))
 
@@ -259,11 +266,16 @@ async def validate_branch_assignment(tenant_id: str, branch_ids: list[str]) -> N
 
 @router.post("/platform/tenants/{tenant_id}/admins")
 async def create_tenant_admin(tenant_id: str, body: TenantAdminIn, user=Depends(require_superadmin())):
-    if not await raw_db.tenants.find_one({"_id": tenant_id, "status": "ACTIVE"}):
+    tenant = await raw_db.tenants.find_one({"_id": tenant_id, "status": "ACTIVE"})
+    if not tenant:
         raise HTTPException(404, "Tenant inexistent")
     await validate_branch_assignment(tenant_id, body.branch_ids)
     if await raw_db.users.find_one({"email": body.email.strip().lower()}):
         raise HTTPException(400, "Email deja existent")
+    if tenant.get("subscription_plan") == "BASIC":
+        active_users = await raw_db.users.count_documents({"tenant_id": tenant_id, "active": True})
+        if active_users >= 3:
+            raise HTTPException(403, "Planul BASIC permite maximum 3 utilizatori activi")
     document = {
         "email": body.email.strip().lower(), "name": body.name.strip(), "role": "admin",
         "tenant_role": "TENANT_ADMIN", "active": True, "password_hash": hash_password(body.password),
