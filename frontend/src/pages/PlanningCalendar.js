@@ -269,7 +269,7 @@ export default function PlanningCalendar() {
           </div>
           {current && <div className="mt-3 flex flex-wrap gap-2"><NativeSelect data-testid="planning-status-select" value={current.status} onChange={(event) => updateStatus(event.target.value)}>{Object.entries(STATUS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect>{current.work_order_id && <Button variant="outline" data-testid="planning-open-work-order-button" onClick={() => window.open(`/work-orders/${current.work_order_id}`, "_blank")}><CalendarDays className="mr-1 h-4 w-4" />{tr("Comandă", "Work order")}</Button>}</div>}
           <DialogFooter className="gap-2 sm:space-x-0">
-            {current && !current.work_order_id && <Button variant="destructive" data-testid="planning-delete-button" disabled={busy} onClick={() => setDeleteDialog(true)}><Trash2 className="h-4 w-4" />{tr("Șterge", "Delete")}</Button>}
+            {current && <Button variant="destructive" data-testid="planning-delete-button" disabled={busy} onClick={() => setDeleteDialog(true)}><Trash2 className="h-4 w-4" />{tr("Șterge", "Delete")}</Button>}
             <Button data-testid="planning-save-button" disabled={busy || !form.client_id || !form.vehicle_id || !form.title || !form.starts_at || !form.ends_at} onClick={save}>{busy ? <RotateCcw className="h-4 w-4 animate-spin" /> : tr("Salvează", "Save")}</Button>
           </DialogFooter>
         </DialogContent>
@@ -278,7 +278,7 @@ export default function PlanningCalendar() {
         <AlertDialogContent data-testid="planning-delete-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle>{tr("Șterge programarea?", "Delete appointment?")}</AlertDialogTitle>
-            <AlertDialogDescription>{tr("Programarea și notificările asociate vor fi eliminate definitiv.", "The appointment and its associated notifications will be permanently removed.")}</AlertDialogDescription>
+            <AlertDialogDescription>{current?.work_order_id ? tr("Programarea și notificările asociate vor fi eliminate. Comanda de lucru deja creată rămâne intactă.", "The appointment and notifications will be removed. The existing work order remains intact.") : tr("Programarea și notificările asociate vor fi eliminate definitiv.", "The appointment and its associated notifications will be permanently removed.")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:space-x-0">
             <AlertDialogCancel data-testid="planning-delete-cancel-button">{tr("Renunță", "Cancel")}</AlertDialogCancel>
