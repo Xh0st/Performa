@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardPlus, Wrench, Users, Car, HardHat, Boxes, FileText, Wallet, Sparkles, Settings, ShieldCheck,
   Building2, Menu, Sun, Moon, LogOut, Plus, FileCode2, ClipboardCheck, CalendarDays, BookOpenCheck, ShieldPlus, ListChecks,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
@@ -41,13 +42,14 @@ const NAV = [
   ]},
 ];
 
-function SideNav({ onNav, collapsed = false }) {
+function SideNav({ onNav, collapsed = false, onToggle }) {
   const { can, user } = useAuth();
   const { tr, theme } = useLang();
   return (
     <TooltipProvider delayDuration={180}>
       <nav className={`flex h-full flex-col overflow-y-auto py-5 ${collapsed ? "gap-3 px-2" : "gap-5 px-3"}`}>
-      <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2 px-2"}`}>
+      <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "justify-between gap-2 px-2"}`}>
+        <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
         <img
           src="/performa-logo-dark.png"
           alt="Performa Auto"
@@ -63,6 +65,18 @@ function SideNav({ onNav, collapsed = false }) {
           </div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">ERP · RO</div>
         </div>}
+        </div>
+        {onToggle && <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          data-testid="sidebar-collapse-toggle"
+          aria-label={collapsed ? tr("Extinde meniul", "Expand menu") : tr("Restrânge meniul", "Collapse menu")}
+          title={collapsed ? tr("Extinde meniul", "Expand menu") : tr("Restrânge meniul", "Collapse menu")}
+          onClick={onToggle}
+        >
+          {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+        </Button>}
       </div>
       {NAV.map((g) => {
         const items = g.items.filter((i) => can(i[1]) && (!i[6] || user?.platform_role === "SUPERADMIN"));
@@ -74,9 +88,9 @@ function SideNav({ onNav, collapsed = false }) {
               const link = <NavLink key={to} to={to} end={to === "/"} onClick={onNav} data-testid={`sidebar-${tid}-link`}
                 aria-label={tr(ro, en)}
                 className={({ isActive }) =>
-                  `mb-0.5 flex rounded text-sm font-medium transition-colors duration-150 ${collapsed ? "h-10 w-10 items-center justify-center" : "items-center gap-3 px-2 py-2"} ${
+                  `mb-0.5 flex rounded text-sm font-medium transition-colors duration-150 ${collapsed ? "h-11 w-11 items-center justify-center" : "items-center gap-3 px-2 py-2"} ${
                     isActive ? "bg-primary/10 text-primary shadow-[inset_2px_0_0_hsl(var(--primary))]" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-                <Icon className="h-4 w-4 shrink-0" /> {!collapsed && tr(ro, en)}
+                <Icon className="h-5 w-5 shrink-0" /> {!collapsed && tr(ro, en)}
               </NavLink>;
               if (!collapsed) return link;
               return <Tooltip key={to}><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right" data-testid={`sidebar-${tid}-tooltip`}>{tr(ro, en)}</TooltipContent></Tooltip>;
@@ -93,11 +107,17 @@ export default function Layout() {
   const { user, logout, switchBranch, can } = useAuth();
   const { lang, setLang, theme, setTheme, tr } = useLang();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") !== "false");
   const nav = useNavigate();
+  const toggleSidebar = () => setCollapsed((current) => {
+    const next = !current;
+    localStorage.setItem("sidebar-collapsed", String(next));
+    return next;
+  });
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-16 shrink-0 border-r bg-card lg:block">
-        <SideNav collapsed />
+      <aside className={`sticky top-0 hidden h-screen shrink-0 border-r bg-card transition-[width] duration-200 lg:block ${collapsed ? "w-16" : "w-60"}`}>
+        <SideNav collapsed={collapsed} onToggle={toggleSidebar} />
       </aside>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-64 p-0">
