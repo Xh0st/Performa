@@ -1,0 +1,15 @@
+{
+  "summary": "Frontend-only retest of the sidebar scrollbar fix in HeadlessChrome 145 at 1920x700, logged in as admin andrei.melek@gmail.com. All checks pass. CSS.supports('selector(::-webkit-scrollbar)') is true. The scrollbar-width/scrollbar-color rules now sit only inside @supports not selector(::-webkit-scrollbar), so they do not apply in Chromium: computed scrollbarWidth and scrollbarColor on nav.sidebar-scroll are both 'auto', in both sidebar states. ::-webkit-scrollbar is 4px x 4px. ::-webkit-scrollbar-button is display:none, 0x0, and a :single-button rule is present. Collapsed sidebar (64px): scrollHeight 1022 > clientHeight 700, wheel scrolled to scrollTop 322, scrollWidth == clientWidth (63). Expanded sidebar (240px): scrollHeight 1069 > clientHeight 700, wheel scrolled to scrollTop 369, scrollWidth == clientWidth (239). The sidebar-collapse-toggle switches 64 <-> 240px. The collapsed tooltip shows 'OPERAȚIONAL / Recepție'. The only console error is the expected 401 from /api/auth/me before login; there are no page errors. The HIGH issue from iteration_18 is resolved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": ["Optional cleanup: remove the empty '.sidebar-scroll { }' rule in index.css (line 74)."],
+  "critical_code_review_comments": ["The CSS fix is correct: standard scrollbar properties are fenced by @supports not selector(::-webkit-scrollbar), so Chromium 121+ uses the WebKit rules (4px, no arrow buttons) and Firefox gets the thin/transparent fallback.", "The empty .sidebar-scroll {} rule does nothing."],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "test_credentials": "andrei.melek@gmail.com / Admin2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Sidebar scrollbar bug is verified fixed via the CSS source and computed styles. Headless Chromium uses overlay scrollbars, so arrow-button rendering on Windows cannot be checked with a screenshot. The sidebar collapsed state is persisted in localStorage key 'sidebar-collapsed' (default collapsed)."
+}

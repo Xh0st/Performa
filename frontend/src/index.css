@@ -71,8 +71,6 @@
 .fade-up {
     animation: fadeUp 0.35s ease-out both;
 }
-.sidebar-scroll {
-}
 @supports not selector(::-webkit-scrollbar) {
     .sidebar-scroll {
         scrollbar-width: thin;

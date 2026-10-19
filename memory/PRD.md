@@ -176,6 +176,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   bara laterală. Lățimea sidebarului se schimbă fluid între 64px și 240px.
 - Logo-ul și textul Performa Auto trimit la Dashboard; subtitlul `ERP · RO` a fost eliminat.
 - Meniul mobil are titlu accesibil pentru dialog, iar categoria tooltip-urilor are contrast ierarhic.
+- Scrollbar-ul sidebarului are 4px, fără butoane/săgeți native în Chromium/WebKit; Firefox primește
+  fallback thin și transparent. Retestarea a confirmat derularea în ambele stări fără overflow.
 
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
