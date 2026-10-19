@@ -5,7 +5,7 @@ import { useLang } from "@/lib/prefs";
 import { money, date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PageHeader, Panel, Loading, Badge, PAY_STATUS, EF_STATUS, Empty } from "@/components/common";
+import { PageHeader, Panel, Loading, Badge, PAY_STATUS, EF_STATUS, Empty, NativeSelect } from "@/components/common";
 import { PaginationControls, usePagination } from "@/components/Pagination";
 
 export default function Invoices() {
@@ -42,9 +42,12 @@ export default function Invoices() {
             <Button key={v} size="sm" variant={type === v ? "default" : "outline"} data-testid={`invoices-type-${v}`} onClick={() => setType(v)}>{l}</Button>
           ))}
           <span className="mx-2 h-5 w-px bg-border" />
-          {[["", tr("Toate", "All")], ["unpaid", tr("Neîncasate", "Unpaid")], ["paid", tr("Încasate", "Paid")]].map(([v, l]) => (
-            <Button key={v} size="sm" variant={status === v ? "secondary" : "ghost"} data-testid={`invoices-status-${v || "all"}`} onClick={() => setStatus(v)}>{l}</Button>
-          ))}
+          <NativeSelect data-testid="invoices-status-select" className="h-9 w-36" value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="">{tr("Toate", "All")}</option>
+            <option value="partial">{tr("Parțial", "Partial")}</option>
+            <option value="unpaid">{tr("Neîncasate", "Unpaid")}</option>
+            <option value="paid">{tr("Încasate", "Paid")}</option>
+          </NativeSelect>
           <Input
             className="h-9 min-w-52 flex-1"
             data-testid="invoices-search-input"
