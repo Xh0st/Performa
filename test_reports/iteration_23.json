@@ -1,0 +1,25 @@
+{
+  "summary": "Retest of the planning appointment modal changes. Backend: new test_iter24_appt_advisor.py passes 3/3, with 1 skipped (a cross-user PUT check where the receptie demo login failed or was out of tenant). The iter23 and iter20 regression tests also pass, for 11 passed in total. POST and PUT ignore an advisor, status or work_order_id sent by the client. The advisor is always the logged-in user (Administrator), on create and on edit (an old advisor value is overwritten). The mechanic_ids value from the single dropdown persists. The work order created from the appointment inherits the advisor and mechanic_ids. UI at desktop 1920 and mobile 390: there is no planning-status-select or planning-advisor-input in the new or edit dialog. planning-mechanic-select is a real SELECT listing the 6 mechanics, and selection works. For an appointment without a work order, planning-create-work-order-button is at the left of the footer, on the same row (same y) as delete and save on the right. Clicking it shows a toast, and the button switches immediately to planning-open-work-order-button with the text 'Comandă'. After a page reload it is still 'Comandă', and clicking it opens /work-orders/{id} in a new tab. Mobile: delete and save are 40x40 icon-only buttons with aria-label and title set to Șterge and Salvează. The footer's scrollWidth equals its clientWidth (308), and document scrollWidth is 390, so there is no overflow. Deleting the converted appointment on mobile shows the text saying the work order stays intact; the event disappears and the work order still exists in the DB. All TEMP data was cleaned up, including leftover TEMP UI21 data from an earlier run that was blocking fixture setup.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Planning dialog footer", "issues": ["Creare comandă and Comandă (outline buttons) are about 34-36px tall, while Delete and Save are 40px, so the heights differ slightly on the same row. Optional: add h-10 to the outline buttons.", "In the New appointment dialog only Save is shown, and it sits at the LEFT of the footer because the flex row has no justify-end. In edit mode Save is on the right, so the position is inconsistent."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter24_appt_advisor.py", "/app/backend/tests/test_iter23_appt_create_wo.py", "/app/backend/tests/test_iter20_appointment_delete.py", "/app/backend/tests/iter21_appt_ui_fixture.py", "/app/test_reports/pytest/pytest_iter24.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "createWorkOrder does not set busy, so a double-click sends 2 requests. The backend claim makes this idempotent, so it is safe, but the button should be disabled while the request runs.",
+    "The mechanic dropdown keeps only mechanic_ids[0]. Editing an older appointment that has several mechanics silently drops the others on save.",
+    "Every PUT, including a drag-and-drop move, overwrites advisor with the user who made the change. This matches the requirement, but the original advisor is lost. Consider keeping created_by, which already exists, as the original owner.",
+    "window.open(..., '_blank') is called without 'noopener'. The risk is minor because the link is same-origin."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter24_appt_advisor.py"],
+  "success_rate": {"backend": "100% (11/11 passed, 1 skipped)", "frontend": "100%"},
+  "seed_data_creation": "iter21_appt_ui_fixture.py setup plus one extra TEMP UI21 Mobile appointment; all torn down afterwards. 0 TEMP clients or vehicles remain.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The server and browser clock is October 2026, and the fixture creates appointments for tomorrow. If iter21 fixture setup fails with KeyError 'id', leftover TEMP UI21 client/vehicle data (VIN uniqueness) is the cause; delete it first. Events are selected with .rbc-event has_text=<title> and click(force=True)."
+}

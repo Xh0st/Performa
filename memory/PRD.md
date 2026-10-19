@@ -181,6 +181,18 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Stilul vizual al toggle-ului de sidebar a fost păstrat în varianta ghost anterioară, la cererea
   utilizatorului; poziționarea și comportamentul de extindere/restrângere rămân neschimbate.
 
+## Programări: comandă, ștergere și modal responsiv (2026-10-19)
+- Programările pot fi șterse și după crearea unei comenzi de lucru; se elimină doar programarea și
+  notificările sale, iar comanda rămâne intactă.
+- Formularul de programare nu mai expune statusul sau Consilierul service; consilierul este setat
+  automat din utilizatorul autentificat, iar mecanicul se selectează din dropdown.
+- Footer-ul modalului afișează Creare comandă în stânga, apoi Comandă după conversie, alături de
+  Șterge și Salvează. Pe mobil, Șterge/Salvează sunt icon-only, accesibile și aliniate la 40px.
+- Dialogurile și calendarul folosesc scrollbar-ul discret de 4px; dialogurile rămân încadrate în
+  viewport cu scroll intern.
+- Verificare: testing agent a trecut 11/11 teste backend și 100% UI pentru conversie, ștergere,
+  păstrarea comenzii, dropdown mecanic și acțiuni mobile; build frontend reușit.
+
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
   `frontend/public/performa-logo.png`.

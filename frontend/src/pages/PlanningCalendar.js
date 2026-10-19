@@ -150,6 +150,7 @@ export default function PlanningCalendar() {
   };
   const createWorkOrder = async () => {
     if (!current) return;
+    setBusy(true);
     try {
       const response = await api.post(`/appointments/${current.id}/status`, { status: "in_lucru" });
       setCurrent(response.data);
@@ -158,6 +159,8 @@ export default function PlanningCalendar() {
       reloadCapacity();
     } catch (error) {
       toast.error(errMsg(error));
+    } finally {
+      setBusy(false);
     }
   };
   const remove = async () => {
@@ -256,9 +259,9 @@ export default function PlanningCalendar() {
             <Field label={tr("Observații", "Notes")} className="sm:col-span-2"><Textarea data-testid="planning-notes-input" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
           </div>
           <DialogFooter className="gap-2 sm:space-x-0">
-            <div className="flex w-full flex-row flex-wrap items-center gap-2">
-              {current && !current.work_order_id && <Button variant="outline" className="mr-auto" data-testid="planning-create-work-order-button" disabled={busy} onClick={createWorkOrder}><CalendarDays className="h-4 w-4" />{tr("Creare comandă", "Create work order")}</Button>}
-              {current?.work_order_id && <Button variant="outline" className="mr-auto" data-testid="planning-open-work-order-button" onClick={() => window.open(`/work-orders/${current.work_order_id}`, "_blank")}><CalendarDays className="h-4 w-4" />{tr("Comandă", "Work order")}</Button>}
+            <div className="flex w-full flex-row flex-wrap items-center justify-end gap-2">
+              {current && !current.work_order_id && <Button variant="outline" className="mr-auto h-10" data-testid="planning-create-work-order-button" disabled={busy} onClick={createWorkOrder}><CalendarDays className="h-4 w-4" />{tr("Creare comandă", "Create work order")}</Button>}
+              {current?.work_order_id && <Button variant="outline" className="mr-auto h-10" data-testid="planning-open-work-order-button" onClick={() => window.open(`/work-orders/${current.work_order_id}`, "_blank", "noopener,noreferrer")}><CalendarDays className="h-4 w-4" />{tr("Comandă", "Work order")}</Button>}
               {current && <Button variant="destructive" className="h-10 w-10 p-0 sm:w-auto sm:px-3" data-testid="planning-delete-button" aria-label={tr("Șterge", "Delete")} title={tr("Șterge", "Delete")} disabled={busy} onClick={() => setDeleteDialog(true)}><Trash2 className="h-4 w-4" /><span className="hidden sm:inline">{tr("Șterge", "Delete")}</span></Button>}
               <Button className="h-10 w-10 p-0 sm:w-auto sm:px-3" data-testid="planning-save-button" aria-label={tr("Salvează", "Save")} title={tr("Salvează", "Save")} disabled={busy || !form.client_id || !form.vehicle_id || !form.title || !form.starts_at || !form.ends_at} onClick={save}>{busy ? <RotateCcw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}<span className="hidden sm:inline">{tr("Salvează", "Save")}</span></Button>
             </div>
