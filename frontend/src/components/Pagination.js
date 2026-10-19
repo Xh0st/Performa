@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 20;
 
 export function usePagination(items, resetKey = "") {
   const [page, setPage] = useState(1);
