@@ -14,6 +14,8 @@ export default function Invoices() {
   const [type, setType] = useState("fiscal");
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const { data } = useApi(`/invoices?type=${type}&status=${status}`, [type, status]);
   const rows = (data || []).filter((invoice) => {
     const value = [
@@ -25,10 +27,12 @@ export default function Invoices() {
       invoice.vehicle_vin,
       invoice.work_order_number,
     ].join(" ").toLowerCase();
-    return value.includes(q.toLowerCase());
+    return value.includes(q.toLowerCase())
+      && (!dateFrom || invoice.issue_date >= dateFrom)
+      && (!dateTo || invoice.issue_date <= dateTo);
   });
   const total = rows.reduce((s, i) => s + i.totals.gross, 0);
-  const pagination = usePagination(rows, `${type}:${status}:${q}:${data?.length || 0}`);
+  const pagination = usePagination(rows, `${type}:${status}:${q}:${dateFrom}:${dateTo}:${data?.length || 0}`);
   return (
     <div data-testid="invoices-page">
       <PageHeader eyebrow="ANAF · e-Factura · SPV" title={tr("Facturi", "Invoices")} />
@@ -38,7 +42,7 @@ export default function Invoices() {
             <Button key={v} size="sm" variant={type === v ? "default" : "outline"} data-testid={`invoices-type-${v}`} onClick={() => setType(v)}>{l}</Button>
           ))}
           <span className="mx-2 h-5 w-px bg-border" />
-          {[["", tr("Toate", "All")], ["unpaid", tr("Neîncasate", "Unpaid")], ["partial", tr("Parțial", "Partial")], ["paid", tr("Încasate", "Paid")]].map(([v, l]) => (
+          {[["", tr("Toate", "All")], ["unpaid", tr("Neîncasate", "Unpaid")], ["paid", tr("Încasate", "Paid")]].map(([v, l]) => (
             <Button key={v} size="sm" variant={status === v ? "secondary" : "ghost"} data-testid={`invoices-status-${v || "all"}`} onClick={() => setStatus(v)}>{l}</Button>
           ))}
           <Input
@@ -48,6 +52,8 @@ export default function Invoices() {
             value={q}
             onChange={(event) => setQ(event.target.value)}
           />
+          <Input data-testid="invoices-date-from-input" className="h-9 w-36" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <Input data-testid="invoices-date-to-input" className="h-9 w-36" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
           <div className="flex-1" />
           <span className="font-mono text-sm">{rows.length} · {money(total)}</span>
         </div>
