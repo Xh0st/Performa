@@ -249,10 +249,14 @@ async def read_settings(user=Depends(get_current_user)):
 @router.put("/settings")
 async def write_settings(body: dict, user=Depends(require("settings"))):
     body.pop("_id", None)
+    body.pop("kind", None)
     body.pop("tenant_id", None)
     body.pop("branch_id", None)
     body.pop("subscription_plan", None)
-    custom_subdomain = str(body.get("custom_subdomain", "")).strip().lower()
+    body.pop("plan_limits", None)
+    body.pop("custom_logo_data_url", None)
+    body.pop("custom_logo_mime", None)
+    custom_subdomain = str(body.get("custom_subdomain") or "").strip().lower()
     if custom_subdomain:
         if await tenant_plan(user["tenant_id"]) == "BASIC":
             raise HTTPException(403, "Subdomeniul dedicat este disponibil doar în planurile FULL sau ENTERPRISE")
