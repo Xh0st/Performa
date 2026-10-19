@@ -214,7 +214,7 @@ export default function PrintDoc() {
   const { data, error } = useApi(PATHS[kind]?.(id));
   return (
     <div className="min-h-screen bg-slate-200 py-6 text-slate-900">
-      <div className="no-print mx-auto mb-4 flex max-w-[210mm] justify-end"><Button data-testid="print-now-button" onClick={() => window.print()}><Printer className="mr-1 h-4 w-4" />Print / PDF</Button></div>
+      {!error && <div className="no-print mx-auto mb-4 flex max-w-[210mm] justify-end"><Button data-testid="print-now-button" onClick={() => window.print()}><Printer className="mr-1 h-4 w-4" />Print / PDF</Button></div>}
       <div data-testid={`print-doc-${kind}`} className="print-doc mx-auto min-h-[297mm] max-w-[210mm] bg-white p-[14mm] shadow-xl">
         {error && <div className="rounded border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive" data-testid="print-doc-error">{error}</div>}
         {s && data && kind === "reception" && <Reception s={s} w={data} />}

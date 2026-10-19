@@ -105,7 +105,7 @@ async def get_invoice(iid: str, user=Depends(require("invoices"))):
         inv["seller"]["custom_logo_data_url"] = settings.get("custom_logo_data_url", "")
     else:
         inv["seller"].pop("custom_logo_data_url", None)
-    inv.get("efactura", {}).pop("xml", None)
+    inv.setdefault("efactura", {}).pop("xml", None)
     inv["efactura"]["has_receipt"] = bool(await db.efactura_files.find_one({"invoice_id": iid}, {"_id": 1}))
     inv["payments"] = [ser(p) for p in await db.payments.find({"invoice_id": iid}).sort("date", 1).to_list(200)]
     if inv.get("kind") != "credit_note":

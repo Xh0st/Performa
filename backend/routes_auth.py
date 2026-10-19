@@ -6,6 +6,7 @@ from typing import Optional
 import jwt
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel
+from pymongo.errors import DuplicateKeyError
 from core import (db, raw_db, ser, oid, iso, now, hash_password, verify_password, make_token, get_current_user, require,
                   permissions_for, audit, get_settings, plan_limits, ROLES, JWT_ALG, tenant_plan)
 
@@ -271,7 +272,10 @@ async def write_settings(body: dict, user=Depends(require("settings"))):
     if "custom_subdomain" in body and not custom_subdomain:
         body.pop("custom_subdomain")
         update["$unset"] = {"custom_subdomain": ""}
-    await db.settings.update_one({"kind": "company"}, update, upsert=True)
+    try:
+        await db.settings.update_one({"kind": "company"}, update, upsert=True)
+    except DuplicateKeyError as error:
+        raise HTTPException(400, "Subdomeniul este deja folosit de alt tenant") from error
     await audit(user, "update", "settings", "company")
     return await get_settings()
 

@@ -1,0 +1,43 @@
+{
+  "summary": "P1 retest after the iteration_25 fixes. Run order: iter25_fixture.py setup, then pytest test_iter25_plan_matrix_branding.py -n 0 (23/23 passed, only the non-blocking multipart PendingDeprecationWarning), then a separate pytest process for test_iter25b_tenant_scope_subdomain.py (3/3 passed), then a new test_iter26_p1_fixes.py (7/7 passed), then teardown (removed 3 tenants, 0 left) and cleanup check (0 TEMP tenants, users, docs or subdomains; 3 original tenants remain). Verified: (1) settings.custom_subdomain has a unique sparse index and no stored '' values. Saving uppercase lowercases it. A duplicate from another tenant returns 400. Clearing with '' or null unsets the field, and the freed subdomain can then be taken by another tenant. A direct duplicate DB insert raises DuplicateKeyError. BASIC gets 403 when setting a subdomain and 200 when clearing. 5 runs of two simultaneous saves of the same subdomain each gave exactly one 200 and one 400. (2) Logo upload adds its size to document_storage_used_bytes. Re-uploading the same logo does not double-count. Delete subtracts it. When the counter is smaller than the logo it goes to 0 (never negative), and a second delete stays at 0. The storage limit is enforced on upload (403 over 10GB on FULL). (3) GET /invoices/{id} replaces an old saved seller plan and logo with the current tenant values: a FULL tenant's invoice saved as BASIC with an old logo returns FULL and the current logo; a BASIC tenant's invoice saved as ENTERPRISE with a logo returns BASIC and no logo; FULL with no logo returns ''. (4) UI at 1920: BASIC /print/nir/:id shows a styled error box [data-testid=print-doc-error] with destructive border, background and text, 16px padding and the message 'Această funcție este disponibilă doar în planurile FULL sau ENTERPRISE', and no footer. The BASIC invoice shows the Performa logo and footer. The FULL invoice and NIR show the custom data-URL logo with no footer. Auth checks: hashes start with $2b$; access and refresh cookies are httpOnly; CORS only allows the app's own origin, with credentials; 429 lockout after 5 failures; seed_admin rehashes the password when it changes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/settings (custom_subdomain)", "issue": "No DuplicateKeyError handling. If two saves get past the find_one check at exactly the same time, the unique index rejects the second, but it surfaces as a 500, not a 400. Not reproduced in 5 runs of two simultaneous saves."},
+      {"endpoint": "GET /api/invoices/{id}", "issue": "Code risk, not reproduced: `inv.get('efactura', {}).pop('xml')` is followed by `inv['efactura']['has_receipt']`, which would raise KeyError (500) on an invoice with no efactura subdocument."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PrintDoc error state (BASIC NIR)", "issues": ["Cosmetic: the 'Print / PDF' button still shows when the document can't be loaded, and the error sits inside an empty A4 sheet."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/iter25_fixture.py",
+    "/app/backend/tests/test_iter25_plan_matrix_branding.py",
+    "/app/backend/tests/test_iter25b_tenant_scope_subdomain.py",
+    "/app/backend/tests/test_iter26_p1_fixes.py",
+    "/app/backend/tests/iter26_race_check.py",
+    "/app/test_reports/pytest/iter26_a.xml",
+    "/app/test_reports/pytest/iter26_b.xml",
+    "/app/test_reports/pytest/iter26_c.xml"
+  ],
+  "action_items": [
+    "Optional: in PUT /settings, catch pymongo DuplicateKeyError and return 400 'Subdomeniul este deja folosit de alt tenant'.",
+    "Optional: in GET /invoices/{id}, use inv.setdefault('efactura', {}) before setting has_receipt.",
+    "Optional: hide the print button on PrintDoc when there is an error."
+  ],
+  "critical_code_review_comments": [
+    "On startup, server.py unsets '' subdomain values before creating the unique sparse index. Correct, since '' would otherwise collide.",
+    "Logo storage math is clamped with max(0, ...) on both upload and delete. Correct.",
+    "get_invoice now always sets seller.subscription_plan, and sets or pops custom_logo_data_url based on the current plan. Correct."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter26_p1_fixes.py", "/app/backend/tests/iter26_race_check.py"],
+  "success_rate": {"backend": "100% (33/33: 23 + 3 + 7)", "frontend": "100%"},
+  "seed_data_creation": "TEMP25 tenants created by iter25_fixture.py setup and removed by teardown; 0 TEMP data left. Temporary login lockout records for temp26_lock@example.com deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run order: cd /app/backend/tests && python iter25_fixture.py setup; cd /app/backend && pytest tests/test_iter25_plan_matrix_branding.py -n 0; then a separate process for pytest tests/test_iter25b_tenant_scope_subdomain.py -n 0; then a separate process for pytest tests/test_iter26_p1_fixes.py -n 0; then python tests/iter25_fixture.py teardown. Fixture state is in /tmp/iter25.json. The fixture's TEMP user password is the NEW_PW constant in iter25_fixture.py."
+}
