@@ -42,14 +42,14 @@ const NAV = [
 
 function SideNav({ onNav }) {
   const { can, user } = useAuth();
-  const { tr } = useLang();
+  const { tr, theme } = useLang();
   return (
     <nav className="flex h-full flex-col gap-5 overflow-y-auto px-3 py-5">
       <div className="flex items-center gap-2 px-2">
         <img
-          src="/performa-logo.png"
+          src={theme === "dark" ? "/performa-logo-dark.png" : "/performa-logo.png"}
           alt="Performa Auto"
-          className="h-10 w-10 shrink-0 object-contain"
+          className={`h-10 shrink-0 object-contain ${theme === "dark" ? "w-16" : "w-10"}`}
           data-testid="app-brand-mark"
         />
         <div>
