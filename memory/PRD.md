@@ -140,8 +140,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   `frontend/public/performa-logo.png`.
 - Varianta inițială a fost înlocuită cu semnul compact bleumarin-portocaliu, pătrat, furnizat
   ulterior de utilizator; dimensiunile din interfață au fost adaptate pentru noul format.
-- Tema light păstrează semnul pătrat bleumarin-portocaliu, iar tema dark folosește automat o variantă
-  portocalie transparentă, fără halo sau margini deschise pe fundalul întunecat.
+- Ambele teme folosesc acum aceeași variantă portocalie transparentă, fără halo sau margini deschise,
+  pentru o identitate Performa uniformă pe fundaluri light și dark.
 - Logo-ul înlocuiește monogramele anterioare în autentificare, bara laterală desktop și meniul
   lateral mobil, păstrând proporțiile și contrastul în temele aplicației.
 - Verificare: logo vizibil în cele trei zone, fără erori de consolă; build frontend reușit.

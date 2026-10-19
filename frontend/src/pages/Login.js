@@ -11,7 +11,7 @@ const HERO = "https://images.unsplash.com/photo-1615906655593-ad0386982a0f?crop=
 
 export default function Login() {
   const { login, user } = useAuth();
-  const { tr, lang, setLang, theme } = useLang();
+  const { tr, lang, setLang } = useLang();
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,9 +58,9 @@ export default function Login() {
         <form onSubmit={submit} className="w-full max-w-sm rounded-md border bg-card p-8 shadow-2xl fade-up" data-testid="login-form">
           <div className="mb-8 flex items-center justify-between">
             <img
-              src={theme === "dark" ? "/performa-logo-dark.png" : "/performa-logo.png"}
+              src="/performa-logo-dark.png"
               alt="Performa Auto"
-              className={`h-12 object-contain ${theme === "dark" ? "w-28" : "w-12"}`}
+              className="h-12 w-28 object-contain"
               data-testid="login-brand-mark"
             />
             <Button type="button" variant="outline" size="sm" className="font-mono" data-testid="login-language-toggle" onClick={() => setLang(lang === "ro" ? "en" : "ro")}>
