@@ -139,6 +139,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Tenantul `SUPERADMIN` are planul `FULL` și capacitate pentru locații multiple.
 - Superadmin poate edita numele companiei, CUI-ul, planul BASIC/FULL, statusul și emailul
   administratorului principal din lista de tenanturi.
+- Mesajele Superadmin comunică acum regula curentă: BASIC include o sucursală, iar FULL permite
+  locații multiple, fără a menționa vechea limită de cinci.
 - Actualizarea validează unicitatea CUI/email, recalculează automat cota de sucursale la 1 pentru
   BASIC și 999 pentru FULL și păstrează jurnalul de audit.
 - Verificare: API-ul confirmă `SUPERADMIN` ca FULL, build frontend reușit și dialogul de editare

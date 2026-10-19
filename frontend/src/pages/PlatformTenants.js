@@ -159,7 +159,7 @@ export default function PlatformTenants() {
         <Panel title="Tenant nou" testid="create-tenant-panel">
           <p className="mb-4 text-sm text-muted-foreground" data-testid="tenant-id-generation-note">
             ID-ul tenantului și sediul principal sunt generate automat. BASIC include o
-            sucursală, iar FULL include până la cinci.
+            sucursală, iar FULL permite locații multiple.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nume companie SRL">
@@ -206,7 +206,7 @@ export default function PlatformTenants() {
                 }}
               >
                 <option value="BASIC">BASIC · 1 sucursală</option>
-                <option value="FULL">FULL · 5 sucursale</option>
+                <option value="FULL">FULL · locații multiple</option>
               </NativeSelect>
             </Field>
           </div>
