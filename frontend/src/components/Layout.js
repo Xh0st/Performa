@@ -46,15 +46,15 @@ function SideNav({ onNav }) {
   return (
     <nav className="flex h-full flex-col gap-5 overflow-y-auto px-3 py-5">
       <div className="flex items-center gap-2 px-2">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded bg-primary font-heading text-lg font-extrabold text-primary-foreground"
+        <img
+          src="/performa-logo.png"
+          alt="Performa Auto"
+          className="h-10 w-24 shrink-0 object-contain object-left"
           data-testid="app-brand-mark"
-        >
-          PA
-        </div>
+        />
         <div>
           <div
-            className="font-heading text-lg font-extrabold uppercase leading-none tracking-wide"
+            className="font-heading text-base font-extrabold uppercase leading-none tracking-wide"
             data-testid="app-brand-name"
           >
             Performa Auto

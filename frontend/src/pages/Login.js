@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { Wrench } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
 import { errMsg } from "@/lib/api";
@@ -58,12 +57,12 @@ export default function Login() {
       <div className="grid-bg flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm rounded-md border bg-card p-8 shadow-2xl fade-up" data-testid="login-form">
           <div className="mb-8 flex items-center justify-between">
-            <div
-              className="flex h-11 w-11 items-center justify-center rounded bg-primary text-primary-foreground"
+            <img
+              src="/performa-logo.png"
+              alt="Performa Auto"
+              className="h-12 w-32 object-contain object-left"
               data-testid="login-brand-mark"
-            >
-              <Wrench className="h-5 w-5" />
-            </div>
+            />
             <Button type="button" variant="outline" size="sm" className="font-mono" data-testid="login-language-toggle" onClick={() => setLang(lang === "ro" ? "en" : "ro")}>
               {lang.toUpperCase()}
             </Button>

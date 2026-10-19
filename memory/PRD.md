@@ -135,6 +135,13 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Verificare: 79 teste backend au trecut, build frontend reușit și curățarea a confirmat 0 date
   temporare rămase; fluxurile de migrare, resetare și schimbare obligatorie au fost testate și în UI.
 
+## Identitate vizuală Performa (2026-10-19)
+- Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
+  `frontend/public/performa-logo.png`.
+- Logo-ul înlocuiește monogramele anterioare în autentificare, bara laterală desktop și meniul
+  lateral mobil, păstrând proporțiile și contrastul în temele aplicației.
+- Verificare: logo vizibil în cele trei zone, fără erori de consolă; build frontend reușit.
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
