@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, Panel, Loading, StatusBadge, STATUS } from "@/components/common";
 
-const COLS = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "in_lucru", "asteapta_piese", "finalizata", "facturata"];
+const COLS = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "asteapta_piese", "in_lucru", "finalizata", "facturata"];
 
 function Card({ w }) {
   return (

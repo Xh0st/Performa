@@ -39,7 +39,7 @@ MODULE_ROLES = {
     "users": ["admin"],
 }
 
-WO_STATUSES = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "in_lucru", "asteapta_piese",
+WO_STATUSES = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "asteapta_piese", "in_lucru",
                "finalizata", "facturata", "inchisa"]
 FULL_ONLY_MODULES = {"planning", "stock"}
 FULL_ONLY_PREFIXES = (
