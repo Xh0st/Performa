@@ -1,0 +1,36 @@
+{
+  "summary": "Executed tests for the 'Cannot convert undefined or null to object' fix when saving settings/logo. Backend: tests/test_iter18_settings_logo.py 17/17 PASS. UI (Playwright 1920, TEMP FULL tenant with no settings doc at all): Settings loads with plan FULL; settings-save-button -> PUT /api/settings 200, toast 'Setări salvate', no 'Cannot convert undefined or null to object' error, no pageerror. Upload of a valid 191-byte PNG via settings-custom-logo-input -> PUT /api/settings/logo 200, settings-custom-logo-preview shows a data:image/png src; then name change + save -> 200, and after reload both the logo preview and the name are kept (DB: custom_logo_mime image/png). BASIC: settings-custom-logo-input and subdomain disabled, settings-logo-plan-note shows Performa branding, save 200 without error; direct PUT /api/settings/logo -> 403. PUT /api/settings with kind/plan_limits/subscription_plan/tenant_id/branch_id/custom_logo_data_url/custom_logo_mime/custom_subdomain:null -> 200; DB doc has kind 'company', correct tenant_id/branch_id, no plan_limits/subscription_plan, logo and mime unchanged (the existing PNG), custom_subdomain None (not 'none'). Cleanup: 0 TEMP/TEST tenants, users or settings left; only the 3 original tenants remain.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/settings", "issue": "Accepts an arbitrary dict (body: dict) without a Pydantic whitelist. Fields not on the blacklist (e.g. custom_logo_* variants, unknown keys) are persisted as-is."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Settings save on sparse tenant", "issue": "vat_rate and payment_terms_days are empty for a new tenant, and save() sends Number('')||0, which persists vat_rate=0 and payment_terms_days=0. A new FULL/BASIC tenant that clicks Save once gets 0% VAT. Use a default (21 / 30) or omit empty fields.", "selector": "[data-testid='settings-save-button']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings", "issues": ["React warning 'A component is changing an uncontrolled input to be controlled' (vat_rate/payment_terms_days/series inputs bound to undefined; use ?? '').", "There is no button to remove the custom logo."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter18_settings_logo.py", "/app/backend/tests/iter16_ui_fixture.py", "/app/test_reports/pytest/iter16.xml"],
+  "action_items": [
+    "Default vat_rate (21) and payment_terms_days (30) on a sparse tenant: do not send 0 when the input is empty.",
+    "Make the Settings inputs controlled (value={f.x ?? ''}) to remove the React warning.",
+    "Optional: replace body: dict in PUT /settings with a Pydantic model (field whitelist)."
+  ],
+  "critical_code_review_comments": [
+    "uploadLogo uses setF({...f, ...data}) with a stale closure of f. Edits made between file selection and the response would be lost (very small window).",
+    "Default deploy: get_settings returns no defaults for vat_rate. Business logic that reads settings.vat_rate on a new tenant may compute 0% VAT."
+  ],
+  "updated_files": ["/app/backend/tests/iter16_ui_fixture.py"],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% functional for the requested flows"},
+  "test_credentials": "Used /app/memory/test_credentials.md (owner SUPERADMIN). Passwords and Base64 are not exposed.",
+  "seed_data_creation": "TEMP-ui16-FULL SRL and TEMP-ui16-BASIC SRL were created and then deleted via the API + DB cleanup. Verified 0 leftovers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "cd /app/backend && python -m pytest tests/test_iter18_settings_logo.py -q -n 0. For the UI: python tests/iter16_ui_fixture.py create|check|inject|delete (users temp_ui16_full/basic@example.com, password changed to TempNew2026!x).",
+  "rca of the issue": "The original error came from Object.entries/Object.keys on f.labor_rates undefined for tenants without settings. The fix (f.labor_rates || {}, elevators || []) plus the backend blacklist on scope/plan/logo fields is confirmed working."
+}

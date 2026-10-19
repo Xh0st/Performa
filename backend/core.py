@@ -56,6 +56,14 @@ PLAN_LIMITS = {
     "FULL": {"branches": 5, "storage_mb": 10 * 1024, "work_orders_monthly": 5000},
     "ENTERPRISE": {"branches": 999, "storage_mb": 50 * 1024, "work_orders_monthly": None},
 }
+DEFAULT_COMPANY_SETTINGS = {
+    "vat_rate": 21,
+    "payment_terms_days": 30,
+    "labor_rates": {},
+    "elevators": [],
+    "invoice_series": "F",
+    "proforma_series": "P",
+}
 
 
 class TenantCollection:
@@ -356,7 +364,7 @@ async def audit(user: dict, action: str, entity: str, entity_id: str = "", detai
 
 async def get_settings() -> dict:
     s = await db.settings.find_one({"kind": "company"})
-    settings = {k: v for k, v in (s or {}).items() if k != "_id"}
+    settings = DEFAULT_COMPANY_SETTINGS | {k: v for k, v in (s or {}).items() if k != "_id"}
     scope = current_scope()
     if scope:
         settings["subscription_plan"] = await tenant_plan(scope["tenant_id"])

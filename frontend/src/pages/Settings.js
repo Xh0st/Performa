@@ -26,8 +26,8 @@ export default function SettingsPage() {
       const body = {
         ...rest,
         elevators: (elevators_text || "").split(",").map((s) => s.trim()).filter(Boolean),
-        vat_rate: Number(f.vat_rate) || 0,
-        payment_terms_days: Number(f.payment_terms_days) || 0,
+        vat_rate: Number(f.vat_rate) || 21,
+        payment_terms_days: Number(f.payment_terms_days) || 30,
         labor_rates: Object.fromEntries(
           Object.entries(f.labor_rates || {}).map(([key, value]) => [key, Number(value)]),
         ),
@@ -49,13 +49,20 @@ export default function SettingsPage() {
     reader.onload = async () => {
       try {
         const { data } = await api.put("/settings/logo", { data_url: reader.result });
-        setF({ ...f, ...data, elevators_text: (data.elevators || []).join(", ") });
+        setF((current) => ({ ...current, ...data, elevators_text: (data.elevators || []).join(", ") }));
         toast.success(tr("Logo personalizat salvat", "Custom logo saved"));
       } catch (error) {
         toast.error(errMsg(error));
       }
     };
     reader.readAsDataURL(file);
+  };
+  const deleteLogo = async () => {
+    try {
+      const { data } = await api.delete("/settings/logo");
+      setF((current) => ({ ...current, ...data, elevators_text: (data.elevators || []).join(", ") }));
+      toast.success(tr("Logo personalizat eliminat", "Custom logo removed"));
+    } catch (error) { toast.error(errMsg(error)); }
   };
   const lookupCompanyCui = async () => {
     try {
@@ -107,7 +114,7 @@ export default function SettingsPage() {
                 accept="image/png,image/jpeg,image/webp"
                 onChange={uploadLogo}
               />
-              {isPremium && f.custom_logo_data_url && <img src={f.custom_logo_data_url} alt="Logo personalizat" className="h-14 max-w-40 object-contain object-left" data-testid="settings-custom-logo-preview" />}
+              {isPremium && f.custom_logo_data_url && <div className="flex items-center gap-2"><img src={f.custom_logo_data_url} alt="Logo personalizat" className="h-14 max-w-40 object-contain object-left" data-testid="settings-custom-logo-preview" /><Button type="button" variant="outline" data-testid="settings-custom-logo-delete-button" onClick={deleteLogo}>Elimină logo</Button></div>}
             </div>
           </Panel>
           <Panel title={tr("Tarife manoperă (RON/oră, fără TVA)", "Labor rates (RON/h, excl. VAT)")}>
@@ -121,12 +128,12 @@ export default function SettingsPage() {
           </Panel>
           <Panel title={tr("Facturare & atelier", "Billing & workshop")}>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label={tr("Serie facturi", "Invoice series")}><Input data-testid="settings-invoice-series" value={f.invoice_series} onChange={(e) => setF({ ...f, invoice_series: e.target.value })} /></Field>
-              <Field label={tr("Serie proforme", "Proforma series")}><Input value={f.proforma_series} onChange={(e) => setF({ ...f, proforma_series: e.target.value })} /></Field>
-              <Field label={tr("Cotă TVA %", "VAT rate %")}><Input data-testid="settings-vat-input" type="number" value={f.vat_rate} onChange={(e) => setF({ ...f, vat_rate: e.target.value })} /></Field>
-              <Field label={tr("Termen plată (zile)", "Payment terms (days)")}><Input type="number" value={f.payment_terms_days} onChange={(e) => setF({ ...f, payment_terms_days: e.target.value })} /></Field>
+              <Field label={tr("Serie facturi", "Invoice series")}><Input data-testid="settings-invoice-series" value={f.invoice_series ?? ""} onChange={(e) => setF({ ...f, invoice_series: e.target.value })} /></Field>
+              <Field label={tr("Serie proforme", "Proforma series")}><Input value={f.proforma_series ?? ""} onChange={(e) => setF({ ...f, proforma_series: e.target.value })} /></Field>
+              <Field label={tr("Cotă TVA %", "VAT rate %")}><Input data-testid="settings-vat-input" type="number" value={f.vat_rate ?? 21} onChange={(e) => setF({ ...f, vat_rate: e.target.value })} /></Field>
+              <Field label={tr("Termen plată (zile)", "Payment terms (days)")}><Input type="number" value={f.payment_terms_days ?? 30} onChange={(e) => setF({ ...f, payment_terms_days: e.target.value })} /></Field>
               <Field label={tr("Elevatoare (separate prin virgulă)", "Lifts (comma separated)")} className="sm:col-span-2">
-                <Input data-testid="settings-elevators-input" value={f.elevators_text} onChange={(e) => setF({ ...f, elevators_text: e.target.value })} />
+                <Input data-testid="settings-elevators-input" value={f.elevators_text ?? ""} onChange={(e) => setF({ ...f, elevators_text: e.target.value })} />
               </Field>
             </div>
           </Panel>

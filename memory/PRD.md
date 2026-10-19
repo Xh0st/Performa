@@ -157,6 +157,15 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Cotele sunt centralizate în backend, aplicate la creare/editare tenant și comenzi de lucru, apoi
   afișate în Setări. FULL și ENTERPRISE au aceleași drepturi premium de branding/module.
 
+## Stabilizare setări și logo Base64 (2026-10-19)
+- Salvarea Setărilor funcționează și pentru tenanturi fără `labor_rates` sau elevatoare, fără eroarea
+  „Cannot convert undefined or null to object”. Setările noi primesc implicit TVA 21% și termen 30 zile.
+- Endpointul de setări acceptă doar câmpuri validate, ignoră scope/plan/câmpuri derivate/logo din
+  payload și normalizează subdomeniul nul; logo-ul se actualizează exclusiv prin endpointul dedicat.
+- Tenanturile FULL/ENTERPRISE pot elimina ulterior logo-ul personalizat; BASIC rămâne blocat.
+- Verificare: testing agent a confirmat fluxul UI/Backend de salvare sparse și logo; suita specifică
+  a trecut 17/17, iar curățarea a confirmat 0 date temporare.
+
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
   `frontend/public/performa-logo.png`.

@@ -248,14 +248,12 @@ async def read_settings(user=Depends(get_current_user)):
 
 @router.put("/settings")
 async def write_settings(body: dict, user=Depends(require("settings"))):
-    body.pop("_id", None)
-    body.pop("kind", None)
-    body.pop("tenant_id", None)
-    body.pop("branch_id", None)
-    body.pop("subscription_plan", None)
-    body.pop("plan_limits", None)
-    body.pop("custom_logo_data_url", None)
-    body.pop("custom_logo_mime", None)
+    allowed_fields = {
+        "name", "cui", "reg_com", "capital", "address", "city", "county_code", "iban", "bank",
+        "phone", "email", "rar_authorization", "vat_rate", "payment_terms_days", "labor_rates",
+        "elevators", "invoice_series", "proforma_series", "custom_subdomain",
+    }
+    body = {key: value for key, value in body.items() if key in allowed_fields}
     custom_subdomain = str(body.get("custom_subdomain") or "").strip().lower()
     if custom_subdomain:
         if await tenant_plan(user["tenant_id"]) == "BASIC":
@@ -287,6 +285,18 @@ async def upload_tenant_logo(body: TenantLogoIn, user=Depends(require("settings"
         upsert=True,
     )
     await audit(user, "upload_custom_logo", "settings", "company")
+    return await get_settings()
+
+
+@router.delete("/settings/logo")
+async def delete_tenant_logo(user=Depends(require("settings"))):
+    if await tenant_plan(user["tenant_id"]) == "BASIC":
+        raise HTTPException(403, "Logo-ul personalizat este disponibil doar în planurile FULL sau ENTERPRISE")
+    await db.settings.update_one(
+        {"kind": "company"},
+        {"$unset": {"custom_logo_data_url": "", "custom_logo_mime": ""}},
+    )
+    await audit(user, "delete_custom_logo", "settings", "company")
     return await get_settings()
 
 
