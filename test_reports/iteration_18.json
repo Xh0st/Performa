@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only retest of the sidebar scrollbar bug (1920x700 desktop, logged in as admin andrei.melek@gmail.com). Computed styles look right (nav.sidebar-scroll overflow-y:auto, ::-webkit-scrollbar 4px, ::-webkit-scrollbar-button display:none 0x0, thumb transparent and rgba(148,163,184,0.45) on hover). The sidebar scrolls when expanded (scrollHeight 1069 > clientHeight 700, wheel moved it to scrollTop 369) and when collapsed (64px wide, scrollTop 322). No horizontal overflow (scrollWidth == clientWidth in both states). The collapsed tooltip works ('OPERAȚIONAL / Recepție'). No JS errors; the only console error is the expected 401 from /api/auth/me before login. BUT there is a CSS conflict: .sidebar-scroll also sets the standard properties scrollbar-width:thin and scrollbar-color. Since Chrome/Edge 121, any non-default value of these properties makes the browser IGNORE all ::-webkit-scrollbar* rules (MDN, developer.chrome.com). In current Chrome/Edge the 4px width and hidden arrow buttons are therefore never rendered. The browser draws its own 'thin' scrollbar, which on Windows can still show up/down arrows. That is the bug the user reported. The bug cannot be confirmed fixed visually; headless Chromium uses overlay scrollbars, so this can't be screenshot-verified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Layout SideNav nav.sidebar-scroll (index.css lines 74-100)", "issue": "scrollbar-width:thin + scrollbar-color on .sidebar-scroll override the ::-webkit-scrollbar rules in Chrome/Edge >=121, so the 4px width and display:none on ::-webkit-scrollbar-button are never applied. The user still sees the native thin scrollbar, possibly with arrows (Windows).", "selector": "aside nav.sidebar-scroll", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "In index.css, only set scrollbar-width/scrollbar-color where WebKit pseudo-elements are not supported, e.g. wrap `.sidebar-scroll{scrollbar-width:thin;scrollbar-color:transparent transparent}` and `.sidebar-scroll:hover{scrollbar-color:...}` in `@supports not selector(::-webkit-scrollbar) { ... }`. Keep the ::-webkit-scrollbar (4px), ::-webkit-scrollbar-button{display:none;width:0;height:0}, track and thumb rules as they are. Firefox then gets thin and Chrome/Edge/Safari get the custom 4px with no arrows.",
+    "Optional, if you want no arrows at all: also hide them with `.sidebar-scroll::-webkit-scrollbar-button:single-button{display:none}`."
+  ],
+  "critical_code_review_comments": [
+    "Mixing standard scrollbar-* properties with ::-webkit-scrollbar on the same selector is the root cause; the standard properties take precedence in Chromium 121+.",
+    "The transition on scrollbar-color has no real effect; you can drop it."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "80% (scroll, no horizontal overflow, tooltips, collapse and console checks pass; the core scrollbar-styling fix is ineffective in Chrome 121+)"},
+  "test_credentials": "andrei.melek@gmail.com / Admin2026! (admin/owner). No SUPERADMIN entry exists in test_credentials.md.",
+  "seed_data_creation": "none",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Headless Playwright Chromium uses overlay scrollbars, so getComputedStyle(n,'::-webkit-scrollbar') still reports 4px even when Chrome ignores it. After the fix, check the CSS source: no scrollbar-width/scrollbar-color should apply to .sidebar-scroll in Chromium (CSS.supports('selector(::-webkit-scrollbar)') is true there), i.e. getComputedStyle(nav).scrollbarWidth should be 'auto' in Chromium.",
+  "rca of the issue": "Repro: open the app in Chrome 121+ on Windows, sidebar at 700px height. The sidebar scrollbar is the native thin one, not 4px, and may show arrows. Cause: per the CSSWG resolution (csswg-drafts#9856), non-default scrollbar-width/scrollbar-color disables the ::-webkit-scrollbar pseudo-elements. Mitigation: guard the standard properties with @supports not selector(::-webkit-scrollbar)."
+}
