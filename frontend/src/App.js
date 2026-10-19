@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import "@/App.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -59,9 +60,25 @@ function Guard({ module, children }) {
 
 const g = (m, el) => <Guard module={m}>{el}</Guard>;
 
+function BrandFavicon() {
+  useEffect(() => {
+    let favicon = document.querySelector('link[rel="icon"]');
+    if (!favicon) {
+      favicon = document.createElement("link");
+      favicon.rel = "icon";
+      document.head.appendChild(favicon);
+    }
+    favicon.type = "image/png";
+    favicon.href = "/performa-favicon.png";
+  }, []);
+
+  return null;
+}
+
 function App() {
   return (
     <PrefsProvider>
+      <BrandFavicon />
       <AuthProvider>
         <BrowserRouter>
           <Routes>

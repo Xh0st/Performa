@@ -142,6 +142,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   ulterior de utilizator; dimensiunile din interfață au fost adaptate pentru noul format.
 - Ambele teme folosesc acum aceeași variantă portocalie transparentă, fără halo sau margini deschise,
   pentru o identitate Performa uniformă pe fundaluri light și dark.
+- Favicon-ul `performa-favicon.png` este generat din semnul Performa și este declarat atât în
+  documentul HTML, cât și la rularea aplicației, pentru încărcare fiabilă în previzualizare.
 - Logo-ul înlocuiește monogramele anterioare în autentificare, bara laterală desktop și meniul
   lateral mobil, păstrând proporțiile și contrastul în temele aplicației.
 - Verificare: logo vizibil în cele trei zone, fără erori de consolă; build frontend reușit.
