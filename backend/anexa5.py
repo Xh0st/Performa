@@ -33,7 +33,7 @@ def table_values(rows: list) -> list:
     return [[row[key] for key in row["columns"]] for row in rows]
 
 
-def build_pdf(rows: list, start: str, end: str, branch: str, include_footer: bool = True) -> bytes:
+def build_pdf(rows: list, start: str, end: str, branch: str, include_footer: bool = True, custom_logo_data_url: str = "") -> bytes:
     output = io.BytesIO()
     doc = SimpleDocTemplate(
         output,
@@ -84,8 +84,8 @@ def build_pdf(rows: list, start: str, end: str, branch: str, include_footer: boo
     ]))
     doc.build(
         [title, meta, table],
-        onFirstPage=lambda canvas, page: draw_brand(canvas, page, include_footer),
-        onLaterPages=lambda canvas, page: draw_brand(canvas, page, include_footer),
+        onFirstPage=lambda canvas, page: draw_brand(canvas, page, include_footer, custom_logo_data_url),
+        onLaterPages=lambda canvas, page: draw_brand(canvas, page, include_footer, custom_logo_data_url),
     )
     return output.getvalue()
 

@@ -92,7 +92,7 @@ def _party_cell(label, p):
     return rows
 
 
-def render_pdf(xml: str, meta: dict, include_footer: bool = True) -> bytes:
+def render_pdf(xml: str, meta: dict, include_footer: bool = True, custom_logo_data_url: str = "") -> bytes:
     d = parse_full(xml)
     cur = d["cur"]
     buf = io.BytesIO()
@@ -141,7 +141,7 @@ def render_pdf(xml: str, meta: dict, include_footer: bool = True) -> bytes:
                                  f"Fișier importat: {meta['filename']}" if meta.get("filename") else "") if x)
 
     def footer(canvas, _doc):
-        draw_brand(canvas, _doc, include_footer)
+        draw_brand(canvas, _doc, include_footer, custom_logo_data_url)
         canvas.saveState()
         canvas.setFont("LS", 6.5)
         canvas.setFillColor(colors.HexColor("#5F6368"))

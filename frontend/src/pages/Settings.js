@@ -30,6 +30,25 @@ export default function SettingsPage() {
       toast.error(errMsg(e));
     }
   };
+  const uploadLogo = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!isFull || !["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 1024 * 1024) {
+      toast.error(tr("Logo acceptat: PNG, JPEG sau WebP, maximum 1 MB", "Logo must be PNG, JPEG, or WebP, maximum 1 MB"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const { data } = await api.put("/settings/logo", { data_url: reader.result });
+        setF({ ...f, ...data, elevators_text: (data.elevators || []).join(", ") });
+        toast.success(tr("Logo personalizat salvat", "Custom logo saved"));
+      } catch (error) {
+        toast.error(errMsg(error));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
   return (
     <div data-testid="settings-page">
       <PageHeader eyebrow={tr("Date apar pe facturi, e-Factura și documente", "Shown on invoices, e-Invoice and documents")} title={tr("Setări companie", "Company settings")}
@@ -57,9 +76,17 @@ export default function SettingsPage() {
               </Field>
               <p className="text-muted-foreground" data-testid="settings-logo-plan-note">
                 {isFull
-                  ? tr("Logo-ul personalizat se activează după configurarea storage-ului.", "Custom logo activates after storage configuration.")
+                  ? tr("Logo personalizat pentru documente, maximum 1 MB.", "Custom document logo, maximum 1 MB.")
                   : tr("Planul BASIC folosește branding Performa pe documente.", "BASIC uses Performa branding on documents.")}
               </p>
+              <Input
+                data-testid="settings-custom-logo-input"
+                disabled={!isFull}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={uploadLogo}
+              />
+              {isFull && f.custom_logo_data_url && <img src={f.custom_logo_data_url} alt="Logo personalizat" className="h-14 max-w-40 object-contain object-left" data-testid="settings-custom-logo-preview" />}
             </div>
           </Panel>
           <Panel title={tr("Tarife manoperă (RON/oră, fără TVA)", "Labor rates (RON/h, excl. VAT)")}>

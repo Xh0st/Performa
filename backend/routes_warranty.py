@@ -64,9 +64,11 @@ async def certificate_pdf(iid: str, user=Depends(require("warranties"))):
     certificate = await db.warranty_certificates.find_one({"invoice_id": iid})
     if not certificate:
         raise HTTPException(404, "Certificatul de garanție nu există")
+    settings = await get_settings()
     content = build_certificate(
         certificate,
-        include_footer=(await get_settings()).get("subscription_plan") != "FULL",
+        include_footer=settings.get("subscription_plan") != "FULL",
+        custom_logo_data_url=settings.get("custom_logo_data_url", ""),
     )
     return Response(content, media_type="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="{certificate["number"]}.pdf"',

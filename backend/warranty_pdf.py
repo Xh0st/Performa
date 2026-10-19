@@ -24,7 +24,7 @@ def ro_date(value: str) -> str:
     return ".".join(reversed(parts)) if len(parts) == 3 else value
 
 
-def build_certificate(certificate: dict, include_footer: bool = True) -> bytes:
+def build_certificate(certificate: dict, include_footer: bool = True, custom_logo_data_url: str = "") -> bytes:
     output = io.BytesIO()
     document = SimpleDocTemplate(
         output,
@@ -113,7 +113,7 @@ def build_certificate(certificate: dict, include_footer: bool = True) -> bytes:
     ]
     document.build(
         story,
-        onFirstPage=lambda canvas, page: draw_brand(canvas, page, include_footer),
-        onLaterPages=lambda canvas, page: draw_brand(canvas, page, include_footer),
+        onFirstPage=lambda canvas, page: draw_brand(canvas, page, include_footer, custom_logo_data_url),
+        onLaterPages=lambda canvas, page: draw_brand(canvas, page, include_footer, custom_logo_data_url),
     )
     return output.getvalue()

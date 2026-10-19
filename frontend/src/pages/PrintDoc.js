@@ -19,14 +19,14 @@ function Header({ s, title, number, dateStr }) {
       <div className="text-[12px] leading-5">
         <div className="mb-2 flex items-center gap-2">
           <img
-            src="/performa-logo-dark.png"
-            alt="Performa"
+            src={s.subscription_plan === "FULL" && s.custom_logo_data_url ? s.custom_logo_data_url : "/performa-logo-dark.png"}
+            alt={s.subscription_plan === "FULL" ? s.name : "Performa"}
             className="h-6 w-14 object-contain object-left"
             data-testid="print-document-brand-logo"
           />
-          <span className="font-bold text-[#f47a2a]" data-testid="print-document-brand-name">
+          {s.subscription_plan !== "FULL" && <span className="font-bold text-[#f47a2a]" data-testid="print-document-brand-name">
             Performa
-          </span>
+          </span>}
         </div>
         <div className="text-base font-bold">{s.name}</div>
         <div>CUI: {s.cui} · Reg. Com.: {s.reg_com}</div>

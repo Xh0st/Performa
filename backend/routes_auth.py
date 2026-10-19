@@ -1,5 +1,6 @@
 import os
 import re
+import base64
 from datetime import timedelta
 from typing import Optional
 import jwt
@@ -31,6 +32,10 @@ class LoginIn(BaseModel):
 class InitialPasswordChangeIn(BaseModel):
     current_password: str
     new_password: str
+
+
+class TenantLogoIn(BaseModel):
+    data_url: str
 
 
 def set_cookies(response: Response, user: dict):
@@ -256,6 +261,28 @@ async def write_settings(body: dict, user=Depends(require("settings"))):
         body["custom_subdomain"] = custom_subdomain
     await db.settings.update_one({"kind": "company"}, {"$set": body, "$setOnInsert": {"kind": "company"}}, upsert=True)
     await audit(user, "update", "settings", "company")
+    return await get_settings()
+
+
+@router.put("/settings/logo")
+async def upload_tenant_logo(body: TenantLogoIn, user=Depends(require("settings"))):
+    if await tenant_plan(user["tenant_id"]) != "FULL":
+        raise HTTPException(403, "Logo-ul personalizat este disponibil doar în planul FULL")
+    match = re.fullmatch(r"data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)", body.data_url)
+    if not match:
+        raise HTTPException(400, "Logo invalid. Sunt acceptate PNG, JPEG sau WebP")
+    try:
+        content = base64.b64decode(match.group(2), validate=True)
+    except ValueError as error:
+        raise HTTPException(400, "Logo Base64 invalid") from error
+    if not content or len(content) > 1024 * 1024:
+        raise HTTPException(400, "Logo-ul poate avea maximum 1 MB")
+    await db.settings.update_one(
+        {"kind": "company"},
+        {"$set": {"custom_logo_data_url": body.data_url, "custom_logo_mime": match.group(1)}},
+        upsert=True,
+    )
+    await audit(user, "upload_custom_logo", "settings", "company")
     return await get_settings()
 
 
