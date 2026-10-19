@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { CalendarDays, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { addDays, endOfWeek, format, getDay, parse, startOfDay, startOfMonth, startOfWeek } from "date-fns";
@@ -12,7 +12,6 @@ import { useLang } from "@/lib/prefs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -41,7 +40,6 @@ const EMPTY = {
   ends_at: "",
   elevator: "",
   mechanic_ids: [],
-  advisor: "",
   title: "",
   notes: "",
 };
@@ -112,7 +110,6 @@ export default function PlanningCalendar() {
       ends_at: toLocal(event.ends_at),
       elevator: event.elevator,
       mechanic_ids: event.mechanic_ids || [],
-      advisor: event.advisor || "",
       title: event.title.split(" · ")[0],
       notes: event.notes || "",
     });
@@ -151,12 +148,12 @@ export default function PlanningCalendar() {
       toast.error(errMsg(error));
     }
   };
-  const updateStatus = async (status) => {
+  const createWorkOrder = async () => {
     if (!current) return;
     try {
-      const response = await api.post(`/appointments/${current.id}/status`, { status });
+      const response = await api.post(`/appointments/${current.id}/status`, { status: "in_lucru" });
       setCurrent(response.data);
-      toast.success(status === "in_lucru" ? tr("Comandă de lucru creată", "Work order created") : tr("Status actualizat", "Status updated"));
+      toast.success(tr("Comandă de lucru creată", "Work order created"));
       reload();
       reloadCapacity();
     } catch (error) {
@@ -254,15 +251,17 @@ export default function PlanningCalendar() {
             <Field label={tr("Începe", "Starts")}><Input data-testid="planning-start-input" type="datetime-local" value={form.starts_at} onChange={(event) => setForm({ ...form, starts_at: event.target.value })} /></Field>
             <Field label={tr("Se termină", "Ends")}><Input data-testid="planning-end-input" type="datetime-local" value={form.ends_at} onChange={(event) => setForm({ ...form, ends_at: event.target.value })} /></Field>
             <Field label={tr("Rampă / elevator", "Bay / lift")}><NativeSelect data-testid="planning-elevator-select" value={form.elevator} onChange={(event) => setForm({ ...form, elevator: event.target.value })}><option value="">—</option>{capacity.elevators.map((item) => <option key={item}>{item}</option>)}</NativeSelect></Field>
-            <Field label={tr("Consilier service", "Service advisor")}><Input data-testid="planning-advisor-input" value={form.advisor} onChange={(event) => setForm({ ...form, advisor: event.target.value })} /></Field>
-            <Field label={tr("Mecanici alocați", "Assigned mechanics")} className="sm:col-span-2"><div className="flex flex-wrap gap-3">{(mechanics || []).map((mechanic) => <label key={mechanic.id} className="flex items-center gap-2 text-sm"><Checkbox data-testid={`planning-mechanic-${mechanic.id}`} checked={form.mechanic_ids.includes(mechanic.id)} onCheckedChange={(checked) => setForm({ ...form, mechanic_ids: checked ? [...form.mechanic_ids, mechanic.id] : form.mechanic_ids.filter((id) => id !== mechanic.id) })} />{mechanic.name}</label>)}</div></Field>
+            <Field label={tr("Mecanic alocat", "Assigned mechanic")}><NativeSelect data-testid="planning-mechanic-select" value={form.mechanic_ids[0] || ""} onChange={(event) => setForm({ ...form, mechanic_ids: event.target.value ? [event.target.value] : [] })}><option value="">—</option>{(mechanics || []).map((mechanic) => <option key={mechanic.id} value={mechanic.id}>{mechanic.name}</option>)}</NativeSelect></Field>
             <Field label={tr("Titlu intervenție", "Service title")} className="sm:col-span-2"><Input data-testid="planning-title-input" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
             <Field label={tr("Observații", "Notes")} className="sm:col-span-2"><Textarea data-testid="planning-notes-input" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
           </div>
           <DialogFooter className="gap-2 sm:space-x-0">
-            {current && <Button variant="destructive" data-testid="planning-delete-button" disabled={busy} onClick={() => setDeleteDialog(true)}><Trash2 className="h-4 w-4" />{tr("Șterge", "Delete")}</Button>}
-            {current && !current.work_order_id && <Button variant="outline" data-testid="planning-create-work-order-button" disabled={busy} onClick={() => updateStatus("in_lucru")}><CalendarDays className="h-4 w-4" />{tr("Creare comandă", "Create work order")}</Button>}
-            <Button data-testid="planning-save-button" disabled={busy || !form.client_id || !form.vehicle_id || !form.title || !form.starts_at || !form.ends_at} onClick={save}>{busy ? <RotateCcw className="h-4 w-4 animate-spin" /> : tr("Salvează", "Save")}</Button>
+            <div className="flex w-full flex-row flex-wrap items-center gap-2">
+              {current && !current.work_order_id && <Button variant="outline" className="mr-auto" data-testid="planning-create-work-order-button" disabled={busy} onClick={createWorkOrder}><CalendarDays className="h-4 w-4" />{tr("Creare comandă", "Create work order")}</Button>}
+              {current?.work_order_id && <Button variant="outline" className="mr-auto" data-testid="planning-open-work-order-button" onClick={() => window.open(`/work-orders/${current.work_order_id}`, "_blank")}><CalendarDays className="h-4 w-4" />{tr("Comandă", "Work order")}</Button>}
+              {current && <Button variant="destructive" className="h-10 w-10 p-0 sm:w-auto sm:px-3" data-testid="planning-delete-button" aria-label={tr("Șterge", "Delete")} title={tr("Șterge", "Delete")} disabled={busy} onClick={() => setDeleteDialog(true)}><Trash2 className="h-4 w-4" /><span className="hidden sm:inline">{tr("Șterge", "Delete")}</span></Button>}
+              <Button className="h-10 w-10 p-0 sm:w-auto sm:px-3" data-testid="planning-save-button" aria-label={tr("Salvează", "Save")} title={tr("Salvează", "Save")} disabled={busy || !form.client_id || !form.vehicle_id || !form.title || !form.starts_at || !form.ends_at} onClick={save}>{busy ? <RotateCcw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}<span className="hidden sm:inline">{tr("Salvează", "Save")}</span></Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

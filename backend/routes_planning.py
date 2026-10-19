@@ -22,7 +22,6 @@ class AppointmentIn(BaseModel):
     ends_at: str
     elevator: str = ""
     mechanic_ids: List[str] = []
-    advisor: str = ""
     title: str = Field(min_length=2, max_length=160)
     notes: str = ""
 
@@ -107,6 +106,7 @@ async def create_appointment(body: AppointmentIn, user=Depends(require("planning
         raise HTTPException(400, "Vehiculul nu aparține clientului selectat")
     await conflicts(body)
     doc = body.model_dump() | {
+        "advisor": user["name"],
         "status": "programat",
         "work_order_id": "",
         "created_by": user["name"],
@@ -135,7 +135,7 @@ async def update_appointment(aid: str, body: AppointmentIn, user=Depends(require
     if vehicle.get("client_id") != body.client_id:
         raise HTTPException(400, "Vehiculul nu aparține clientului selectat")
     await conflicts(body, aid)
-    await db.appointments.update_one({"_id": oid(aid)}, {"$set": body.model_dump() | {"updated_at": iso()}})
+    await db.appointments.update_one({"_id": oid(aid)}, {"$set": body.model_dump() | {"advisor": user["name"], "updated_at": iso()}})
     return (await enrich([await get_or_404("appointments", aid)]))[0]
 
 
