@@ -9,6 +9,7 @@ import { useLang } from "@/lib/prefs";
 import { errMsg } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ROLE_LABELS } from "@/components/common";
 import { toast } from "sonner";
 
@@ -40,19 +41,20 @@ const NAV = [
   ]},
 ];
 
-function SideNav({ onNav }) {
+function SideNav({ onNav, collapsed = false }) {
   const { can, user } = useAuth();
   const { tr, theme } = useLang();
   return (
-    <nav className="flex h-full flex-col gap-5 overflow-y-auto px-3 py-5">
-      <div className="flex items-center gap-2 px-2">
+    <TooltipProvider delayDuration={180}>
+      <nav className={`flex h-full flex-col overflow-y-auto py-5 ${collapsed ? "gap-3 px-2" : "gap-5 px-3"}`}>
+      <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2 px-2"}`}>
         <img
           src="/performa-logo-dark.png"
           alt="Performa Auto"
-          className="h-10 w-16 shrink-0 object-contain"
+          className={`shrink-0 object-contain ${collapsed ? "h-9 w-9" : "h-10 w-16"}`}
           data-testid="app-brand-mark"
         />
-        <div>
+        {!collapsed && <div>
           <div
             className="font-heading text-base font-extrabold uppercase leading-none tracking-wide"
             data-testid="app-brand-name"
@@ -60,26 +62,30 @@ function SideNav({ onNav }) {
             Performa Auto
           </div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">ERP · RO</div>
-        </div>
+        </div>}
       </div>
       {NAV.map((g) => {
         const items = g.items.filter((i) => can(i[1]) && (!i[6] || user?.platform_role === "SUPERADMIN"));
         if (!items.length) return null;
         return (
           <div key={g.group[0]}>
-            <div className="eyebrow mb-2 px-2">{tr(g.group[0], g.group[1])}</div>
-            {items.map(([to, , Icon, ro, en, tid]) => (
-              <NavLink key={to} to={to} end={to === "/"} onClick={onNav} data-testid={`sidebar-${tid}-link`}
+            {!collapsed && <div className="eyebrow mb-2 px-2">{tr(g.group[0], g.group[1])}</div>}
+            {items.map(([to, , Icon, ro, en, tid]) => {
+              const link = <NavLink key={to} to={to} end={to === "/"} onClick={onNav} data-testid={`sidebar-${tid}-link`}
+                aria-label={tr(ro, en)}
                 className={({ isActive }) =>
-                  `mb-0.5 flex items-center gap-3 rounded px-2 py-2 text-sm font-medium transition-colors duration-150 ${
+                  `mb-0.5 flex rounded text-sm font-medium transition-colors duration-150 ${collapsed ? "h-10 w-10 items-center justify-center" : "items-center gap-3 px-2 py-2"} ${
                     isActive ? "bg-primary/10 text-primary shadow-[inset_2px_0_0_hsl(var(--primary))]" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-                <Icon className="h-4 w-4" /> {tr(ro, en)}
-              </NavLink>
-            ))}
+                <Icon className="h-4 w-4 shrink-0" /> {!collapsed && tr(ro, en)}
+              </NavLink>;
+              if (!collapsed) return link;
+              return <Tooltip key={to}><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right" data-testid={`sidebar-${tid}-tooltip`}>{tr(ro, en)}</TooltipContent></Tooltip>;
+            })}
           </div>
         );
       })}
-    </nav>
+      </nav>
+    </TooltipProvider>
   );
 }
 
@@ -90,8 +96,8 @@ export default function Layout() {
   const nav = useNavigate();
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r bg-card lg:block">
-        <SideNav />
+      <aside className="sticky top-0 hidden h-screen w-16 shrink-0 border-r bg-card lg:block">
+        <SideNav collapsed />
       </aside>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-64 p-0">

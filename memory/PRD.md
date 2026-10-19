@@ -166,6 +166,13 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Verificare: testing agent a confirmat fluxul UI/Backend de salvare sparse și logo; suita specifică
   a trecut 17/17, iar curățarea a confirmat 0 date temporare.
 
+## Navigare laterală compactă (2026-10-19)
+- Bara laterală desktop afișează doar iconițele modulelor pentru a elibera spațiu de lucru.
+- La hover, fiecare iconiță afișează un tooltip cu denumirea modulului; accesibilitatea este păstrată
+  prin etichete ARIA.
+- Pe mobil, meniul lateral rămâne extins, cu denumiri complete pentru navigare clară.
+- Verificare: tooltip desktop și meniul mobil au fost testate vizual; build frontend reușit.
+
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
   `frontend/public/performa-logo.png`.
