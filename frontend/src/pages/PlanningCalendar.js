@@ -216,7 +216,7 @@ export default function PlanningCalendar() {
         </div>
       </div>
       <Panel className="min-w-0" testid="planning-calendar-panel">
-        <div className="min-w-0 overflow-x-auto" data-testid="planning-calendar">
+        <div className="app-scroll min-w-0 overflow-x-auto" data-testid="planning-calendar">
           <DndCalendar
             localizer={localizer}
             events={events}

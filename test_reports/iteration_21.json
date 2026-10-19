@@ -1,0 +1,24 @@
+{
+  "summary": "Retested two fixes: (1) deleting an appointment that has already been turned into a work order, and (2) modal sizing. Backend: updated test_iter20_appointment_delete.py, which still expected the old 400 block on this delete. All 5 tests pass. They create a real work order via POST /appointments/{id}/status in_lucru, delete the appointment (200, work_order_preserved=true), and confirm the appointment, its notifications and audit are handled while the work order stays intact (number/status/client/vehicle/complaint/lines unchanged) and stays isolated from the other tenant. They also cover a plain delete (work_order_preserved=false), cross-tenant delete returning 404 for both plain and converted appointments, a non-existent id returning 404, an invalid id, and unauthenticated access returning 401. UI on desktop at 1920x1080: on a converted appointment planning-delete-button is visible and enabled. The confirm dialog says the work order stays intact. Cancel keeps the appointment. Confirm deletes it, shows a toast, removes the event from the calendar and updates capacity from 3 to 2. The work order still exists in the DB. UI on mobile at 390x800: planning-dialog (new and edit) is 768px tall (top 16, bottom 784, left 16, right 374) with overflow-y auto and scrolls internally (scrollHeight 938 > clientHeight 766). planning-delete-dialog is centered inside the viewport, the plain-delete text is correct, and confirm deletes. edit-tenant-dialog fits at 390x800 and scrolls internally at 390x420 (max-h 388px). planning-dialog at 1920x700 also fits.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dialogs (mobile)", "issues": ["The close X is absolutely positioned inside the scrolling content, so it scrolls out of view in long dialogs (planning-dialog on mobile). Optional: make it sticky.", "max-h uses 100vh. On mobile browsers with dynamic toolbars, 100dvh would fit more reliably."]},
+      {"screen": "Planning dialog", "issues": ["The start and end fields use the browser's default datetime-local picker instead of a shadcn calendar (existing behaviour, low priority)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter20_appointment_delete.py", "/app/backend/tests/iter21_appt_ui_fixture.py", "/app/test_reports/pytest/pytest_iter21.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "delete_appointment: the backend logic is correct. A deleted converted appointment leaves an orphan work order with no back-reference. Acceptable by requirement, but consider recording the source appointment title or id in the work order's status_history or audit so the link can be traced.",
+    "Converting an appointment through the tests consumes a work_order sequence number, so the CL numbers will have a gap after test cleanup (expected with test data, not a bug)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter20_appointment_delete.py", "/app/backend/tests/iter21_appt_ui_fixture.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100%"},
+  "seed_data_creation": "TEMP tenants, users, client, vehicle, appointments and work orders were created by the pytest fixture and by iter21_appt_ui_fixture.py (owner tenant). All were removed by teardown; afterwards the DB has 0 TEMP clients, appointments, tenants and work orders.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use `python /app/backend/tests/iter21_appt_ui_fixture.py setup|check|teardown` to create a converted and a plain appointment for tomorrow in the owner tenant, for UI tests. Calendar events can be selected with .rbc-event filtered by title text. The server clock is in Oct 2026."
+}

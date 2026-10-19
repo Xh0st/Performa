@@ -1,4 +1,4 @@
-# Iteration 20: DELETE /api/appointments/{id} - success, notifications+audit, cross-tenant isolation, work_order guard, 404
+# Iteration 20/21: DELETE /api/appointments/{id} - success, notifications+audit, cross-tenant isolation, work_order guard, 404
 import asyncio
 import os
 import re
@@ -109,7 +109,7 @@ def test_delete_success_removes_notifications_and_audits(a1, cv):
     assert run(db.notifications.count_documents({"appointment_id": aid, "tenant_id": T1})) == 1
     r = a1.delete(f"{BASE}/appointments/{aid}")
     assert r.status_code == 200, r.text
-    assert r.json() == {"ok": True}
+    assert r.json() == {"ok": True, "work_order_preserved": False}
     assert run(db.appointments.find_one({"_id": ObjectId(aid)})) is None
     assert run(db.notifications.count_documents({"appointment_id": aid})) == 0
     audit = run(db.audit_logs.find_one({"action": "delete_appointment", "entity_id": aid}))
@@ -130,16 +130,37 @@ def test_cross_tenant_delete_blocked(a1, a2, cv):
     assert a1.delete(f"{BASE}/appointments/{aid}").status_code == 200
 
 
-def test_delete_with_work_order_blocked(a1, cv):
+def test_delete_converted_appointment_preserves_work_order(a1, a2, cv):
+    # Iter21: appointment converted to work order (status in_lucru) can be deleted; WO preserved
     aid = mk_appt(a1, cv, 12, f"TEMP wo {SUF}")
+    r = a1.post(f"{BASE}/appointments/{aid}/status", json={"status": "in_lucru"})
+    assert r.status_code == 200, r.text
+    wo_id = r.json().get("work_order_id")
+    assert wo_id
+    wo_before = a1.get(f"{BASE}/work-orders/{wo_id}")
+    assert wo_before.status_code == 200, wo_before.text
+    # cross-tenant cannot delete converted appointment
+    assert a2.delete(f"{BASE}/appointments/{aid}").status_code == 404
     db = rdb()
-    run(db.appointments.update_one({"_id": ObjectId(aid)}, {"$set": {"work_order_id": "TEMPWOID"}}))
-    r = a1.delete(f"{BASE}/appointments/{aid}")
-    assert r.status_code == 400, r.text
-    assert "comandă" in r.json().get("detail", "")
     assert run(db.appointments.find_one({"_id": ObjectId(aid)})) is not None
-    assert run(db.notifications.count_documents({"appointment_id": aid})) == 1
-    assert run(db.audit_logs.count_documents({"action": "delete_appointment", "entity_id": aid})) == 0
+    r = a1.delete(f"{BASE}/appointments/{aid}")
+    assert r.status_code == 200, r.text
+    assert r.json() == {"ok": True, "work_order_preserved": True}
+    assert run(db.appointments.find_one({"_id": ObjectId(aid)})) is None
+    assert run(db.notifications.count_documents({"appointment_id": aid})) == 0
+    assert run(db.audit_logs.count_documents({"action": "delete_appointment", "entity_id": aid})) == 1
+    wo_after = a1.get(f"{BASE}/work-orders/{wo_id}")
+    assert wo_after.status_code == 200, wo_after.text
+    b, a = wo_before.json(), wo_after.json()
+    for k in ("number", "status", "client_id", "vehicle_id", "complaint", "lines"):
+        assert b.get(k) == a.get(k), k
+    assert a["status"] == "in_lucru"
+    assert a2.get(f"{BASE}/work-orders/{wo_id}").status_code == 404
+    assert a1.delete(f"{BASE}/appointments/{aid}").status_code == 404
+
+
+def test_delete_nonexistent_404(a1):
+    assert a1.delete(f"{BASE}/appointments/{ObjectId()}").status_code == 404
 
 
 def test_delete_invalid_id_and_unauth(a1):

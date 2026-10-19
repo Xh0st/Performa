@@ -72,34 +72,42 @@
     animation: fadeUp 0.35s ease-out both;
 }
 @supports not selector(::-webkit-scrollbar) {
-    .sidebar-scroll {
+    .sidebar-scroll,
+    .app-scroll {
         scrollbar-width: thin;
         scrollbar-color: transparent transparent;
     }
-    .sidebar-scroll:hover {
+    .sidebar-scroll:hover,
+    .app-scroll:hover {
         scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
     }
 }
-.sidebar-scroll::-webkit-scrollbar {
+.sidebar-scroll::-webkit-scrollbar,
+.app-scroll::-webkit-scrollbar {
     width: 4px;
     height: 4px;
 }
-.sidebar-scroll::-webkit-scrollbar-button {
+.sidebar-scroll::-webkit-scrollbar-button,
+.app-scroll::-webkit-scrollbar-button {
     display: none;
     width: 0;
     height: 0;
 }
-.sidebar-scroll::-webkit-scrollbar-button:single-button {
+.sidebar-scroll::-webkit-scrollbar-button:single-button,
+.app-scroll::-webkit-scrollbar-button:single-button {
     display: none;
 }
-.sidebar-scroll::-webkit-scrollbar-track {
+.sidebar-scroll::-webkit-scrollbar-track,
+.app-scroll::-webkit-scrollbar-track {
     background: transparent;
 }
-.sidebar-scroll::-webkit-scrollbar-thumb {
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.app-scroll::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: 999px;
 }
-.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+.sidebar-scroll:hover::-webkit-scrollbar-thumb,
+.app-scroll:hover::-webkit-scrollbar-thumb {
     background: hsl(var(--muted-foreground) / 0.45);
 }
 @keyframes fadeUp {
