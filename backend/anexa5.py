@@ -13,6 +13,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
+from pdf_brand import draw_brand
 
 
 HEADERS = [
@@ -32,15 +33,15 @@ def table_values(rows: list) -> list:
     return [[row[key] for key in row["columns"]] for row in rows]
 
 
-def build_pdf(rows: list, start: str, end: str, branch: str) -> bytes:
+def build_pdf(rows: list, start: str, end: str, branch: str, include_footer: bool = True) -> bytes:
     output = io.BytesIO()
     doc = SimpleDocTemplate(
         output,
         pagesize=landscape(A4),
         leftMargin=7 * mm,
         rightMargin=7 * mm,
-        topMargin=8 * mm,
-        bottomMargin=8 * mm,
+        topMargin=19 * mm,
+        bottomMargin=14 * mm,
     )
     styles = getSampleStyleSheet()
     styles["Title"].fontName = FONT_BOLD
@@ -81,7 +82,11 @@ def build_pdf(rows: list, start: str, end: str, branch: str) -> bytes:
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
-    doc.build([title, meta, table])
+    doc.build(
+        [title, meta, table],
+        onFirstPage=lambda canvas, page: draw_brand(canvas, page, include_footer),
+        onLaterPages=lambda canvas, page: draw_brand(canvas, page, include_footer),
+    )
     return output.getvalue()
 
 

@@ -10,6 +10,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from pdf_brand import draw_brand
 
 
 FONT_DIR = Path(font_roboto.__file__).parent / "files"
@@ -23,15 +24,15 @@ def ro_date(value: str) -> str:
     return ".".join(reversed(parts)) if len(parts) == 3 else value
 
 
-def build_certificate(certificate: dict) -> bytes:
+def build_certificate(certificate: dict, include_footer: bool = True) -> bytes:
     output = io.BytesIO()
     document = SimpleDocTemplate(
         output,
         pagesize=A4,
         leftMargin=18 * mm,
         rightMargin=18 * mm,
-        topMargin=16 * mm,
-        bottomMargin=16 * mm,
+        topMargin=23 * mm,
+        bottomMargin=18 * mm,
     )
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
@@ -110,5 +111,9 @@ def build_certificate(certificate: dict) -> bytes:
         Paragraph(f"Unitate emitentă: {certificate['seller_name']} · CUI {certificate.get('seller_cui', '—')}", normal),
         Paragraph("Reprezentant autorizat: ______________________________", normal),
     ]
-    document.build(story)
+    document.build(
+        story,
+        onFirstPage=lambda canvas, page: draw_brand(canvas, page, include_footer),
+        onLaterPages=lambda canvas, page: draw_brand(canvas, page, include_footer),
+    )
     return output.getvalue()

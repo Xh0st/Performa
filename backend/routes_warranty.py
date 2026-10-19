@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from core import db, get_or_404, iso, next_seq, oid, require, ser
+from core import db, get_or_404, get_settings, iso, next_seq, oid, require, ser
 from warranty_pdf import build_certificate
 
 
@@ -64,7 +64,10 @@ async def certificate_pdf(iid: str, user=Depends(require("warranties"))):
     certificate = await db.warranty_certificates.find_one({"invoice_id": iid})
     if not certificate:
         raise HTTPException(404, "Certificatul de garanție nu există")
-    content = build_certificate(certificate)
+    content = build_certificate(
+        certificate,
+        include_footer=(await get_settings()).get("subscription_plan") != "FULL",
+    )
     return Response(content, media_type="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="{certificate["number"]}.pdf"',
     })

@@ -180,7 +180,11 @@ async def inbox_get(mid: str, user=Depends(require("stock"))):
 @router.get("/efactura/inbox/{mid}/pdf")
 async def inbox_pdf(mid: str, user=Depends(require("stock"))):
     m = await get_or_404("efactura_inbox", mid)
-    pdf = render_pdf(m["xml"], m)
+    pdf = render_pdf(
+        m["xml"],
+        m,
+        include_footer=(await get_settings()).get("subscription_plan") != "FULL",
+    )
     name = "".join(c for c in m["parsed"]["series_number"] if c.isalnum() or c in "-_") or "factura"
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="efactura_{name}.pdf"'})
 

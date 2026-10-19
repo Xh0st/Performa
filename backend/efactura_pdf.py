@@ -9,6 +9,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+from pdf_brand import draw_brand
 from xml.sax.saxutils import escape
 
 NS = {"cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
@@ -91,11 +92,11 @@ def _party_cell(label, p):
     return rows
 
 
-def render_pdf(xml: str, meta: dict) -> bytes:
+def render_pdf(xml: str, meta: dict, include_footer: bool = True) -> bytes:
     d = parse_full(xml)
     cur = d["cur"]
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=14 * mm, bottomMargin=16 * mm,
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=23 * mm, bottomMargin=18 * mm,
                             title=f"e-Factura {d['id']}", author=d["seller"]["name"])
     W = A4[0] - 28 * mm
     head = Table([[_party_cell("FURNIZOR", d["seller"]),
@@ -140,6 +141,7 @@ def render_pdf(xml: str, meta: dict) -> bytes:
                                  f"Fișier importat: {meta['filename']}" if meta.get("filename") else "") if x)
 
     def footer(canvas, _doc):
+        draw_brand(canvas, _doc, include_footer)
         canvas.saveState()
         canvas.setFont("LS", 6.5)
         canvas.setFillColor(colors.HexColor("#5F6368"))

@@ -17,6 +17,17 @@ function Header({ s, title, number, dateStr }) {
   return (
     <div className="mb-6 flex justify-between border-b-2 border-slate-900 pb-4">
       <div className="text-[12px] leading-5">
+        <div className="mb-2 flex items-center gap-2">
+          <img
+            src="/performa-logo-dark.png"
+            alt="Performa"
+            className="h-6 w-14 object-contain object-left"
+            data-testid="print-document-brand-logo"
+          />
+          <span className="font-bold text-[#f47a2a]" data-testid="print-document-brand-name">
+            Performa
+          </span>
+        </div>
         <div className="text-base font-bold">{s.name}</div>
         <div>CUI: {s.cui} · Reg. Com.: {s.reg_com}</div>
         <div>{addr(s.address, s.city)}</div>
@@ -28,6 +39,15 @@ function Header({ s, title, number, dateStr }) {
         <div className="font-mono text-sm">Nr. {number}</div>
         <div className="text-[12px]">Data: {dateStr}</div>
       </div>
+    </div>
+  );
+}
+
+function PrintFooter({ settings }) {
+  if (settings?.subscription_plan === "FULL") return null;
+  return (
+    <div className="print-brand-footer mt-10 border-t pt-2 text-xs text-slate-500">
+      Generat cu Performa - performa.net
     </div>
   );
 }
@@ -199,11 +219,12 @@ export default function PrintDoc() {
         {error && <div>{error}</div>}
         {s && data && kind === "reception" && <Reception s={s} w={data} />}
         {s && data && kind === "quote" && <Quote s={s} w={data} v={sp.get("v")} />}
-        {data && kind === "invoice" && <Invoice inv={data} />}
+        {s && data && kind === "invoice" && <Invoice inv={data} />}
         {s && data && kind === "receipt" && <ReceiptDoc s={s} p={data} />}
         {s && data && kind === "nir" && <NirDoc s={s} n={data} />}
         {s && data && kind === "register" && <RegisterDoc s={s} r={data} />}
         {s && data && kind === "return" && <ReturnDoc s={s} r={data} />}
+        {s && data && <PrintFooter settings={s} />}
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ export default function SettingsPage() {
     if (data) setF({ ...data, elevators_text: (data.elevators || []).join(", ") });
   }, [data]);
   if (!f) return <Loading />;
+  const isFull = f.subscription_plan === "FULL";
   const save = async () => {
     try {
       const { elevators_text, ...rest } = f;
@@ -40,6 +41,27 @@ export default function SettingsPage() {
           </div>
         </Panel>
         <div className="space-y-4">
+          <Panel title={tr("Plan & branding", "Plan & branding")}>
+            <div className="space-y-3 text-sm">
+              <div data-testid="settings-subscription-plan" className="font-semibold">
+                {isFull ? "FULL" : "BASIC"}
+              </div>
+              <Field label={tr("Subdomeniu dedicat", "Dedicated subdomain")}>
+                <Input
+                  data-testid="settings-custom-subdomain-input"
+                  disabled={!isFull}
+                  placeholder="serviceul-meu"
+                  value={f.custom_subdomain || ""}
+                  onChange={(e) => setF({ ...f, custom_subdomain: e.target.value })}
+                />
+              </Field>
+              <p className="text-muted-foreground" data-testid="settings-logo-plan-note">
+                {isFull
+                  ? tr("Logo-ul personalizat se activează după configurarea storage-ului.", "Custom logo activates after storage configuration.")
+                  : tr("Planul BASIC folosește branding Performa pe documente.", "BASIC uses Performa branding on documents.")}
+              </p>
+            </div>
+          </Panel>
           <Panel title={tr("Tarife manoperă (RON/oră, fără TVA)", "Labor rates (RON/h, excl. VAT)")}>
             <div className="grid gap-3 sm:grid-cols-3">
               {Object.keys(LABOR_CATS).map((k) => (

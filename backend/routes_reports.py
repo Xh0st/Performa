@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
 from anexa5 import build_csv, build_pdf, build_xlsx
-from core import db, require
+from core import db, get_settings, require
 from rar_autopass import get_config
 
 
@@ -100,7 +100,13 @@ async def export_final_inspections(kind: str, start: str, end: str, inspector: s
     rows = await anexa_rows(start, end, inspector)
     branch = (await get_config())["branch_name"]
     if kind == "pdf":
-        content = build_pdf(rows, start, end, branch)
+        content = build_pdf(
+            rows,
+            start,
+            end,
+            branch,
+            include_footer=(await get_settings()).get("subscription_plan") != "FULL",
+        )
         media_type = "application/pdf"
     if kind == "csv":
         content = build_csv(rows)

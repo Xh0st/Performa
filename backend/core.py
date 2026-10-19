@@ -41,6 +41,16 @@ MODULE_ROLES = {
 
 WO_STATUSES = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "in_lucru", "asteapta_piese",
                "finalizata", "facturata", "inchisa"]
+FULL_ONLY_MODULES = {"planning", "stock"}
+FULL_ONLY_PREFIXES = (
+    "/api/appointments",
+    "/api/products",
+    "/api/suppliers",
+    "/api/nirs",
+    "/api/supplier-returns",
+    "/api/efactura",
+    "/api/rar-autopass",
+)
 
 
 class TenantCollection:
@@ -208,8 +218,31 @@ async def get_or_404(coll, id_: str) -> dict:
     return raw
 
 
-def permissions_for(role: str):
-    return [m for m, roles in MODULE_ROLES.items() if role in roles]
+def permissions_for(role: str, plan: str = "BASIC"):
+    return [
+        module
+        for module, roles in MODULE_ROLES.items()
+        if role in roles and (plan == "FULL" or module not in FULL_ONLY_MODULES)
+    ]
+
+
+def requires_full_plan(path: str) -> bool:
+    return path.startswith(FULL_ONLY_PREFIXES) or "/efactura/" in path
+
+
+async def tenant_plan(tenant_id: str) -> str:
+    tenant = await raw_db.tenants.find_one({"_id": tenant_id}, {"subscription_plan": 1})
+    return (tenant or {}).get("subscription_plan", "BASIC")
+
+
+async def enforce_work_order_quota() -> None:
+    scope = current_scope()
+    if not scope or await tenant_plan(scope["tenant_id"]) == "FULL":
+        return
+    month = now().strftime("%Y-%m")
+    count = await db.work_orders.count_documents({"created_at": {"$regex": f"^{month}"}})
+    if count >= 1000:
+        raise HTTPException(403, "Planul BASIC permite maximum 1.000 comenzi de lucru pe lună")
 
 
 async def get_current_user(request: Request) -> dict:
@@ -259,6 +292,9 @@ async def get_current_user(request: Request) -> dict:
             "branch_id": u["active_branch_id"],
             "platform_role": user.get("platform_role"),
         })
+        u["subscription_plan"] = tenant.get("subscription_plan", "BASIC")
+        if u["subscription_plan"] != "FULL" and requires_full_plan(request.url.path):
+            raise HTTPException(403, "Această funcție este disponibilă doar în planul FULL")
     allowed_initial_password_paths = {
         "/api/auth/change-initial-password",
         "/api/auth/logout",
@@ -266,7 +302,7 @@ async def get_current_user(request: Request) -> dict:
     }
     if user.get("must_change_password") and request.url.path not in allowed_initial_password_paths:
         raise HTTPException(403, "Schimbați parola inițială pentru a continua")
-    u["permissions"] = permissions_for(u["role"])
+    u["permissions"] = permissions_for(u["role"], u.get("subscription_plan", "BASIC"))
     return u
 
 
@@ -307,7 +343,11 @@ async def audit(user: dict, action: str, entity: str, entity_id: str = "", detai
 
 async def get_settings() -> dict:
     s = await db.settings.find_one({"kind": "company"})
-    return {k: v for k, v in (s or {}).items() if k != "_id"}
+    settings = {k: v for k, v in (s or {}).items() if k != "_id"}
+    scope = current_scope()
+    if scope:
+        settings["subscription_plan"] = await tenant_plan(scope["tenant_id"])
+    return settings
 
 
 def calc_totals(lines: list):

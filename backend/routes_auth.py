@@ -1,11 +1,12 @@
 import os
+import re
 from datetime import timedelta
 from typing import Optional
 import jwt
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel
 from core import (db, raw_db, ser, oid, iso, now, hash_password, verify_password, make_token, get_current_user, require,
-                  permissions_for, audit, get_settings, ROLES, JWT_ALG)
+                  permissions_for, audit, get_settings, ROLES, JWT_ALG, tenant_plan)
 
 router = APIRouter(prefix="/api")
 
@@ -185,6 +186,10 @@ async def create_user(body: UserIn, user=Depends(require("users"))):
     email = body.email.strip().lower()
     if await raw_db.users.find_one({"email": email}):
         raise HTTPException(400, "Email deja existent")
+    if body.active and await tenant_plan(user["tenant_id"]) == "BASIC":
+        active_users = await raw_db.users.count_documents({"tenant_id": user["tenant_id"], "active": True})
+        if active_users >= 3:
+            raise HTTPException(403, "Planul BASIC permite maximum 3 utilizatori activi")
     doc = {"email": email, "name": body.name, "role": body.role, "active": body.active,
            "password_hash": hash_password(body.password), "tenant_id": user["tenant_id"],
            "assigned_branch_ids": [user["active_branch_id"]], "active_branch_id": user["active_branch_id"], "created_at": iso()}
@@ -208,6 +213,10 @@ async def update_user(uid: str, body: UserIn, user=Depends(require("users"))):
         raise HTTPException(404, "Not found")
     if target.get("platform_role") and user.get("platform_role") != "SUPERADMIN":
         raise HTTPException(403, "Contul Superadmin poate fi administrat doar de Superadmin")
+    if body.active and not target.get("active", True) and await tenant_plan(user["tenant_id"]) == "BASIC":
+        active_users = await raw_db.users.count_documents({"tenant_id": user["tenant_id"], "active": True})
+        if active_users >= 3:
+            raise HTTPException(403, "Planul BASIC permite maximum 3 utilizatori activi")
     await raw_db.users.update_one({"_id": oid(uid)}, {"$set": upd})
     await audit(user, "update", "user", uid, body.email)
     return user_out(await raw_db.users.find_one({"_id": oid(uid)}))
@@ -237,6 +246,14 @@ async def write_settings(body: dict, user=Depends(require("settings"))):
     body.pop("_id", None)
     body.pop("tenant_id", None)
     body.pop("branch_id", None)
+    body.pop("subscription_plan", None)
+    custom_subdomain = str(body.get("custom_subdomain", "")).strip().lower()
+    if custom_subdomain:
+        if await tenant_plan(user["tenant_id"]) != "FULL":
+            raise HTTPException(403, "Subdomeniul dedicat este disponibil doar în planul FULL")
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", custom_subdomain):
+            raise HTTPException(400, "Subdomeniu invalid")
+        body["custom_subdomain"] = custom_subdomain
     await db.settings.update_one({"kind": "company"}, {"$set": body, "$setOnInsert": {"kind": "company"}}, upsert=True)
     await audit(user, "update", "settings", "company")
     return await get_settings()

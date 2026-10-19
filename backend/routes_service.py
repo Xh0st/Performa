@@ -4,8 +4,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from core import (db, raw_db, ser, oid, iso, now, require, audit, get_or_404, next_seq, get_settings, calc_totals,
-                  WO_STATUSES)
+from core import (db, raw_db, ser, oid, iso, now, require, audit, enforce_work_order_quota, get_or_404, next_seq,
+                  get_settings, calc_totals, WO_STATUSES)
 from tenant_context import set_scope
 
 router = APIRouter(prefix="/api")
@@ -178,6 +178,7 @@ async def list_work_orders(status: str = "", q: str = "", active: bool = False, 
 
 @router.post("/work-orders")
 async def create_work_order(body: ReceptionIn, user=Depends(require("reception"))):
+    await enforce_work_order_quota()
     if not body.signature:
         raise HTTPException(400, "Semnătura clientului este obligatorie")
     await get_or_404("clients", body.client_id)

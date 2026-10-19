@@ -6,7 +6,7 @@ from typing import List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from core import db, raw_db, get_or_404, get_settings, iso, now, oid, require, ser
+from core import db, raw_db, enforce_work_order_quota, get_or_404, get_settings, iso, now, oid, require, ser
 from tenant_context import set_scope
 
 
@@ -142,6 +142,7 @@ async def update_appointment(aid: str, body: AppointmentIn, user=Depends(require
 async def create_work_order_from_appointment(appointment: dict, user: dict) -> str:
     if appointment.get("work_order_id"):
         return appointment["work_order_id"]
+    await enforce_work_order_quota()
     vehicle = await get_or_404("vehicles", appointment["vehicle_id"])
     from core import next_seq
 

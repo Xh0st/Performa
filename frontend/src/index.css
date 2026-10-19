@@ -87,6 +87,7 @@
     .no-print { display: none !important; }
     body { background: white !important; }
     .print-doc { box-shadow: none !important; margin: 0 !important; }
+    .print-brand-footer { position: fixed; bottom: 8mm; left: 14mm; right: 14mm; }
 }
 
 [data-debug-wrapper="true"] { display: contents !important; }
