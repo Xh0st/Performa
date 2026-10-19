@@ -163,13 +163,15 @@ export default function Stock() {
           <Button data-testid="add-nir-button" onClick={() => setNirOpen(true)}><Plus className="mr-1 h-4 w-4" />NIR</Button>
         </>} />
       <Tabs defaultValue="products">
-        <TabsList>
+        <div className="app-scroll overflow-x-auto">
+        <TabsList className="w-max">
           <TabsTrigger value="products" data-testid="stock-tab-products">{tr("Produse", "Products")}</TabsTrigger>
           <TabsTrigger value="nir" data-testid="stock-tab-nir">NIR</TabsTrigger>
           <TabsTrigger value="returns" data-testid="stock-tab-returns">{tr("Retururi furnizor", "Supplier returns")}</TabsTrigger>
           <TabsTrigger value="suppliers" data-testid="stock-tab-suppliers">{tr("Furnizori", "Suppliers")}</TabsTrigger>
           <TabsTrigger value="einbox" data-testid="stock-tab-efactura">{tr("Facturi e-Factura primite", "Received e-Invoices")}</TabsTrigger>
         </TabsList>
+        </div>
         <TabsContent value="products">
           <Panel>
             <div className="mb-4 flex flex-col gap-2 sm:flex-row">

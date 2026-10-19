@@ -1,0 +1,37 @@
+{
+  "summary": "Retest of client-side pagination (PAGE_SIZE=20). Fixture: added 45 TEMP clients, each with a TEMP vehicle (59 clients / 63 vehicles in total), plus 25 TEMP products (81 in total). Invoices (82 fiscal), work orders (92) and products were already over 20 from seed data. Desktop 1920: Clients shows 20/20/19 rows; summary reads 1–20, 21–40 and 41–59 din 59; Pagina x/3; previous is disabled on page 1 and next on the last page; previous goes back correctly. Search ('TEMP Pag Client 4' gives 5 rows and no controls; 'TEMP Pag' gives 45 rows and Pagina 1/3) and the all/pf/pj filters reset to page 1, even when starting from page 2 or 3. No blank page: pj shows the empty state. Vehicles show 20/20/20/3 rows (63 total, 4 pages). Invoices show 20x4 and 2 (82 total, 5 pages); the paid, unpaid, all, proforma and fiscal filters reset to page 1 starting from page 5, and lists of 20 or fewer hide the controls. Work orders list view shows 20x4 and 12 (92 total); a search with no matches gives 0 rows and no controls. Products show 20x4 and 1 (81 total); search and the low-stock filter reset to Pagina 1/2. NIR (4) and returns (3) correctly show no controls. Kanban shows 11 active cards with no controls. Mobile 390: on clients, vehicles, invoices, stock and work orders the controls fit (324–358px wide, 36px touch targets) and next works. Page-level horizontal overflow appears only on /stock (542px), caused by the TabsList and not by pagination. No page errors. Confirmed: the API still sends every object; there is no server-side pagination. All TEMP/TEST data was cleaned up, including leftovers from earlier runs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/invoices, /api/work-orders, /api/products, /api/clients, /api/vehicles, /api/nirs, /api/supplier-returns", "issue": "There is no server-side pagination. The limit, skip and page params are ignored and the full array is returned: invoices about 195KB (89 objects), work-orders about 222KB (92), products 56–81 objects. Pagination only limits the DOM, not the network payload or load time. Hard caps silently cut off data: clients to_list(1000), work-orders 1000, invoices 2000, vehicles 2000, products 5000. Past these caps, records become invisible with no warning."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/stock mobile 390", "issues": ["The TabsList (5 tabs, whitespace-nowrap) overflows the page horizontally: document scrollWidth is 542 against a 390px viewport. This was not caused by pagination. Wrap it in overflow-x-auto or make the tabs scrollable."]},
+      {"screen": "WorkOrders kanban", "issues": ["Kanban columns use pagination.pageItems. Once there are more than 20 active work orders, each column shows only the cards on the current page, and the column counts become per-page rather than real totals. Consider not paginating kanban, or paginating per column."]},
+      {"screen": "All paginated lists", "issues": ["Clicking next or previous does not scroll back to the top of the list. On mobile the user stays at the bottom of the new page (minor UX)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter27_pagination_api.py", "/app/backend/tests/iter27_pagination_fixture.py", "/app/test_reports/pytest/iter27_pagination.xml"],
+  "action_items": [
+    "Optional (the user asked for faster loading): add server-side pagination (skip/limit and a total count) to the list endpoints. The current fix only limits rendering.",
+    "Fix horizontal overflow of the /stock TabsList on mobile.",
+    "Do not paginate the kanban view, or paginate it per column.",
+    "Add data-testid to work-orders list rows (work-order-row-{number}); they currently have none.",
+    "Optional: scroll the list into view when changing page."
+  ],
+  "critical_code_review_comments": [
+    "The usePagination resetKey includes data.length, so a reload that changes the row count (create or delete) jumps back to page 1. This is acceptable but worth knowing.",
+    "WorkOrders.js applies pagination to both kanban and list views (visibleRows in the kanban filter).",
+    "The backend list endpoints use fixed to_list caps with no total or count, so data past the cap is silently dropped."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter27_pagination_api.py", "/app/backend/tests/iter27_pagination_fixture.py"],
+  "success_rate": {"backend": "100% (10/10 behaviour-documenting tests)", "frontend": "100% pagination checks passed; 1 unrelated mobile overflow on /stock"},
+  "seed_data_creation": "45 TEMP Pag clients, 45 TEMP vehicles and 25 TEMPPAG products were created and then deleted. Leftovers from earlier runs were also removed: the 3 TEMP25 tenants and users from iter25_fixture (created 17:43) and the client TEST_Client X100C9F8A with its vehicle. Final counts: 13 clients, 17 vehicles, 56 products, 89 invoices, 92 work orders, 4 NIRs, 3 returns; 0 TEMP/TEST docs left.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: python /app/backend/tests/iter27_pagination_fixture.py setup | teardown | counts (state in /tmp/iter27_pag.json; teardown also deletes leftovers by regex through the DB). Admin: andrei.melek@gmail.com. Pagination test IDs: {prefix}-pagination-controls, -summary, -page-indicator, -next-button, -previous-button. Work-orders list rows have no testid; use [data-testid=work-orders-table] tbody tr."
+}

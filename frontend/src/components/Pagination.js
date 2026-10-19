@@ -30,6 +30,10 @@ export function PaginationControls({ page, setPage, totalPages, total, testid = 
 
   const from = (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, total);
+  const goTo = (nextPage) => {
+    setPage(nextPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3" data-testid={`${testid}-controls`}>
       <span className="text-xs text-muted-foreground" data-testid={`${testid}-summary`}>
@@ -42,7 +46,7 @@ export function PaginationControls({ page, setPage, totalPages, total, testid = 
           data-testid={`${testid}-previous-button`}
           aria-label="Pagina anterioară"
           disabled={page <= 1}
-          onClick={() => setPage(page - 1)}
+          onClick={() => goTo(page - 1)}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -55,7 +59,7 @@ export function PaginationControls({ page, setPage, totalPages, total, testid = 
           data-testid={`${testid}-next-button`}
           aria-label="Pagina următoare"
           disabled={page >= totalPages}
-          onClick={() => setPage(page + 1)}
+          onClick={() => goTo(page + 1)}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

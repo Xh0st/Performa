@@ -66,7 +66,7 @@ export default function WorkOrders() {
       {!data ? <Loading /> : view === "kanban" ? (
         <div className="flex gap-3 overflow-x-auto pb-4" data-testid="kanban-board">
           {COLS.filter((c) => c !== "facturata").map((c) => {
-            const items = visibleRows.filter((w) => w.status === c);
+            const items = rows.filter((w) => w.status === c);
             return (
               <div key={c} data-testid={`kanban-col-${c}`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => drop(e, c)} className="w-64 shrink-0 rounded-md border bg-card/60">
                 <div className="flex items-center justify-between border-b px-3 py-2">
@@ -87,7 +87,7 @@ export default function WorkOrders() {
               </tr></thead>
               <tbody>
                 {visibleRows.map((w) => (
-                  <tr key={w.id} onClick={() => nav(`/work-orders/${w.id}`)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
+                  <tr key={w.id} data-testid={`work-order-row-${w.number}`} onClick={() => nav(`/work-orders/${w.id}`)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
                     <td className="px-2 font-mono text-xs text-primary">{w.number}</td><td className="px-2">{date(w.created_at)}</td>
                     <td className="px-2"><span className="font-mono text-xs">{w.vehicle.plate}</span> · {w.vehicle.make} {w.vehicle.model}</td>
                     <td className="px-2">{w.client_name}</td><td className="px-2 text-xs text-muted-foreground">{w.mechanic_names.join(", ")}</td>
