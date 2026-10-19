@@ -1,0 +1,21 @@
+{
+  "summary": "Verified the shared app-scroll scrollbar style. Chromium computed styles: planning-dialog, planning-delete-dialog, edit-tenant-dialog and planning-calendar all have the app-scroll class. Their ::-webkit-scrollbar is 4px wide and 4px high. ::-webkit-scrollbar-button is display:none with width 0. The Firefox fallback (scrollbar-width/scrollbar-color) is inside @supports not selector(::-webkit-scrollbar), so it does not override the webkit styles in Chrome 121+; computed scrollbar-width in Chromium is auto. planning-calendar has overflow-x auto. Mobile (390x800): the calendar scrolls horizontally (scrollWidth 620 vs clientWidth 324 in week view and 760 vs 324 in bays view). Setting scrollLeft and a horizontal mouse wheel both scroll the calendar, and the page itself has no horizontal overflow. planning-dialog fits the viewport (16 to 784) and scrolls internally (new: 830>766, edit: 982>766). On desktop (1920 and 1024 wide) the calendar fits its container (minWidth 620/760), so there is no overflow to scroll; this is expected. Regression: deleted a converted appointment on mobile. The dialog text says the work order stays intact; after confirming, the event disappears and the DB still has the work order. The backend test test_iter20_appointment_delete.py passes 5/5.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Planning calendar (mobile)", "issues": ["The react-big-calendar toolbar (Astăzi/Înapoi/Înainte and the date label) sits inside the horizontally scrolling app-scroll container. On 390px the 'Înainte' button is clipped and the toolbar scrolls away along with the grid. Optional: let only the grid scroll, or wrap the toolbar.", "The today column/slot highlight is light blue (default rbc .rbc-today), which is high-contrast against the dark theme (existing behaviour)."]},
+      {"screen": "Platform tenants (1024px)", "issues": ["The Actions column of the tenants table is clipped at 1024px (the 'Șterge' button is cut off). If the table wrapper scrolls horizontally, consider applying app-scroll there too for consistency."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter20_appointment_delete.py", "/app/backend/tests/iter21_appt_ui_fixture.py", "/app/test_reports/pytest/pytest_iter22.xml"],
+  "action_items": [],
+  "critical_code_review_comments": ["The CSS is correct. The sidebar-scroll and app-scroll selectors are shared, so there is no duplication. The @supports guard correctly avoids the Chrome 121+ standard-property override. The thumb is transparent until hover, so touch users get no visual scroll affordance in dialogs; this matches the requested sidebar behaviour."],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100%"},
+  "seed_data_creation": "iter21_appt_ui_fixture.py setup/teardown in the owner tenant. All TEMP data was removed (cleanup_temp_check shows 0).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use getComputedStyle(el,'::-webkit-scrollbar') and getComputedStyle(el,'::-webkit-scrollbar-button') to verify scrollbar styles. The edit-tenant button selector is [data-testid^=edit-tenant-][data-testid$=-button] on /platform/tenants. Calendar horizontal overflow only happens on viewports below about 800px."
+}

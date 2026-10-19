@@ -34,14 +34,6 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales: { ro },
 });
-const STATUS = {
-  programat: "Programat",
-  sosit: "Sosit în service",
-  in_lucru: "În lucru",
-  finalizat: "Finalizat",
-  neprezentat: "Neprezentat",
-  anulat: "Anulat",
-};
 const EMPTY = {
   client_id: "",
   vehicle_id: "",
@@ -267,9 +259,9 @@ export default function PlanningCalendar() {
             <Field label={tr("Titlu intervenție", "Service title")} className="sm:col-span-2"><Input data-testid="planning-title-input" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
             <Field label={tr("Observații", "Notes")} className="sm:col-span-2"><Textarea data-testid="planning-notes-input" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
           </div>
-          {current && <div className="mt-3 flex flex-wrap gap-2"><NativeSelect data-testid="planning-status-select" value={current.status} onChange={(event) => updateStatus(event.target.value)}>{Object.entries(STATUS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect>{current.work_order_id && <Button variant="outline" data-testid="planning-open-work-order-button" onClick={() => window.open(`/work-orders/${current.work_order_id}`, "_blank")}><CalendarDays className="mr-1 h-4 w-4" />{tr("Comandă", "Work order")}</Button>}</div>}
           <DialogFooter className="gap-2 sm:space-x-0">
             {current && <Button variant="destructive" data-testid="planning-delete-button" disabled={busy} onClick={() => setDeleteDialog(true)}><Trash2 className="h-4 w-4" />{tr("Șterge", "Delete")}</Button>}
+            {current && !current.work_order_id && <Button variant="outline" data-testid="planning-create-work-order-button" disabled={busy} onClick={() => updateStatus("in_lucru")}><CalendarDays className="h-4 w-4" />{tr("Creare comandă", "Create work order")}</Button>}
             <Button data-testid="planning-save-button" disabled={busy || !form.client_id || !form.vehicle_id || !form.title || !form.starts_at || !form.ends_at} onClick={save}>{busy ? <RotateCcw className="h-4 w-4 animate-spin" /> : tr("Salvează", "Save")}</Button>
           </DialogFooter>
         </DialogContent>
