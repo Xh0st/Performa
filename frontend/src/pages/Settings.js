@@ -23,8 +23,15 @@ export default function SettingsPage() {
   const save = async () => {
     try {
       const { elevators_text, ...rest } = f;
-      const body = { ...rest, elevators: elevators_text.split(",").map((s) => s.trim()).filter(Boolean), vat_rate: Number(f.vat_rate), payment_terms_days: Number(f.payment_terms_days),
-        labor_rates: Object.fromEntries(Object.entries(f.labor_rates).map(([k, v]) => [k, Number(v)])) };
+      const body = {
+        ...rest,
+        elevators: (elevators_text || "").split(",").map((s) => s.trim()).filter(Boolean),
+        vat_rate: Number(f.vat_rate) || 0,
+        payment_terms_days: Number(f.payment_terms_days) || 0,
+        labor_rates: Object.fromEntries(
+          Object.entries(f.labor_rates || {}).map(([key, value]) => [key, Number(value)]),
+        ),
+      };
       await api.put("/settings", body);
       toast.success(tr("Setări salvate", "Settings saved"));
     } catch (e) {
