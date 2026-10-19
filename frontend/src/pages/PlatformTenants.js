@@ -158,8 +158,8 @@ export default function PlatformTenants() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Tenant nou" testid="create-tenant-panel">
           <p className="mb-4 text-sm text-muted-foreground" data-testid="tenant-id-generation-note">
-            ID-ul tenantului și sediul principal sunt generate automat. BASIC include o
-            sucursală, iar FULL permite locații multiple.
+            ID-ul tenantului este generat automat. BASIC include o sucursală, iar FULL permite
+            locații multiple.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nume companie SRL">

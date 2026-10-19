@@ -143,6 +143,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   locații multiple, fără a menționa vechea limită de cinci.
 - Selectorul de plan din creare afișează doar valorile BASIC și FULL; regulile de capacitate rămân
   explicate separat în mesajul informativ.
+- Mesajul de creare menționează exclusiv generarea automată a ID-ului de tenant; configurarea
+  sediului principal rămâne responsabilitatea tenantului în propriul cont.
 - Actualizarea validează unicitatea CUI/email, recalculează automat cota de sucursale la 1 pentru
   BASIC și 999 pentru FULL și păstrează jurnalul de audit.
 - Verificare: API-ul confirmă `SUPERADMIN` ca FULL, build frontend reușit și dialogul de editare
