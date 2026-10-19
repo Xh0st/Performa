@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardPlus, Wrench, Users, Car, HardHat, Boxes, FileText, Wallet, Sparkles, Settings, ShieldCheck,
@@ -42,12 +42,18 @@ const NAV = [
   ]},
 ];
 
-function SideNav({ onNav, collapsed = false, onToggle }) {
+// Radix Slot (TooltipTrigger asChild) stringifies function classNames; keep NavLink's function className internal.
+const SideLink = forwardRef(({ classFn, className: slotClassName, ...props }, ref) => (
+  <NavLink ref={ref} {...props} className={(state) => `${classFn(state)} ${slotClassName || ""}`} />
+));
+SideLink.displayName = "SideLink";
+
+function SideNav({ onNav, collapsed = false }) {
   const { can, user } = useAuth();
-  const { tr, theme } = useLang();
+  const { tr } = useLang();
   return (
     <TooltipProvider delayDuration={180}>
-      <nav className={`flex h-full flex-col overflow-y-auto py-5 ${collapsed ? "gap-3 px-2" : "gap-5 px-3"}`}>
+      <nav className={`sidebar-scroll flex h-full flex-col overflow-y-auto py-5 ${collapsed ? "gap-3 px-2" : "gap-5 px-3"}`}>
       <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "justify-between gap-2 px-2"}`}>
         <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
         <img
@@ -66,17 +72,6 @@ function SideNav({ onNav, collapsed = false, onToggle }) {
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">ERP · RO</div>
         </div>}
         </div>
-        {onToggle && <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9"
-          data-testid="sidebar-collapse-toggle"
-          aria-label={collapsed ? tr("Extinde meniul", "Expand menu") : tr("Restrânge meniul", "Collapse menu")}
-          title={collapsed ? tr("Extinde meniul", "Expand menu") : tr("Restrânge meniul", "Collapse menu")}
-          onClick={onToggle}
-        >
-          {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
-        </Button>}
       </div>
       {NAV.map((g) => {
         const items = g.items.filter((i) => can(i[1]) && (!i[6] || user?.platform_role === "SUPERADMIN"));
@@ -85,15 +80,23 @@ function SideNav({ onNav, collapsed = false, onToggle }) {
           <div key={g.group[0]}>
             {!collapsed && <div className="eyebrow mb-2 px-2">{tr(g.group[0], g.group[1])}</div>}
             {items.map(([to, , Icon, ro, en, tid]) => {
-              const link = <NavLink key={to} to={to} end={to === "/"} onClick={onNav} data-testid={`sidebar-${tid}-link`}
+              const link = <SideLink key={to} to={to} end={to === "/"} onClick={onNav} data-testid={`sidebar-${tid}-link`}
                 aria-label={tr(ro, en)}
-                className={({ isActive }) =>
+                classFn={({ isActive }) =>
                   `mb-0.5 flex rounded text-sm font-medium transition-colors duration-150 ${collapsed ? "h-11 w-11 items-center justify-center" : "items-center gap-3 px-2 py-2"} ${
                     isActive ? "bg-primary/10 text-primary shadow-[inset_2px_0_0_hsl(var(--primary))]" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <Icon className="h-5 w-5 shrink-0" /> {!collapsed && tr(ro, en)}
-              </NavLink>;
+              </SideLink>;
               if (!collapsed) return link;
-              return <Tooltip key={to}><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right" data-testid={`sidebar-${tid}-tooltip`}>{tr(ro, en)}</TooltipContent></Tooltip>;
+              return <Tooltip key={to}>
+                <TooltipTrigger asChild>{link}</TooltipTrigger>
+                <TooltipContent side="right" data-testid={`sidebar-${tid}-tooltip`}>
+                  <div className="space-y-0.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/70">{tr(g.group[0], g.group[1])}</div>
+                    <div className="font-semibold">{tr(ro, en)}</div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>;
             })}
           </div>
         );
@@ -117,7 +120,7 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen">
       <aside className={`sticky top-0 hidden h-screen shrink-0 border-r bg-card transition-[width] duration-200 lg:block ${collapsed ? "w-16" : "w-60"}`}>
-        <SideNav collapsed={collapsed} onToggle={toggleSidebar} />
+        <SideNav collapsed={collapsed} />
       </aside>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-64 p-0">
@@ -127,6 +130,17 @@ export default function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-xl sm:px-6">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen(true)} data-testid="mobile-menu-button"><Menu className="h-5 w-5" /></Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden h-9 w-9 lg:inline-flex"
+            data-testid="sidebar-collapse-toggle"
+            aria-label={collapsed ? tr("Extinde meniul", "Expand menu") : tr("Restrânge meniul", "Collapse menu")}
+            title={collapsed ? tr("Extinde meniul", "Expand menu") : tr("Restrânge meniul", "Collapse menu")}
+            onClick={toggleSidebar}
+          >
+            {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </Button>
           <div className="hidden font-mono text-xs uppercase tracking-widest text-muted-foreground md:block">{new Date().toLocaleDateString(lang === "ro" ? "ro-RO" : "en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
           <div className="flex-1" />
           {user?.branches?.length > 1 && (
