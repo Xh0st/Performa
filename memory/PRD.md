@@ -138,6 +138,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
   `frontend/public/performa-logo.png`.
+- Varianta inițială a fost înlocuită cu semnul compact bleumarin-portocaliu, pătrat, furnizat
+  ulterior de utilizator; dimensiunile din interfață au fost adaptate pentru noul format.
 - Logo-ul înlocuiește monogramele anterioare în autentificare, bara laterală desktop și meniul
   lateral mobil, păstrând proporțiile și contrastul în temele aplicației.
 - Verificare: logo vizibil în cele trei zone, fără erori de consolă; build frontend reușit.

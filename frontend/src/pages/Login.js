@@ -60,7 +60,7 @@ export default function Login() {
             <img
               src="/performa-logo.png"
               alt="Performa Auto"
-              className="h-12 w-32 object-contain object-left"
+              className="h-12 w-12 object-contain"
               data-testid="login-brand-mark"
             />
             <Button type="button" variant="outline" size="sm" className="font-mono" data-testid="login-language-toggle" onClick={() => setLang(lang === "ro" ? "en" : "ro")}>

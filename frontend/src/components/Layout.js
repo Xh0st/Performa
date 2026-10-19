@@ -49,7 +49,7 @@ function SideNav({ onNav }) {
         <img
           src="/performa-logo.png"
           alt="Performa Auto"
-          className="h-10 w-24 shrink-0 object-contain object-left"
+          className="h-10 w-10 shrink-0 object-contain"
           data-testid="app-brand-mark"
         />
         <div>
