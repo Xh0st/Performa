@@ -4,6 +4,7 @@ import { useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { money, date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { PageHeader, Panel, Loading, Badge, PAY_STATUS, EF_STATUS, Empty } from "@/components/common";
 import { PaginationControls, usePagination } from "@/components/Pagination";
 
@@ -12,9 +13,22 @@ export default function Invoices() {
   const nav = useNavigate();
   const [type, setType] = useState("fiscal");
   const [status, setStatus] = useState("");
+  const [q, setQ] = useState("");
   const { data } = useApi(`/invoices?type=${type}&status=${status}`, [type, status]);
-  const total = (data || []).reduce((s, i) => s + i.totals.gross, 0);
-  const pagination = usePagination(data || [], `${type}:${status}:${data?.length || 0}`);
+  const rows = (data || []).filter((invoice) => {
+    const value = [
+      invoice.series,
+      invoice.number,
+      invoice.buyer?.name,
+      invoice.buyer?.cui,
+      invoice.vehicle?.vin,
+      invoice.vehicle_vin,
+      invoice.work_order_number,
+    ].join(" ").toLowerCase();
+    return value.includes(q.toLowerCase());
+  });
+  const total = rows.reduce((s, i) => s + i.totals.gross, 0);
+  const pagination = usePagination(rows, `${type}:${status}:${q}:${data?.length || 0}`);
   return (
     <div data-testid="invoices-page">
       <PageHeader eyebrow="ANAF · e-Factura · SPV" title={tr("Facturi", "Invoices")} />
@@ -27,10 +41,17 @@ export default function Invoices() {
           {[["", tr("Toate", "All")], ["unpaid", tr("Neîncasate", "Unpaid")], ["partial", tr("Parțial", "Partial")], ["paid", tr("Încasate", "Paid")]].map(([v, l]) => (
             <Button key={v} size="sm" variant={status === v ? "secondary" : "ghost"} data-testid={`invoices-status-${v || "all"}`} onClick={() => setStatus(v)}>{l}</Button>
           ))}
+          <Input
+            className="h-9 min-w-52 flex-1"
+            data-testid="invoices-search-input"
+            placeholder={tr("Caută număr, client, CUI sau VIN…", "Search number, client, CUI, or VIN…")}
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+          />
           <div className="flex-1" />
-          <span className="font-mono text-sm">{data?.length || 0} · {money(total)}</span>
+          <span className="font-mono text-sm">{rows.length} · {money(total)}</span>
         </div>
-        {!data ? <Loading /> : !data.length ? <Empty text={tr("Niciun document.", "No documents.")} /> : (
+        {!data ? <Loading /> : !rows.length ? <Empty text={tr("Niciun document.", "No documents.")} /> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="invoices-table">
               <thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -53,7 +74,7 @@ export default function Invoices() {
             </table>
           </div>
         )}
-        <PaginationControls {...pagination} total={data?.length || 0} testid="invoices-pagination" />
+        <PaginationControls {...pagination} total={rows.length} testid="invoices-pagination" />
       </Panel>
     </div>
   );
