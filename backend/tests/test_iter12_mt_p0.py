@@ -15,7 +15,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 load_dotenv("/app/backend/.env")
 load_dotenv("/app/frontend/.env")
 sys.path.insert(0, "/app/backend")
-from tenant_context import OPERATIONAL_COLLECTIONS  # noqa: E402
+from tenant_context import DEMO_BRANCH_ID, DEMO_TENANT_ID, OPERATIONAL_COLLECTIONS  # noqa: E402
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 
@@ -195,12 +195,12 @@ def test_settings_rar_efactura_distinct(a1, a2, demo_admin):
 
 
 def test_malicious_settings_body_does_not_move(a1, demo_admin):
-    before = run(rdb().settings.count_documents({"tenant_id": "demo-tenant-001"}))
-    r = a1.put(f"{BASE}/settings", json={"tenant_id": "demo-tenant-001", "branch_id": "demo-branch-001", "company_name": f"TEMP M {SUF}"})
+    before = run(rdb().settings.count_documents({"tenant_id": DEMO_TENANT_ID}))
+    r = a1.put(f"{BASE}/settings", json={"tenant_id": DEMO_TENANT_ID, "branch_id": DEMO_BRANCH_ID, "company_name": f"TEMP M {SUF}"})
     assert r.status_code == 200
     doc = run(rdb().settings.find_one({"tenant_id": T1, "kind": "company"}))
     assert doc and doc["branch_id"] == B1 and doc["company_name"] == f"TEMP M {SUF}"
-    assert run(rdb().settings.count_documents({"tenant_id": "demo-tenant-001"})) == before
+    assert run(rdb().settings.count_documents({"tenant_id": DEMO_TENANT_ID})) == before
     assert demo_admin.get(f"{BASE}/settings").json().get("company_name") != f"TEMP M {SUF}"
 
 
@@ -217,14 +217,14 @@ def test_tenantcollection_sanitizes_and_forbids_unscoped():
         try:
             r = await db.clients.insert_one({
                 "name": f"TEMP sanit {SUF}",
-                "tenant_id": "demo-tenant-001",
+                "tenant_id": DEMO_TENANT_ID,
             })
             inserted_id = r.inserted_id
             doc = await cli.clients.find_one({"_id": inserted_id})
             assert doc["tenant_id"] == T1
             await db.clients.update_one(
                 {"_id": inserted_id},
-                {"$set": {"tenant_id": "demo-tenant-001", "branch_id": "demo-branch-001"}},
+                {"$set": {"tenant_id": DEMO_TENANT_ID, "branch_id": DEMO_BRANCH_ID}},
             )
             doc = await cli.clients.find_one({"_id": inserted_id})
             assert doc["tenant_id"] == T1 and doc["branch_id"] == B1
@@ -259,10 +259,10 @@ def test_counters_independent():
         set_scope({"tenant_id": T2, "branch_id": B2b})
         c = await core.next_seq("work_order")
         return a, b, c
-    demo_before = run(rdb().counters.find_one({"_id": "demo-tenant-001:demo-branch-001:work_order"}))
+    demo_before = run(rdb().counters.find_one({"_id": f"{DEMO_TENANT_ID}:{DEMO_BRANCH_ID}:work_order"}))
     a, b, c = asyncio.new_event_loop().run_until_complete(go())
     assert a == [1, 2] and b == 1 and c == 1
-    demo_after = run(rdb().counters.find_one({"_id": "demo-tenant-001:demo-branch-001:work_order"}))
+    demo_after = run(rdb().counters.find_one({"_id": f"{DEMO_TENANT_ID}:{DEMO_BRANCH_ID}:work_order"}))
     assert demo_before == demo_after
 
 
@@ -330,7 +330,7 @@ def test_cron_isolation_inprocess(env):
         finally:
             rf._run_job = orig
     asyncio.new_event_loop().run_until_complete(go())
-    assert B1 in seen and B2a in seen and B2b in seen and "demo-branch-001" in seen
+    assert B1 in seen and B2a in seen and B2b in seen and DEMO_BRANCH_ID in seen
     assert seen.index(B2b) > seen.index(B2a) or B2b in seen
     assert run(rdb().cron_errors.count_documents({"branch_id": B2a})) == 1
     assert run(rdb().cron_errors.count_documents({"branch_id": {"$in": [B1, B2b]}})) == 0
@@ -356,4 +356,4 @@ def test_branch_switch_multi(env):
     s.headers["Authorization"] = f"Bearer {r.json()['token']}"
     assert s.get(f"{BASE}/auth/me").json()["active_branch_id"] == B2b
     assert s.post(f"{BASE}/auth/active-branch", json={"branch_id": B1}).status_code == 403
-    assert s.post(f"{BASE}/auth/active-branch", json={"branch_id": "demo-branch-001"}).status_code == 403
+    assert s.post(f"{BASE}/auth/active-branch", json={"branch_id": DEMO_BRANCH_ID}).status_code == 403

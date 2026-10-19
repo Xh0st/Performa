@@ -18,7 +18,7 @@ load_dotenv("/app/backend/.env")
 load_dotenv("/app/frontend/.env")
 sys.path.insert(0, "/app/backend")
 from core import hash_password  # noqa: E402
-from tenant_context import OPERATIONAL_COLLECTIONS  # noqa: E402
+from tenant_context import DEMO_BRANCH_ID, DEMO_TENANT_ID, OPERATIONAL_COLLECTIONS  # noqa: E402
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 
@@ -168,14 +168,14 @@ def test_singletons_per_branch(q2):
     for coll in ("settings", "rar_autopass_config", "efactura_config"):
         docs = run(db[coll].find({"tenant_id": T2}).to_list(10))
         assert sorted(d["branch_id"] for d in docs) == sorted([B2A, B2B]), f"{coll}: {[(d['_id'], d.get('branch_id')) for d in docs]}"
-    demo = run(db.settings.find_one({"tenant_id": "demo-tenant-001", "kind": "company"}))
+    demo = run(db.settings.find_one({"tenant_id": DEMO_TENANT_ID, "kind": "company"}))
     assert demo and f"TEST" not in (demo.get("name") or "")
 
 
 # ---- Per tenant+branch counters ----
 def test_counters_per_branch(q1, q2, owner):
     db = rdb()
-    demo_before = run(db.counters.find_one({"_id": "demo-tenant-001:demo-branch-001:work_order"}))["seq"]
+    demo_before = run(db.counters.find_one({"_id": f"{DEMO_TENANT_ID}:{DEMO_BRANCH_ID}:work_order"}))["seq"]
     _, _, w1 = mk_wo(q1, "q1")
     switch(q2, B2A)
     ca, va, wa = mk_wo(q2, "ba")
@@ -184,15 +184,15 @@ def test_counters_per_branch(q1, q2, owner):
     STATE.update(q2a=(ca, va, wa["id"]), q2b=(cb, vb, wb["id"]), q1_wo=w1["id"])
     for w in (w1, wa, wb):
         assert w["number"].endswith("00001"), w["number"]
-    assert run(db.counters.find_one({"_id": "demo-tenant-001:demo-branch-001:work_order"}))["seq"] == demo_before
+    assert run(db.counters.find_one({"_id": f"{DEMO_TENANT_ID}:{DEMO_BRANCH_ID}:work_order"}))["seq"] == demo_before
     for t, b in ((T1, B1), (T2, B2A), (T2, B2B)):
         assert run(db.counters.find_one({"_id": f"{t}:{b}:work_order"}))["seq"] == 1
     # same VIN reusable in another tenant (compound index)
-    demo_vin = run(db.vehicles.find_one({"tenant_id": "demo-tenant-001"}))["vin"]
+    demo_vin = run(db.vehicles.find_one({"tenant_id": DEMO_TENANT_ID}))["vin"]
     cid = q1.get(f"{BASE}/clients").json()[0]["id"]
     r = q1.post(f"{BASE}/vehicles", json={"client_id": cid, "vin": demo_vin, "plate": "TSTVIN", "make": "Dacia", "model": "Logan"})
     assert r.status_code == 200, r.text
-    demo_code = run(db.products.find_one({"tenant_id": "demo-tenant-001"}))["code"]
+    demo_code = run(db.products.find_one({"tenant_id": DEMO_TENANT_ID}))["code"]
     r = q1.post(f"{BASE}/products", json={"code": demo_code, "name": f"TEST prod {SUF}"})
     assert r.status_code == 200, r.text
     STATE["q1_product"] = r.json()["id"]
@@ -203,7 +203,7 @@ def test_counters_per_branch(q1, q2, owner):
 # ---- Cross-tenant CRUD by id ----
 def test_cross_tenant_by_id_fail_closed(q1):
     db = rdb()
-    demo = {c: str(run(db[c].find_one({"tenant_id": "demo-tenant-001"}))["_id"])
+    demo = {c: str(run(db[c].find_one({"tenant_id": DEMO_TENANT_ID}))["_id"])
             for c in ("clients", "vehicles", "work_orders", "invoices", "products", "appointments", "warranty_claims", "payments", "nirs")}
     checks = [("get", f"/clients/{demo['clients']}"), ("put", f"/clients/{demo['clients']}"), ("delete", f"/clients/{demo['clients']}"),
               ("get", f"/vehicles/{demo['vehicles']}"), ("put", f"/vehicles/{demo['vehicles']}"),

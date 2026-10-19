@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, Plus, Trash2 } from "lucide-react";
+import { Building2, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg, useApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -16,6 +16,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const EMPTY_TENANT = {
   company_name: "",
@@ -44,6 +52,8 @@ export default function PlatformTenants() {
   const [selected, setSelected] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [resetTarget, setResetTarget] = useState(null);
+  const [temporaryPassword, setTemporaryPassword] = useState(null);
 
   if (!user || user.platform_role !== "SUPERADMIN") {
     return (
@@ -91,6 +101,30 @@ export default function PlatformTenants() {
     } catch (error) {
       toast.error(errMsg(error));
     }
+  };
+
+  const resetTenantAdminPassword = async () => {
+    if (!resetTarget) return;
+    try {
+      const response = await api.post(
+        `/platform/tenants/${resetTarget.id}/admin/reset-password`,
+      );
+      setTemporaryPassword(response.data);
+      toast.success("Parola temporară a fost generată");
+    } catch (error) {
+      toast.error(errMsg(error));
+    }
+  };
+
+  const closeResetDialog = () => {
+    setResetTarget(null);
+    setTemporaryPassword(null);
+  };
+
+  const copyTemporaryPassword = async () => {
+    if (!temporaryPassword?.temporary_password) return;
+    await navigator.clipboard.writeText(temporaryPassword.temporary_password);
+    toast.success("Parola temporară a fost copiată");
   };
 
   return (
@@ -227,6 +261,7 @@ export default function PlatformTenants() {
               <tr className="border-b text-left text-xs uppercase text-muted-foreground">
                 <th className="px-2 py-2">Companie</th>
                 <th>CUI</th>
+                <th>Email administrator</th>
                 <th>Plan</th>
                 <th>Limită sucursale</th>
                 <th>Status</th>
@@ -243,28 +278,51 @@ export default function PlatformTenants() {
                     <div className="font-mono text-xs text-muted-foreground">{item.id}</div>
                   </td>
                   <td data-testid={`tenant-cui-${item.id}`}>{item.cui || "—"}</td>
+                  <td data-testid={`tenant-admin-email-${item.id}`}>
+                    {item.admin_email || "—"}
+                  </td>
                   <td data-testid={`tenant-plan-${item.id}`}>{item.subscription_plan}</td>
                   <td>{item.max_branches_allowed}</td>
                   <td data-testid={`tenant-status-${item.id}`}>{item.status}</td>
                   <td className="px-2 py-2 text-right">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      data-testid={`delete-tenant-${item.id}-button`}
-                      disabled={item.id === user.tenant_id}
-                      title={
-                        item.id === user.tenant_id
-                          ? "Tenantul curent nu poate fi șters"
-                          : "Șterge tenant"
-                      }
-                      onClick={() => {
-                        setDeleteTarget(item);
-                        setDeleteConfirmation("");
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Șterge
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-testid={`reset-tenant-${item.id}-password-button`}
+                        disabled={item.id === user.tenant_id || !item.admin_email}
+                        title={
+                          item.id === user.tenant_id
+                            ? "Parola administratorului propriu nu poate fi resetată"
+                            : "Generează o parolă temporară"
+                        }
+                        onClick={() => {
+                          setResetTarget(item);
+                          setTemporaryPassword(null);
+                        }}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        Resetare parolă
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        data-testid={`delete-tenant-${item.id}-button`}
+                        disabled={item.id === user.tenant_id}
+                        title={
+                          item.id === user.tenant_id
+                            ? "Tenantul curent nu poate fi șters"
+                            : "Șterge tenant"
+                        }
+                        onClick={() => {
+                          setDeleteTarget(item);
+                          setDeleteConfirmation("");
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Șterge
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -311,6 +369,73 @@ export default function PlatformTenants() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={Boolean(resetTarget)}
+        onOpenChange={(open) => {
+          if (!open) closeResetDialog();
+        }}
+      >
+        <DialogContent data-testid="reset-tenant-password-dialog">
+          {!temporaryPassword ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Resetează parola administratorului</DialogTitle>
+                <DialogDescription>
+                  Se generează o parolă temporară pentru {resetTarget?.admin_email}. Administratorul
+                  va fi obligat să o schimbe la următoarea conectare.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  data-testid="reset-tenant-password-cancel-button"
+                  onClick={closeResetDialog}
+                >
+                  Renunță
+                </Button>
+                <Button
+                  data-testid="reset-tenant-password-generate-button"
+                  onClick={resetTenantAdminPassword}
+                >
+                  Generează parola temporară
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Parolă temporară generată</DialogTitle>
+                <DialogDescription>
+                  Comunic-o securizat la {temporaryPassword.admin_email}. Nu va mai fi afișată după
+                  închiderea acestei ferestre.
+                </DialogDescription>
+              </DialogHeader>
+              <Input
+                data-testid="reset-tenant-temporary-password"
+                value={temporaryPassword.temporary_password}
+                readOnly
+              />
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  data-testid="copy-tenant-temporary-password-button"
+                  onClick={copyTemporaryPassword}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiază parola
+                </Button>
+                <Button
+                  data-testid="close-tenant-temporary-password-button"
+                  onClick={closeResetDialog}
+                >
+                  Am notat parola
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

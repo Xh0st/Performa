@@ -16,7 +16,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 load_dotenv("/app/backend/.env")
 load_dotenv("/app/frontend/.env")
 sys.path.insert(0, "/app/backend")
-from tenant_context import OPERATIONAL_COLLECTIONS  # noqa: E402
+from tenant_context import DEMO_BRANCH_ID, DEMO_TENANT_ID, OPERATIONAL_COLLECTIONS  # noqa: E402
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 
@@ -79,7 +79,7 @@ def demo_admin():
 def env(owner):
     db = rdb()
     counters_before = {c["_id"]: c["seq"] for c in run(db.counters.find().to_list(1000))}
-    demo_cfg = run(db.efactura_config.find_one({"tenant_id": "demo-tenant-001", "kind": "efactura"}))
+    demo_cfg = run(db.efactura_config.find_one({"tenant_id": DEMO_TENANT_ID, "kind": "efactura"}))
     for t, mx in ((T1, 1), (T2, 2)):
         assert _mk_tenant(owner, t, f"TEMP {t}", mx).status_code == 200
     for t, b in ((T1, B1), (T2, B2a), (T2, B2b)):
@@ -127,7 +127,7 @@ def test_efactura_disconnect_unsets_all_tokens(a1, a2, env):
     assert d1["client_id"] == "TEMPCID1" and d1["branch_id"] == B1
     d2 = run(rdb().efactura_config.find_one({"tenant_id": T2, "kind": "efactura"}))
     assert d2["access_token"] == "TEMPAT"  # other tenant untouched
-    demo = run(rdb().efactura_config.find_one({"tenant_id": "demo-tenant-001", "kind": "efactura"}))
+    demo = run(rdb().efactura_config.find_one({"tenant_id": DEMO_TENANT_ID, "kind": "efactura"}))
     assert (demo or {}).get("access_token") == (env["demo_cfg"] or {}).get("access_token")
     assert run(rdb().efactura_logs.count_documents({"tenant_id": T1, "op": "oauth", "message": "Deconectat SPV"})) == 1
 
@@ -281,9 +281,9 @@ def test_branch_inactive_blocks_operations_and_reactivate(env):
 
 
 def test_superadmin_cannot_suspend_own_tenant(owner):
-    r = owner.put(f"{BASE}/platform/tenants/demo-tenant-001", json={"subscription_plan": "BASIC", "max_branches_allowed": 1, "status": "SUSPENDED"})
+    r = owner.put(f"{BASE}/platform/tenants/{DEMO_TENANT_ID}", json={"subscription_plan": "BASIC", "max_branches_allowed": 1, "status": "SUSPENDED"})
     assert r.status_code == 400
-    t = next(x for x in owner.get(f"{BASE}/platform/tenants").json() if x["id"] == "demo-tenant-001")
+    t = next(x for x in owner.get(f"{BASE}/platform/tenants").json() if x["id"] == DEMO_TENANT_ID)
     assert t["status"] == "ACTIVE"
 
 
@@ -335,7 +335,8 @@ def test_branch_quota(owner, env):
 
 def test_tenant_admin_cannot_touch_superadmin(a1, owner):
     me = owner.get(f"{BASE}/auth/me").json()
-    assert me["platform_role"] == "SUPERADMIN" and me["tenant_id"] == "demo-tenant-001" and me["active_branch_id"] == "demo-branch-001"
+    assert me["platform_role"] == "SUPERADMIN" and me["tenant_id"] == DEMO_TENANT_ID
+    assert me["active_branch_id"] == DEMO_BRANCH_ID
     assert a1.put(f"{BASE}/users/{me['id']}", json={"email": me["email"], "name": "hack", "role": "mecanic"}).status_code in (403, 404)
     assert a1.delete(f"{BASE}/users/{me['id']}").status_code in (403, 404)
     assert a1.get(f"{BASE}/platform/tenants").status_code == 403

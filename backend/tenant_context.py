@@ -4,8 +4,10 @@ from contextvars import ContextVar
 tenant_scope: ContextVar[dict | None] = ContextVar("tenant_scope", default=None)
 
 
-DEMO_TENANT_ID = "demo-tenant-001"
-DEMO_BRANCH_ID = "demo-branch-001"
+LEGACY_DEMO_TENANT_ID = "demo-tenant-001"
+LEGACY_DEMO_BRANCH_ID = "demo-branch-001"
+DEMO_TENANT_ID = "tenant-e93a5f22c8ba4a11"
+DEMO_BRANCH_ID = "branch-e93a5f22c8ba4a11"
 GLOBAL_COLLECTIONS = {
     "users",
     "tenants",

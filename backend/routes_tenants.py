@@ -1,4 +1,5 @@
 import re
+import secrets
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -52,9 +53,33 @@ class TenantQuotaIn(BaseModel):
     status: str
 
 
+async def primary_tenant_admin(tenant: dict) -> dict | None:
+    primary_admin_id = tenant.get("primary_admin_user_id")
+    if primary_admin_id:
+        primary_admin = await raw_db.users.find_one({"_id": oid(primary_admin_id)})
+        if primary_admin and primary_admin.get("tenant_id") == tenant["_id"]:
+            return primary_admin
+    primary_admin = await raw_db.users.find_one({
+        "tenant_id": tenant["_id"],
+        "tenant_role": "TENANT_ADMIN",
+    })
+    if primary_admin:
+        return primary_admin
+    return await raw_db.users.find_one({"tenant_id": tenant["_id"], "role": "admin"})
+
+
+async def tenant_out(tenant: dict) -> dict:
+    output = ser(tenant)
+    admin = await primary_tenant_admin(tenant)
+    output["admin_email"] = admin.get("email", "") if admin else ""
+    output["admin_user_id"] = str(admin["_id"]) if admin else ""
+    return output
+
+
 @router.get("/platform/tenants")
 async def list_tenants(user=Depends(require_superadmin())):
-    return [ser(item) for item in await raw_db.tenants.find({}).sort("company_name", 1).to_list(1000)]
+    tenants = await raw_db.tenants.find({}).sort("company_name", 1).to_list(1000)
+    return [await tenant_out(item) for item in tenants]
 
 
 @router.post("/platform/tenants")
@@ -91,7 +116,7 @@ async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
             "created_at": iso(),
         }
         await raw_db.branches.insert_one(branch)
-        await raw_db.users.insert_one({
+        admin_result = await raw_db.users.insert_one({
             "email": admin_email,
             "name": "Administrator",
             "role": "admin",
@@ -104,13 +129,17 @@ async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
             "active_branch_id": branch["_id"],
             "created_at": iso(),
         })
+        await raw_db.tenants.update_one(
+            {"_id": tenant_id},
+            {"$set": {"primary_admin_user_id": str(admin_result.inserted_id)}},
+        )
     except Exception:
         await raw_db.users.delete_many({"tenant_id": tenant_id})
         await raw_db.branches.delete_many({"tenant_id": tenant_id})
         await raw_db.tenants.delete_one({"_id": tenant_id})
         raise
     await audit(user, "create", "tenant", tenant_id, document["company_name"])
-    return ser(document)
+    return await tenant_out(await raw_db.tenants.find_one({"_id": tenant_id}))
 
 
 @router.put("/platform/tenants/{tenant_id}")
@@ -124,7 +153,33 @@ async def update_tenant(tenant_id: str, body: TenantQuotaIn, user=Depends(requir
     result = await raw_db.tenants.update_one({"_id": tenant_id}, {"$set": body.model_dump()})
     if not result.matched_count:
         raise HTTPException(404, "Tenant inexistent")
-    return ser(await raw_db.tenants.find_one({"_id": tenant_id}))
+    return await tenant_out(await raw_db.tenants.find_one({"_id": tenant_id}))
+
+
+@router.post("/platform/tenants/{tenant_id}/admin/reset-password")
+async def reset_primary_admin_password(tenant_id: str, user=Depends(require_superadmin())):
+    if tenant_id == user.get("tenant_id"):
+        raise HTTPException(400, "Nu puteți reseta parola administratorului propriu")
+    tenant = await raw_db.tenants.find_one({"_id": tenant_id})
+    if not tenant:
+        raise HTTPException(404, "Tenant inexistent")
+    admin = await primary_tenant_admin(tenant)
+    if not admin:
+        raise HTTPException(404, "Administratorul principal al tenantului lipsește")
+    temporary_password = f"PA-{secrets.token_urlsafe(12)}"
+    await raw_db.users.update_one(
+        {"_id": admin["_id"]},
+        {
+            "$set": {
+                "password_hash": hash_password(temporary_password),
+                "must_change_password": True,
+                "password_reset_by_superadmin_at": iso(),
+                "password_reset_by_user_id": user["id"],
+            }
+        },
+    )
+    await audit(user, "reset_tenant_admin_password", "tenant", tenant_id, admin["email"])
+    return {"admin_email": admin["email"], "temporary_password": temporary_password}
 
 
 @router.delete("/platform/tenants/{tenant_id}")

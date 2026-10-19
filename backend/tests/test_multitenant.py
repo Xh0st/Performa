@@ -15,7 +15,7 @@ load_dotenv("/app/backend/.env")
 load_dotenv("/app/frontend/.env")
 sys.path.insert(0, "/app/backend")
 from core import hash_password  # noqa: E402
-from tenant_context import OPERATIONAL_COLLECTIONS  # noqa: E402
+from tenant_context import DEMO_BRANCH_ID, DEMO_TENANT_ID, OPERATIONAL_COLLECTIONS  # noqa: E402
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 
@@ -144,8 +144,8 @@ def test_owner_login_me(owner):
     assert "httponly" in sc and "samesite=none" in sc
     me = owner.get(f"{BASE}/auth/me").json()
     assert me["platform_role"] == "SUPERADMIN"
-    assert me["tenant_id"] == "demo-tenant-001" and me["active_branch_id"] == "demo-branch-001"
-    assert any(b["id"] == "demo-branch-001" for b in me["branches"])
+    assert me["tenant_id"] == DEMO_TENANT_ID and me["active_branch_id"] == DEMO_BRANCH_ID
+    assert any(b["id"] == DEMO_BRANCH_ID for b in me["branches"])
     assert "password_hash" not in me
 
 
@@ -221,7 +221,7 @@ def test_cross_tenant_vehicle_with_demo_client(owner, ua):
 
 def test_vin_namespace_shared_across_tenants(ua):
     """Global unique index on vehicles.vin -> tenant A cannot register VIN existing in demo (and learns it exists)."""
-    demo_vin = run(rdb().vehicles.find_one({"tenant_id": "demo-tenant-001"}))["vin"]
+    demo_vin = run(rdb().vehicles.find_one({"tenant_id": DEMO_TENANT_ID}))["vin"]
     cid = ua.get(f"{BASE}/clients").json()[0]["id"]
     r = ua.post(f"{BASE}/vehicles", json={"client_id": cid, "vin": demo_vin, "plate": "TST02AAA", "make": "Dacia", "model": "Logan"})
     assert r.status_code == 200, f"VIN collision across tenants: {r.status_code} {r.text[:200]}"
@@ -263,7 +263,7 @@ def test_tenant_admin_can_escalate_via_superadmin_password_reset(ua):
 
 def test_shared_counter_numbering(ua):
     db = rdb()
-    before = (run(db.counters.find_one({"_id": "demo-tenant-001:demo-branch-001:work_order"})) or {}).get("seq")
+    before = (run(db.counters.find_one({"_id": f"{DEMO_TENANT_ID}:{DEMO_BRANCH_ID}:work_order"})) or {}).get("seq")
     cid = ua.get(f"{BASE}/clients").json()[0]["id"]
     vr = ua.post(f"{BASE}/vehicles", json={"client_id": cid, "vin": f"TSTB{SUF.upper()}".ljust(17, "1"), "plate": "TST03AAA", "make": "Dacia", "model": "Logan"})
     assert vr.status_code == 200, vr.text
@@ -299,7 +299,7 @@ def test_public_quote_token_scope(ua):
 def test_quota_second_branch_403(owner, setup):
     r = owner.post(f"{BASE}/platform/tenants/{T_A}/branches", json={"branch_id": f"TEST-branch-a2-{SUF}", "branch_name": "TEST A2"})
     assert r.status_code == 403 and "limita" in r.json()["detail"].lower()
-    r = owner.post(f"{BASE}/platform/tenants/demo-tenant-001/branches", json={"branch_id": f"TEST-demo-b2-{SUF}", "branch_name": "TEST D2"})
+    r = owner.post(f"{BASE}/platform/tenants/{DEMO_TENANT_ID}/branches", json={"branch_id": f"TEST-demo-b2-{SUF}", "branch_name": "TEST D2"})
     assert r.status_code == 403
 
 
@@ -334,7 +334,7 @@ def test_branch_switch(ub):
     s = requests.Session(); s.headers["Authorization"] = tok1
     assert [c["id"] for c in s.get(f"{BASE}/clients").json()] == [c1]
     # not assigned branch / other tenant
-    assert ub.post(f"{BASE}/auth/active-branch", json={"branch_id": "demo-branch-001"}).status_code == 403
+    assert ub.post(f"{BASE}/auth/active-branch", json={"branch_id": DEMO_BRANCH_ID}).status_code == 403
     assert ub.post(f"{BASE}/auth/active-branch", json={"branch_id": B_A}).status_code == 403
     doc = run(rdb().clients.find_one({"name": f"TEST B2 {SUF}"}))
     assert doc["tenant_id"] == T_B and doc["branch_id"] == B_B2
