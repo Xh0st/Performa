@@ -172,6 +172,10 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   prin etichete ARIA.
 - Pe mobil, meniul lateral rămâne extins, cu denumiri complete pentru navigare clară.
 - Verificare: tooltip desktop și meniul mobil au fost testate vizual; build frontend reușit.
+- Toggle-ul de extindere/restrângere este poziționat în header, înaintea datei, fără duplicat în
+  bara laterală. Lățimea sidebarului se schimbă fluid între 64px și 240px.
+- Logo-ul și textul Performa Auto trimit la Dashboard; subtitlul `ERP · RO` a fost eliminat.
+- Meniul mobil are titlu accesibil pentru dialog, iar categoria tooltip-urilor are contrast ierarhic.
 
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în

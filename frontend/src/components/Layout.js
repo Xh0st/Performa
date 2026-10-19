@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLang } from "@/lib/prefs";
 import { errMsg } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ROLE_LABELS } from "@/components/common";
 import { toast } from "sonner";
@@ -55,7 +55,15 @@ function SideNav({ onNav, collapsed = false }) {
     <TooltipProvider delayDuration={180}>
       <nav className={`sidebar-scroll flex h-full flex-col overflow-y-auto py-5 ${collapsed ? "gap-3 px-2" : "gap-5 px-3"}`}>
       <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "justify-between gap-2 px-2"}`}>
-        <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
+        <NavLink
+          to="/"
+          end
+          onClick={onNav}
+          data-testid="sidebar-brand-dashboard-link"
+          aria-label={tr("Dashboard", "Dashboard")}
+          title={tr("Dashboard", "Dashboard")}
+          className={`flex items-center rounded outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring ${collapsed ? "justify-center" : "gap-2"}`}
+        >
         <img
           src="/performa-logo-dark.png"
           alt="Performa Auto"
@@ -69,9 +77,8 @@ function SideNav({ onNav, collapsed = false }) {
           >
             Performa Auto
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">ERP · RO</div>
         </div>}
-        </div>
+        </NavLink>
       </div>
       {NAV.map((g) => {
         const items = g.items.filter((i) => can(i[1]) && (!i[6] || user?.platform_role === "SUPERADMIN"));
@@ -92,7 +99,7 @@ function SideNav({ onNav, collapsed = false }) {
                 <TooltipTrigger asChild>{link}</TooltipTrigger>
                 <TooltipContent side="right" data-testid={`sidebar-${tid}-tooltip`}>
                   <div className="space-y-0.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/70">{tr(g.group[0], g.group[1])}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider opacity-70">{tr(g.group[0], g.group[1])}</div>
                     <div className="font-semibold">{tr(ro, en)}</div>
                   </div>
                 </TooltipContent>
@@ -124,6 +131,7 @@ export default function Layout() {
       </aside>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-64 p-0">
+          <SheetTitle className="sr-only">{tr("Navigare principală", "Main navigation")}</SheetTitle>
           <SideNav onNav={() => setOpen(false)} />
         </SheetContent>
       </Sheet>

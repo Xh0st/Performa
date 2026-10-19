@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend only: tested the collapsible sidebar with Playwright, logged in as SUPERADMIN andrei.melek. DESKTOP 1920: the sidebar-collapse-toggle button is in the header. It is the first visible element (x=88, right after the 64px aside plus the header padding) and comes before the date 'luni, 19 octombrie'. There are 0 toggles inside the aside. Width goes 64px -> 240px and 240px -> 64px with 'width 0.2s cubic-bezier'; a mid-transition width of 177px was captured, so the animation runs. aria-label switches between Extinde meniul and Restrânge meniul. localStorage sidebar-collapsed persists across reload; the default with no key is collapsed. COLLAPSED: 19/19 links are icon-only (empty textContent), each exactly 44x44, no overlaps, 0 group headers. Tooltips tested with realistic mouse movement: clients='OPERAȚIONAL / Clienți', invoices='FINANCIAR / Facturi & e-Factura', ai='INTELIGENȚĂ / AI Advisor', final-inspections='RAPOARTE / ...', stock='MAGAZIE / ...', settings and platform-tenants='ADMINISTRARE / ...', cash and dashboard OK. Tooltips close when the mouse leaves. Clicking a collapsed link navigates (/clients). EXPANDED: all 19 labels and 6 groups come back, no label truncation, no tooltip in the DOM on hover, navigation works (/vehicles). SCROLL: nav.sidebar-scroll has overflow-y auto and scrollbar-width thin. scrollbar-color is transparent by default and becomes rgba(148,163,184,0.45) on hover; the webkit thumb is 6px. With a 700px-tall viewport the nav scrolls (1022 > 700) and there is no horizontal overflow (scrollWidth == clientWidth). MOBILE 390: the desktop toggle and the aside are hidden. mobile-menu-button opens a 256px Sheet with 19 full labels and 6 groups. The Sheet closes on navigation. No horizontal overflow on a fresh load (390 == 390). Tablet 768: no toggle, menu button visible. Console: no pageerror. There is a Radix warning 'DialogContent requires a DialogTitle' from the mobile Sheet, plus a 401 before login (normal /auth/me).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Mobile Sheet menu", "issues": ["Console error from Radix: 'DialogContent requires a DialogTitle'. The SheetContent in Layout.js has no SheetTitle. Add a SheetTitle wrapped in VisuallyHidden (a11y)."]},
+      {"screen": "Collapsed tooltip", "issues": ["The class text-primary-foreground/70 on the category resolves to rgb(255,255,255) with no opacity, the same color as the name. The intended visual hierarchy is lost; it is distinguished only by size and uppercase. Cosmetic only."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: add a hidden SheetTitle (VisuallyHidden) to the mobile SheetContent to remove the Radix a11y console error.",
+    "Optional: make the tooltip category text use a reduced opacity that actually applies (e.g. opacity-70 or text-white/70)."
+  ],
+  "critical_code_review_comments": [
+    "With no localStorage key, the default is collapsed (!== 'false'). This is intentional, but first-time users see only icons. Confirm this is the desired behavior.",
+    "Testing note: an instant mouse jump (Playwright hover with no intermediate pointermove events) can leave the previous Radix tooltip open because of the grace area, and the next one may not open. With realistic movement (steps) everything works. This is not a product bug."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% of the requested flows (7/7)"},
+  "test_credentials": "andrei.melek@gmail.com / Admin2026! from /app/memory/test_credentials.md",
+  "seed_data_creation": "None. Application data was not modified (only localStorage sidebar-collapsed in the test browser).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Sidebar in Layout.js: aside w-16/w-60, transition-[width] duration-200. Toggle sidebar-collapse-toggle in the header (hidden lg:inline-flex). Tooltips sidebar-{tid}-tooltip are rendered only in collapsed mode. For Radix tooltip tests, use page.mouse.move(x, y, steps=10+) instead of hover.",
+  "rca of the issue": "N/A - no functional bugs."
+}
