@@ -18,7 +18,7 @@ export default function SettingsPage() {
     if (data) setF({ ...data, elevators_text: (data.elevators || []).join(", ") });
   }, [data]);
   if (!f) return <Loading />;
-  const isFull = f.subscription_plan === "FULL";
+  const isPremium = f.subscription_plan === "FULL" || f.subscription_plan === "ENTERPRISE";
   const save = async () => {
     try {
       const { elevators_text, ...rest } = f;
@@ -33,7 +33,7 @@ export default function SettingsPage() {
   const uploadLogo = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!isFull || !["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 1024 * 1024) {
+    if (!isPremium || !["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 1024 * 1024) {
       toast.error(tr("Logo acceptat: PNG, JPEG sau WebP, maximum 1 MB", "Logo must be PNG, JPEG, or WebP, maximum 1 MB"));
       return;
     }
@@ -63,30 +63,35 @@ export default function SettingsPage() {
           <Panel title={tr("Plan & branding", "Plan & branding")}>
             <div className="space-y-3 text-sm">
               <div data-testid="settings-subscription-plan" className="font-semibold">
-                {isFull ? "FULL" : "BASIC"}
+                {f.subscription_plan || "BASIC"}
               </div>
+              <p className="text-muted-foreground" data-testid="settings-plan-limits">
+                {`${f.plan_limits?.branches === 999 ? "Locații multiple" : `${f.plan_limits?.branches || 1} locație`}`}
+                {` · ${(f.plan_limits?.storage_mb || 500) >= 1024 ? `${(f.plan_limits.storage_mb || 500) / 1024} GB` : `${f.plan_limits?.storage_mb || 500} MB`} storage · `}
+                {f.plan_limits?.work_orders_monthly ? `${f.plan_limits.work_orders_monthly} comenzi/lună` : "comenzi nelimitate"}
+              </p>
               <Field label={tr("Subdomeniu dedicat", "Dedicated subdomain")}>
                 <Input
                   data-testid="settings-custom-subdomain-input"
-                  disabled={!isFull}
+                  disabled={!isPremium}
                   placeholder="serviceul-meu"
                   value={f.custom_subdomain || ""}
                   onChange={(e) => setF({ ...f, custom_subdomain: e.target.value })}
                 />
               </Field>
               <p className="text-muted-foreground" data-testid="settings-logo-plan-note">
-                {isFull
+                {isPremium
                   ? tr("Logo personalizat pentru documente, maximum 1 MB.", "Custom document logo, maximum 1 MB.")
                   : tr("Planul BASIC folosește branding Performa pe documente.", "BASIC uses Performa branding on documents.")}
               </p>
               <Input
                 data-testid="settings-custom-logo-input"
-                disabled={!isFull}
+                disabled={!isPremium}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 onChange={uploadLogo}
               />
-              {isFull && f.custom_logo_data_url && <img src={f.custom_logo_data_url} alt="Logo personalizat" className="h-14 max-w-40 object-contain object-left" data-testid="settings-custom-logo-preview" />}
+              {isPremium && f.custom_logo_data_url && <img src={f.custom_logo_data_url} alt="Logo personalizat" className="h-14 max-w-40 object-contain object-left" data-testid="settings-custom-logo-preview" />}
             </div>
           </Panel>
           <Panel title={tr("Tarife manoperă (RON/oră, fără TVA)", "Labor rates (RON/h, excl. VAT)")}>

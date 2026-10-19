@@ -254,8 +254,8 @@ async def write_settings(body: dict, user=Depends(require("settings"))):
     body.pop("subscription_plan", None)
     custom_subdomain = str(body.get("custom_subdomain", "")).strip().lower()
     if custom_subdomain:
-        if await tenant_plan(user["tenant_id"]) != "FULL":
-            raise HTTPException(403, "Subdomeniul dedicat este disponibil doar în planul FULL")
+        if await tenant_plan(user["tenant_id"]) == "BASIC":
+            raise HTTPException(403, "Subdomeniul dedicat este disponibil doar în planurile FULL sau ENTERPRISE")
         if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", custom_subdomain):
             raise HTTPException(400, "Subdomeniu invalid")
         body["custom_subdomain"] = custom_subdomain
@@ -266,8 +266,8 @@ async def write_settings(body: dict, user=Depends(require("settings"))):
 
 @router.put("/settings/logo")
 async def upload_tenant_logo(body: TenantLogoIn, user=Depends(require("settings"))):
-    if await tenant_plan(user["tenant_id"]) != "FULL":
-        raise HTTPException(403, "Logo-ul personalizat este disponibil doar în planul FULL")
+    if await tenant_plan(user["tenant_id"]) == "BASIC":
+        raise HTTPException(403, "Logo-ul personalizat este disponibil doar în planurile FULL sau ENTERPRISE")
     match = re.fullmatch(r"data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)", body.data_url)
     if not match:
         raise HTTPException(400, "Logo invalid. Sunt acceptate PNG, JPEG sau WebP")

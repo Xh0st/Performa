@@ -106,7 +106,7 @@ async def export_final_inspections(kind: str, start: str, end: str, inspector: s
             start,
             end,
             branch,
-            include_footer=settings.get("subscription_plan") != "FULL",
+            include_footer=settings.get("subscription_plan") == "BASIC",
             custom_logo_data_url=settings.get("custom_logo_data_url", ""),
         )
         media_type = "application/pdf"

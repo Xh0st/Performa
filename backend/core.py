@@ -51,6 +51,11 @@ FULL_ONLY_PREFIXES = (
     "/api/efactura",
     "/api/rar-autopass",
 )
+PLAN_LIMITS = {
+    "BASIC": {"branches": 1, "storage_mb": 500, "work_orders_monthly": 500},
+    "FULL": {"branches": 5, "storage_mb": 10 * 1024, "work_orders_monthly": 5000},
+    "ENTERPRISE": {"branches": 999, "storage_mb": 50 * 1024, "work_orders_monthly": None},
+}
 
 
 class TenantCollection:
@@ -222,7 +227,7 @@ def permissions_for(role: str, plan: str = "BASIC"):
     return [
         module
         for module, roles in MODULE_ROLES.items()
-        if role in roles and (plan == "FULL" or module not in FULL_ONLY_MODULES)
+        if role in roles and (plan != "BASIC" or module not in FULL_ONLY_MODULES)
     ]
 
 
@@ -232,17 +237,25 @@ def requires_full_plan(path: str) -> bool:
 
 async def tenant_plan(tenant_id: str) -> str:
     tenant = await raw_db.tenants.find_one({"_id": tenant_id}, {"subscription_plan": 1})
-    return (tenant or {}).get("subscription_plan", "BASIC")
+    plan = (tenant or {}).get("subscription_plan", "BASIC")
+    return plan if plan in PLAN_LIMITS else "BASIC"
+
+
+def plan_limits(plan: str) -> dict:
+    return PLAN_LIMITS[plan if plan in PLAN_LIMITS else "BASIC"]
 
 
 async def enforce_work_order_quota() -> None:
     scope = current_scope()
-    if not scope or await tenant_plan(scope["tenant_id"]) == "FULL":
+    if not scope:
+        return
+    limit = plan_limits(await tenant_plan(scope["tenant_id"]))["work_orders_monthly"]
+    if limit is None:
         return
     month = now().strftime("%Y-%m")
     count = await db.work_orders.count_documents({"created_at": {"$regex": f"^{month}"}})
-    if count >= 1000:
-        raise HTTPException(403, "Planul BASIC permite maximum 1.000 comenzi de lucru pe lună")
+    if count >= limit:
+        raise HTTPException(403, f"Planul permite maximum {limit} comenzi de lucru pe lună")
 
 
 async def get_current_user(request: Request) -> dict:
@@ -293,8 +306,8 @@ async def get_current_user(request: Request) -> dict:
             "platform_role": user.get("platform_role"),
         })
         u["subscription_plan"] = tenant.get("subscription_plan", "BASIC")
-        if u["subscription_plan"] != "FULL" and requires_full_plan(request.url.path):
-            raise HTTPException(403, "Această funcție este disponibilă doar în planul FULL")
+        if u["subscription_plan"] == "BASIC" and requires_full_plan(request.url.path):
+            raise HTTPException(403, "Această funcție este disponibilă doar în planurile FULL sau ENTERPRISE")
     allowed_initial_password_paths = {
         "/api/auth/change-initial-password",
         "/api/auth/logout",
@@ -347,6 +360,7 @@ async def get_settings() -> dict:
     scope = current_scope()
     if scope:
         settings["subscription_plan"] = await tenant_plan(scope["tenant_id"])
+        settings["plan_limits"] = plan_limits(settings["subscription_plan"])
     return settings
 
 

@@ -150,6 +150,13 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Verificare: API-ul confirmă `SUPERADMIN` ca FULL, build frontend reușit și dialogul de editare
   a fost verificat în interfață.
 
+## Matrice planuri actualizată (2026-10-19)
+- BASIC: 1 locație, 500 MB storage documente și maximum 500 comenzi de lucru pe lună.
+- FULL: 5 locații, 10 GB storage documente și maximum 5.000 comenzi de lucru pe lună.
+- ENTERPRISE: locații multiple, 50 GB storage documente și comenzi de lucru nelimitate.
+- Cotele sunt centralizate în backend, aplicate la creare/editare tenant și comenzi de lucru, apoi
+  afișate în Setări. FULL și ENTERPRISE au aceleași drepturi premium de branding/module.
+
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
   `frontend/public/performa-logo.png`.

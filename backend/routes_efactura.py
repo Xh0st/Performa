@@ -184,7 +184,7 @@ async def inbox_pdf(mid: str, user=Depends(require("stock"))):
     pdf = render_pdf(
         m["xml"],
         m,
-        include_footer=settings.get("subscription_plan") != "FULL",
+        include_footer=settings.get("subscription_plan") == "BASIC",
         custom_logo_data_url=settings.get("custom_logo_data_url", ""),
     )
     name = "".join(c for c in m["parsed"]["series_number"] if c.isalnum() or c in "-_") or "factura"

@@ -67,7 +67,7 @@ async def certificate_pdf(iid: str, user=Depends(require("warranties"))):
     settings = await get_settings()
     content = build_certificate(
         certificate,
-        include_footer=settings.get("subscription_plan") != "FULL",
+        include_footer=settings.get("subscription_plan") == "BASIC",
         custom_logo_data_url=settings.get("custom_logo_data_url", ""),
     )
     return Response(content, media_type="application/pdf", headers={

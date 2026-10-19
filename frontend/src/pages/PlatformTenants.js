@@ -158,8 +158,8 @@ export default function PlatformTenants() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Tenant nou" testid="create-tenant-panel">
           <p className="mb-4 text-sm text-muted-foreground" data-testid="tenant-id-generation-note">
-            ID-ul tenantului este generat automat. BASIC include o sucursală, iar FULL permite
-            locații multiple.
+            ID-ul tenantului este generat automat. BASIC include 1 locație, FULL include 5, iar
+            ENTERPRISE permite locații multiple.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nume companie SRL">
@@ -207,6 +207,7 @@ export default function PlatformTenants() {
               >
                 <option value="BASIC">BASIC</option>
                 <option value="FULL">FULL</option>
+                <option value="ENTERPRISE">ENTERPRISE</option>
               </NativeSelect>
             </Field>
           </div>
@@ -304,7 +305,7 @@ export default function PlatformTenants() {
                     {item.admin_email || "—"}
                   </td>
                   <td data-testid={`tenant-plan-${item.id}`}>{item.subscription_plan}</td>
-                  <td>{item.max_branches_allowed}</td>
+                  <td>{item.subscription_plan === "ENTERPRISE" ? "Multiple" : item.max_branches_allowed}</td>
                   <td data-testid={`tenant-status-${item.id}`}>{item.status}</td>
                   <td className="px-2 py-2 text-right">
                     <div className="flex justify-end gap-2">
@@ -411,7 +412,7 @@ export default function PlatformTenants() {
             <Field label="Nume companie SRL"><Input data-testid="edit-tenant-company-input" value={editTarget.company_name} onChange={(event) => setEditTarget({ ...editTarget, company_name: event.target.value })} /></Field>
             <Field label="CUI"><Input data-testid="edit-tenant-cui-input" value={editTarget.cui} onChange={(event) => setEditTarget({ ...editTarget, cui: event.target.value })} /></Field>
             <Field label="Email administrator"><Input data-testid="edit-tenant-admin-email-input" type="email" value={editTarget.admin_email} onChange={(event) => setEditTarget({ ...editTarget, admin_email: event.target.value })} /></Field>
-            <Field label="Plan"><NativeSelect data-testid="edit-tenant-plan-select" value={editTarget.subscription_plan} onChange={(event) => setEditTarget({ ...editTarget, subscription_plan: event.target.value })}><option value="BASIC">BASIC</option><option value="FULL">FULL</option></NativeSelect></Field>
+            <Field label="Plan"><NativeSelect data-testid="edit-tenant-plan-select" value={editTarget.subscription_plan} onChange={(event) => setEditTarget({ ...editTarget, subscription_plan: event.target.value })}><option value="BASIC">BASIC</option><option value="FULL">FULL</option><option value="ENTERPRISE">ENTERPRISE</option></NativeSelect></Field>
           </div>}
           <DialogFooter className="gap-2 sm:space-x-0">
             <Button variant="outline" data-testid="edit-tenant-cancel-button" onClick={() => setEditTarget(null)}>Renunță</Button>

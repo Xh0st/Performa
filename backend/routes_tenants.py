@@ -6,7 +6,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core import audit, db, hash_password, iso, oid, raw_db, require_superadmin, ser
+from core import audit, db, hash_password, iso, oid, plan_limits, raw_db, require_superadmin, ser
 from tenant_context import OPERATIONAL_COLLECTIONS
 
 
@@ -87,8 +87,8 @@ async def list_tenants(user=Depends(require_superadmin())):
 
 @router.post("/platform/tenants")
 async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
-    if body.subscription_plan not in {"BASIC", "FULL"}:
-        raise HTTPException(400, "Planul poate fi BASIC sau FULL")
+    if body.subscription_plan not in {"BASIC", "FULL", "ENTERPRISE"}:
+        raise HTTPException(400, "Planul poate fi BASIC, FULL sau ENTERPRISE")
     tenant_id = f"tenant-{uuid4().hex[:16]}"
     company_cui = body.cui.strip().upper()
     if await raw_db.tenants.find_one({"cui": company_cui}):
@@ -96,7 +96,7 @@ async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
     admin_email = body.admin_email.strip().lower()
     if await raw_db.users.find_one({"email": admin_email}):
         raise HTTPException(400, "Email administrator deja existent")
-    branch_limit = 1 if body.subscription_plan == "BASIC" else 999
+    branch_limit = plan_limits(body.subscription_plan)["branches"]
     document = {
         "_id": tenant_id,
         "company_name": body.company_name.strip(),
@@ -147,7 +147,7 @@ async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
 
 @router.put("/platform/tenants/{tenant_id}")
 async def update_tenant(tenant_id: str, body: TenantUpdateIn, user=Depends(require_superadmin())):
-    if body.subscription_plan not in {"BASIC", "FULL"}:
+    if body.subscription_plan not in {"BASIC", "FULL", "ENTERPRISE"}:
         raise HTTPException(400, "Plan invalid")
     if body.status not in {"ACTIVE", "SUSPENDED", "EXPIRED"}:
         raise HTTPException(400, "Status invalid")
@@ -167,7 +167,7 @@ async def update_tenant(tenant_id: str, body: TenantUpdateIn, user=Depends(requi
     duplicate_email = await raw_db.users.find_one({"email": email, "_id": {"$ne": admin["_id"]}})
     if duplicate_email:
         raise HTTPException(400, "Email administrator deja existent")
-    branch_limit = 1 if body.subscription_plan == "BASIC" else 999
+    branch_limit = plan_limits(body.subscription_plan)["branches"]
     await raw_db.tenants.update_one({"_id": tenant_id}, {"$set": {
         "company_name": body.company_name.strip(), "cui": company_cui,
         "subscription_plan": body.subscription_plan, "max_branches_allowed": branch_limit,

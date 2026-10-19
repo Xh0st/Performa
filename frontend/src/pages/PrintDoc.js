@@ -19,12 +19,12 @@ function Header({ s, title, number, dateStr }) {
       <div className="text-[12px] leading-5">
         <div className="mb-2 flex items-center gap-2">
           <img
-            src={s.subscription_plan === "FULL" && s.custom_logo_data_url ? s.custom_logo_data_url : "/performa-logo-dark.png"}
-            alt={s.subscription_plan === "FULL" ? s.name : "Performa"}
+            src={s.subscription_plan !== "BASIC" && s.custom_logo_data_url ? s.custom_logo_data_url : "/performa-logo-dark.png"}
+            alt={s.subscription_plan !== "BASIC" ? s.name : "Performa"}
             className="h-6 w-14 object-contain object-left"
             data-testid="print-document-brand-logo"
           />
-          {s.subscription_plan !== "FULL" && <span className="font-bold text-[#f47a2a]" data-testid="print-document-brand-name">
+          {s.subscription_plan === "BASIC" && <span className="font-bold text-[#f47a2a]" data-testid="print-document-brand-name">
             Performa
           </span>}
         </div>
@@ -44,7 +44,7 @@ function Header({ s, title, number, dateStr }) {
 }
 
 function PrintFooter({ settings }) {
-  if (settings?.subscription_plan === "FULL") return null;
+  if (settings?.subscription_plan !== "BASIC") return null;
   return (
     <div className="print-brand-footer mt-10 border-t pt-2 text-xs text-slate-500">
       Generat cu Performa - performa.net
