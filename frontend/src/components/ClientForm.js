@@ -15,6 +15,8 @@ export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
   const { tr } = useLang();
   const [f, setF] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
+  const [cuiBusy, setCuiBusy] = useState(false);
+  const [cuiResult, setCuiResult] = useState(null);
   useEffect(() => {
     if (open) setF({ ...EMPTY, ...(initial || {}) });
   }, [open, initial]);
@@ -33,6 +35,14 @@ export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
     } finally {
       setBusy(false);
     }
+  };
+  const lookupCui = async () => {
+    setCuiBusy(true);
+    try {
+      const { data } = await api.post("/cui/lookup", { cui: f.cui });
+      setCuiResult(data);
+      if (data.anaf_found) setF({ ...f, cui: data.vat_number || data.cui, name: data.name || f.name, address: data.address || f.address, reg_com: data.reg_com || f.reg_com });
+    } catch (error) { toast.error(errMsg(error)); } finally { setCuiBusy(false); }
   };
 
   return (
@@ -53,7 +63,8 @@ export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
             <Field label="CNP"><Input data-testid="client-cnp-input" className="font-mono" maxLength={13} value={f.cnp} onChange={set("cnp")} /></Field>
           ) : (
             <>
-              <Field label="CUI"><Input data-testid="client-cui-input" className="font-mono" value={f.cui} onChange={set("cui")} placeholder="RO12345678" /></Field>
+              <Field label="CUI"><div className="flex gap-2"><Input data-testid="client-cui-input" className="font-mono" value={f.cui} onChange={set("cui")} placeholder="RO12345678" /><Button type="button" variant="outline" data-testid="client-cui-lookup-button" disabled={cuiBusy || !f.cui} onClick={lookupCui}>{cuiBusy ? "Verific…" : "Importă"}</Button></div></Field>
+              {cuiResult && <div className="sm:col-span-2 text-sm" data-testid="client-cui-vat-status">{cuiResult.anaf_found ? (cuiResult.vat_payer ? `Plătitor TVA: ${cuiResult.vat_number}` : "Nu este plătitor de TVA") : "CUI negăsit în ANAF"}</div>}
               <Field label={tr("Nr. Reg. Comerțului", "Trade register no.")}><Input data-testid="client-regcom-input" className="font-mono" value={f.reg_com} onChange={set("reg_com")} placeholder="J40/123/2020" /></Field>
               <Field label={tr("Reprezentant", "Representative")}><Input data-testid="client-rep-input" value={f.representative} onChange={set("representative")} /></Field>
             </>

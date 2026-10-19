@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from core import db, ser, oid, iso, require, audit, get_or_404
 from vehicle_catalog import MAKES, decode_vin
+from cui_lookup import lookup_cui
 
 router = APIRouter(prefix="/api")
 
@@ -45,6 +46,10 @@ class VehicleIn(BaseModel):
     rovinieta_expiry: str = ""
 
 
+class CuiLookupIn(BaseModel):
+    cui: str
+
+
 def validate_cnp(cnp: str) -> bool:
     if not re.fullmatch(r"\d{13}", cnp):
         return False
@@ -65,6 +70,13 @@ def validate_client(b: ClientIn):
 def search_filter(q: str, fields):
     rx = {"$regex": re.escape(q), "$options": "i"}
     return {"$or": [{f: rx} for f in fields]}
+
+
+@router.post("/cui/lookup")
+async def cui_lookup(body: CuiLookupIn, user=Depends(require("crm"))):
+    result = await lookup_cui(body.cui)
+    await db.audit_logs.insert_one({"action": "cui_lookup", "entity": "cui", "detail": result["cui"], "at": iso(), "user_id": user["id"]})
+    return result
 
 
 @router.get("/clients")

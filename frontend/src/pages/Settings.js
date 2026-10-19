@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const { tr } = useLang();
   const { data } = useApi("/settings");
   const [f, setF] = useState(null);
+  const [cuiResult, setCuiResult] = useState(null);
   useEffect(() => {
     if (data) setF({ ...data, elevators_text: (data.elevators || []).join(", ") });
   }, [data]);
@@ -49,6 +50,13 @@ export default function SettingsPage() {
     };
     reader.readAsDataURL(file);
   };
+  const lookupCompanyCui = async () => {
+    try {
+      const { data } = await api.post("/cui/lookup", { cui: f.cui });
+      setCuiResult(data);
+      if (data.anaf_found) setF({ ...f, cui: data.vat_number || data.cui, name: data.name || f.name, address: data.address || f.address, reg_com: data.reg_com || f.reg_com });
+    } catch (error) { toast.error(errMsg(error)); }
+  };
   return (
     <div data-testid="settings-page">
       <PageHeader eyebrow={tr("Date apar pe facturi, e-Factura și documente", "Shown on invoices, e-Invoice and documents")} title={tr("Setări companie", "Company settings")}
@@ -56,7 +64,8 @@ export default function SettingsPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title={tr("Date firmă", "Company data")}>
           <div className="grid gap-3 sm:grid-cols-2">
-            {COMPANY.map(([k, ro, en]) => <Field key={k} label={tr(ro, en)}><Input data-testid={`settings-${k}-input`} value={f[k] || ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></Field>)}
+            {COMPANY.map(([k, ro, en]) => <Field key={k} label={tr(ro, en)}><div className="flex gap-2"><Input data-testid={`settings-${k}-input`} value={f[k] || ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} />{k === "cui" && <Button type="button" variant="outline" data-testid="settings-cui-lookup-button" onClick={lookupCompanyCui}>Importă</Button>}</div></Field>)}
+            {cuiResult && <p className="sm:col-span-2 text-sm" data-testid="settings-cui-vat-status">{cuiResult.anaf_found ? (cuiResult.vat_payer ? `Plătitor TVA: ${cuiResult.vat_number}` : "Nu este plătitor de TVA") : "CUI negăsit în ANAF"}</p>}
           </div>
         </Panel>
         <div className="space-y-4">
