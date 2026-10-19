@@ -48,9 +48,11 @@ class BranchAssignmentIn(BaseModel):
     branch_ids: list[str]
 
 
-class TenantQuotaIn(BaseModel):
+class TenantUpdateIn(BaseModel):
+    company_name: str = Field(min_length=2, max_length=180)
+    cui: str = Field(min_length=2, max_length=30)
+    admin_email: str = Field(min_length=5, max_length=254)
     subscription_plan: str
-    max_branches_allowed: int = Field(ge=1, le=999)
     status: str
 
 
@@ -94,7 +96,7 @@ async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
     admin_email = body.admin_email.strip().lower()
     if await raw_db.users.find_one({"email": admin_email}):
         raise HTTPException(400, "Email administrator deja existent")
-    branch_limit = 1 if body.subscription_plan == "BASIC" else 5
+    branch_limit = 1 if body.subscription_plan == "BASIC" else 999
     document = {
         "_id": tenant_id,
         "company_name": body.company_name.strip(),
@@ -144,16 +146,35 @@ async def create_tenant(body: TenantIn, user=Depends(require_superadmin())):
 
 
 @router.put("/platform/tenants/{tenant_id}")
-async def update_tenant(tenant_id: str, body: TenantQuotaIn, user=Depends(require_superadmin())):
+async def update_tenant(tenant_id: str, body: TenantUpdateIn, user=Depends(require_superadmin())):
     if body.subscription_plan not in {"BASIC", "FULL"}:
         raise HTTPException(400, "Plan invalid")
     if body.status not in {"ACTIVE", "SUSPENDED", "EXPIRED"}:
         raise HTTPException(400, "Status invalid")
     if tenant_id == user.get("tenant_id") and body.status != "ACTIVE":
         raise HTTPException(400, "Nu puteți suspenda tenantul contextului Superadmin activ")
-    result = await raw_db.tenants.update_one({"_id": tenant_id}, {"$set": body.model_dump()})
-    if not result.matched_count:
+    tenant = await raw_db.tenants.find_one({"_id": tenant_id})
+    if not tenant:
         raise HTTPException(404, "Tenant inexistent")
+    company_cui = body.cui.strip().upper()
+    duplicate_cui = await raw_db.tenants.find_one({"cui": company_cui, "_id": {"$ne": tenant_id}})
+    if duplicate_cui:
+        raise HTTPException(400, "CUI deja existent")
+    admin = await primary_tenant_admin(tenant)
+    if not admin:
+        raise HTTPException(400, "Administratorul principal al tenantului lipsește")
+    email = body.admin_email.strip().lower()
+    duplicate_email = await raw_db.users.find_one({"email": email, "_id": {"$ne": admin["_id"]}})
+    if duplicate_email:
+        raise HTTPException(400, "Email administrator deja existent")
+    branch_limit = 1 if body.subscription_plan == "BASIC" else 999
+    await raw_db.tenants.update_one({"_id": tenant_id}, {"$set": {
+        "company_name": body.company_name.strip(), "cui": company_cui,
+        "subscription_plan": body.subscription_plan, "max_branches_allowed": branch_limit,
+        "status": body.status,
+    }})
+    await raw_db.users.update_one({"_id": admin["_id"]}, {"$set": {"email": email}})
+    await audit(user, "update_tenant", "tenant", tenant_id, body.company_name.strip())
     return await tenant_out(await raw_db.tenants.find_one({"_id": tenant_id}))
 
 

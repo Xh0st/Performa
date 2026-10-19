@@ -99,6 +99,10 @@ async def migrate_demo_tenant() -> None:
         }},
         upsert=True,
     )
+    await raw_db.tenants.update_one(
+        {"_id": DEMO_TENANT_ID},
+        {"$set": {"subscription_plan": "FULL", "max_branches_allowed": 999}},
+    )
     for collection in OPERATIONAL_COLLECTIONS:
         await raw_db[collection].update_many(
             {"tenant_id": {"$exists": False}},

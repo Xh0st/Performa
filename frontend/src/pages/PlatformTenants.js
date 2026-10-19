@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
+import { Building2, Copy, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg, useApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -55,6 +55,7 @@ export default function PlatformTenants() {
   const [resetTarget, setResetTarget] = useState(null);
   const [temporaryPassword, setTemporaryPassword] = useState(null);
   const [resetBusy, setResetBusy] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
 
   if (!user || user.platform_role !== "SUPERADMIN") {
     return (
@@ -98,6 +99,18 @@ export default function PlatformTenants() {
       setDeleteTarget(null);
       setDeleteConfirmation("");
       if (selected === deleteTarget.id) setSelected("");
+      reload();
+    } catch (error) {
+      toast.error(errMsg(error));
+    }
+  };
+
+  const saveTenant = async () => {
+    if (!editTarget) return;
+    try {
+      await api.put(`/platform/tenants/${editTarget.id}`, editTarget);
+      toast.success("Tenant actualizat");
+      setEditTarget(null);
       reload();
     } catch (error) {
       toast.error(errMsg(error));
@@ -298,6 +311,15 @@ export default function PlatformTenants() {
                       <Button
                         variant="outline"
                         size="sm"
+                        data-testid={`edit-tenant-${item.id}-button`}
+                        onClick={() => setEditTarget({ ...item })}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editează
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         data-testid={`reset-tenant-${item.id}-password-button`}
                         disabled={item.id === user.tenant_id || !item.admin_email}
                         title={
@@ -378,6 +400,25 @@ export default function PlatformTenants() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={Boolean(editTarget)} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent data-testid="edit-tenant-dialog">
+          <DialogHeader>
+            <DialogTitle>Editează tenant</DialogTitle>
+            <DialogDescription>Actualizează compania, abonamentul sau emailul administratorului.</DialogDescription>
+          </DialogHeader>
+          {editTarget && <div className="grid gap-3">
+            <Field label="Nume companie SRL"><Input data-testid="edit-tenant-company-input" value={editTarget.company_name} onChange={(event) => setEditTarget({ ...editTarget, company_name: event.target.value })} /></Field>
+            <Field label="CUI"><Input data-testid="edit-tenant-cui-input" value={editTarget.cui} onChange={(event) => setEditTarget({ ...editTarget, cui: event.target.value })} /></Field>
+            <Field label="Email administrator"><Input data-testid="edit-tenant-admin-email-input" type="email" value={editTarget.admin_email} onChange={(event) => setEditTarget({ ...editTarget, admin_email: event.target.value })} /></Field>
+            <Field label="Plan"><NativeSelect data-testid="edit-tenant-plan-select" value={editTarget.subscription_plan} onChange={(event) => setEditTarget({ ...editTarget, subscription_plan: event.target.value })}><option value="BASIC">BASIC</option><option value="FULL">FULL</option></NativeSelect></Field>
+          </div>}
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <Button variant="outline" data-testid="edit-tenant-cancel-button" onClick={() => setEditTarget(null)}>Renunță</Button>
+            <Button data-testid="edit-tenant-save-button" onClick={saveTenant}>Salvează</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(resetTarget)}

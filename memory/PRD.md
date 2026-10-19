@@ -135,6 +135,15 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Verificare: 79 teste backend au trecut, build frontend reușit și curățarea a confirmat 0 date
   temporare rămase; fluxurile de migrare, resetare și schimbare obligatorie au fost testate și în UI.
 
+## Administrare plan și date tenant (2026-10-19)
+- Tenantul `SUPERADMIN` are planul `FULL` și capacitate pentru locații multiple.
+- Superadmin poate edita numele companiei, CUI-ul, planul BASIC/FULL, statusul și emailul
+  administratorului principal din lista de tenanturi.
+- Actualizarea validează unicitatea CUI/email, recalculează automat cota de sucursale la 1 pentru
+  BASIC și 999 pentru FULL și păstrează jurnalul de audit.
+- Verificare: API-ul confirmă `SUPERADMIN` ca FULL, build frontend reușit și dialogul de editare
+  a fost verificat în interfață.
+
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
   `frontend/public/performa-logo.png`.
