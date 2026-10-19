@@ -178,6 +178,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Meniul mobil are titlu accesibil pentru dialog, iar categoria tooltip-urilor are contrast ierarhic.
 - Scrollbar-ul sidebarului are 4px, fără butoane/săgeți native în Chromium/WebKit; Firefox primește
   fallback thin și transparent. Retestarea a confirmat derularea în ambele stări fără overflow.
+- Stilul vizual al toggle-ului de sidebar a fost păstrat în varianta ghost anterioară, la cererea
+  utilizatorului; poziționarea și comportamentul de extindere/restrângere rămân neschimbate.
 
 ## Identitate vizuală Performa (2026-10-19)
 - Logo-ul Performa furnizat a fost decupat și pregătit cu fundal transparent în
