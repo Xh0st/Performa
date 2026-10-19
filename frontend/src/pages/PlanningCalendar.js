@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, Plus, RotateCcw } from "lucide-react";
+import { CalendarDays, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { addDays, endOfWeek, format, getDay, parse, startOfDay, startOfMonth, startOfWeek } from "date-fns";
@@ -14,6 +14,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Field, Loading, NativeSelect, PageHeader, Panel } from "@/components/common";
 
 const DndCalendar = withDragAndDrop(Calendar);
@@ -75,6 +85,7 @@ export default function PlanningCalendar() {
   const [current, setCurrent] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
   const [start, end] = rangeFor(date, bayMode ? "day" : view);
   const query = `start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
   const { data: appointments, reload } = useApi(`/appointments?${query}`, [query]);
@@ -160,6 +171,23 @@ export default function PlanningCalendar() {
       toast.error(errMsg(error));
     }
   };
+  const remove = async () => {
+    if (!current) return;
+    setBusy(true);
+    try {
+      await api.delete(`/appointments/${current.id}`);
+      toast.success(tr("Programare ștearsă", "Appointment deleted"));
+      setDeleteDialog(false);
+      setDialog(false);
+      setCurrent(null);
+      reload();
+      reloadCapacity();
+    } catch (error) {
+      toast.error(errMsg(error));
+    } finally {
+      setBusy(false);
+    }
+  };
   if (!appointments || !capacity) return <Loading />;
 
   return (
@@ -240,9 +268,24 @@ export default function PlanningCalendar() {
             <Field label={tr("Observații", "Notes")} className="sm:col-span-2"><Textarea data-testid="planning-notes-input" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
           </div>
           {current && <div className="mt-3 flex flex-wrap gap-2"><NativeSelect data-testid="planning-status-select" value={current.status} onChange={(event) => updateStatus(event.target.value)}>{Object.entries(STATUS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect>{current.work_order_id && <Button variant="outline" data-testid="planning-open-work-order-button" onClick={() => window.open(`/work-orders/${current.work_order_id}`, "_blank")}><CalendarDays className="mr-1 h-4 w-4" />{tr("Comandă", "Work order")}</Button>}</div>}
-          <DialogFooter><Button data-testid="planning-save-button" disabled={busy || !form.client_id || !form.vehicle_id || !form.title || !form.starts_at || !form.ends_at} onClick={save}>{busy ? <RotateCcw className="h-4 w-4 animate-spin" /> : tr("Salvează", "Save")}</Button></DialogFooter>
+          <DialogFooter className="gap-2 sm:space-x-0">
+            {current && !current.work_order_id && <Button variant="destructive" data-testid="planning-delete-button" disabled={busy} onClick={() => setDeleteDialog(true)}><Trash2 className="h-4 w-4" />{tr("Șterge", "Delete")}</Button>}
+            <Button data-testid="planning-save-button" disabled={busy || !form.client_id || !form.vehicle_id || !form.title || !form.starts_at || !form.ends_at} onClick={save}>{busy ? <RotateCcw className="h-4 w-4 animate-spin" /> : tr("Salvează", "Save")}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+        <AlertDialogContent data-testid="planning-delete-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tr("Șterge programarea?", "Delete appointment?")}</AlertDialogTitle>
+            <AlertDialogDescription>{tr("Programarea și notificările asociate vor fi eliminate definitiv.", "The appointment and its associated notifications will be permanently removed.")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:space-x-0">
+            <AlertDialogCancel data-testid="planning-delete-cancel-button">{tr("Renunță", "Cancel")}</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" data-testid="planning-delete-confirm-button" disabled={busy} onClick={remove}>{tr("Șterge definitiv", "Delete permanently")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

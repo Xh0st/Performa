@@ -139,6 +139,24 @@ async def update_appointment(aid: str, body: AppointmentIn, user=Depends(require
     return (await enrich([await get_or_404("appointments", aid)]))[0]
 
 
+@router.delete("/appointments/{aid}")
+async def delete_appointment(aid: str, user=Depends(require("planning"))):
+    appointment = await get_or_404("appointments", aid)
+    if appointment.get("work_order_id"):
+        raise HTTPException(400, "Programarea are comandă de lucru asociată și nu poate fi ștearsă")
+    await db.notifications.delete_many({"appointment_id": aid})
+    await db.appointments.delete_one({"_id": appointment["_id"]})
+    await db.audit_logs.insert_one({
+        "action": "delete_appointment",
+        "entity": "appointment",
+        "entity_id": aid,
+        "detail": appointment.get("title", ""),
+        "at": iso(),
+        "user_id": user["id"],
+    })
+    return {"ok": True}
+
+
 async def create_work_order_from_appointment(appointment: dict, user: dict) -> str:
     if appointment.get("work_order_id"):
         return appointment["work_order_id"]
