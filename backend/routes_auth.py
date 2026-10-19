@@ -7,7 +7,7 @@ import jwt
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel
 from core import (db, raw_db, ser, oid, iso, now, hash_password, verify_password, make_token, get_current_user, require,
-                  permissions_for, audit, get_settings, ROLES, JWT_ALG, tenant_plan)
+                  permissions_for, audit, get_settings, plan_limits, ROLES, JWT_ALG, tenant_plan)
 
 router = APIRouter(prefix="/api")
 
@@ -267,7 +267,11 @@ async def write_settings(body: dict, user=Depends(require("settings"))):
         if duplicate:
             raise HTTPException(400, "Subdomeniul este deja folosit de alt tenant")
         body["custom_subdomain"] = custom_subdomain
-    await db.settings.update_one({"kind": "company"}, {"$set": body, "$setOnInsert": {"kind": "company"}}, upsert=True)
+    update = {"$set": body, "$setOnInsert": {"kind": "company"}}
+    if "custom_subdomain" in body and not custom_subdomain:
+        body.pop("custom_subdomain")
+        update["$unset"] = {"custom_subdomain": ""}
+    await db.settings.update_one({"kind": "company"}, update, upsert=True)
     await audit(user, "update", "settings", "company")
     return await get_settings()
 
@@ -285,11 +289,19 @@ async def upload_tenant_logo(body: TenantLogoIn, user=Depends(require("settings"
         raise HTTPException(400, "Logo Base64 invalid") from error
     if not content or len(content) > 1024 * 1024:
         raise HTTPException(400, "Logo-ul poate avea maximum 1 MB")
+    current = await db.settings.find_one({"kind": "company"}) or {}
+    previous = current.get("custom_logo_data_url", "")
+    previous_size = len(base64.b64decode(previous.split(",", 1)[1])) if "," in previous else 0
+    tenant = await raw_db.tenants.find_one({"_id": user["tenant_id"]}) or {}
+    used = max(0, tenant.get("document_storage_used_bytes", 0) - previous_size + len(content))
+    if used > plan_limits(await tenant_plan(user["tenant_id"]))["storage_mb"] * 1024 * 1024:
+        raise HTTPException(403, "Limita de storage a planului a fost depășită")
     await db.settings.update_one(
         {"kind": "company"},
         {"$set": {"custom_logo_data_url": body.data_url, "custom_logo_mime": match.group(1)}},
         upsert=True,
     )
+    await raw_db.tenants.update_one({"_id": user["tenant_id"]}, {"$set": {"document_storage_used_bytes": used}})
     await audit(user, "upload_custom_logo", "settings", "company")
     return await get_settings()
 
@@ -298,9 +310,18 @@ async def upload_tenant_logo(body: TenantLogoIn, user=Depends(require("settings"
 async def delete_tenant_logo(user=Depends(require("settings"))):
     if await tenant_plan(user["tenant_id"]) == "BASIC":
         raise HTTPException(403, "Logo-ul personalizat este disponibil doar în planurile FULL sau ENTERPRISE")
+    current_settings = await db.settings.find_one({"kind": "company"}) or {}
+    previous_logo = current_settings.get("custom_logo_data_url", "")
+    previous_size = len(base64.b64decode(previous_logo.split(",", 1)[1])) if "," in previous_logo else 0
     await db.settings.update_one(
         {"kind": "company"},
         {"$unset": {"custom_logo_data_url": "", "custom_logo_mime": ""}},
+    )
+    tenant = await raw_db.tenants.find_one({"_id": user["tenant_id"]}) or {}
+    used = max(0, tenant.get("document_storage_used_bytes", 0) - previous_size)
+    await raw_db.tenants.update_one(
+        {"_id": user["tenant_id"]},
+        {"$set": {"document_storage_used_bytes": used}},
     )
     await audit(user, "delete_custom_logo", "settings", "company")
     return await get_settings()

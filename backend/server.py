@@ -59,6 +59,8 @@ async def startup():
     await migrate_demo_tenant()
     set_scope({"tenant_id": DEMO_TENANT_ID, "branch_id": DEMO_BRANCH_ID})
     await raw_db.users.create_index("email", unique=True)
+    await raw_db.settings.update_many({"custom_subdomain": ""}, {"$unset": {"custom_subdomain": ""}})
+    await raw_db.settings.create_index("custom_subdomain", unique=True, sparse=True)
     await db.login_attempts.create_index("identifier")
     for collection, index_name in [
         (raw_db.vehicles, "vin_1"),

@@ -1,0 +1,44 @@
+{
+  "summary": "P1 retest of document branding and the BASIC/FULL/ENTERPRISE plan matrix after the iter24 fixes. Ran iter25_fixture setup, then pytest test_iter25_plan_matrix_branding.py with -n 0: 23/23 passed (the only warning is the non-blocking multipart PendingDeprecationWarning). Added test_iter25b_tenant_scope_subdomain.py: 3/3 passed. (1) The work-order quota counts the whole tenant: 4999 orders on a 2nd FULL branch plus a new order on the main branch gives 200 for the 5000th and 403 for the 5001st. (2) custom_subdomain must be unique across tenants, case-insensitive (400 on duplicate, 400 on invalid format, the same tenant can re-save its own). (3) An old invoice with no plan/logo in its saved seller data gets it filled in on read: BASIC gets the BASIC plan and no logo, FULL gets the FULL plan and a data:image logo. All iter24 bugs are confirmed fixed: PrintDoc invoice header, Settings logo-delete preview, a BASIC-downgraded tenant with a leftover logo gets Performa branding, superadmin /admins respects the BASIC cap of 3 users, subdomain is unique, work-order quota is per tenant. In the UI with TEMP tenants (desktop 1920): BASIC PrintDoc for invoice, proforma and storno shows /performa-logo-dark.png, the 'Performa' brand name and the footer 'Generat cu Performa - performa.net'. FULL and ENTERPRISE PrintDoc for invoice, proforma, storno and NIR shows the custom data-URL logo, no Performa name, no footer. BASIC NIR print returns 403, as expected: the stock module is FULL-only. Settings for BASIC: plan 'BASIC', '1 locație · 500 MB storage · 500 comenzi/lună', subdomain and logo inputs disabled. ENTERPRISE: 'Locații multiple · 50 GB storage · comenzi nelimitate'; deleting the logo clears the preview right away and it stays gone after reload. PDFs for Anexa5, warranty and e-Factura (plus the e-Factura builder) were checked by pytest: BASIC has the Performa logo 458x201 and the footer; FULL and ENTERPRISE have the custom logo 64x32 and no footer; ENTERPRISE without a logo falls back to the Performa logo without footer. Teardown is clean: 0 TEMP25 tenants, users, branches, docs or subdomains left, and only the 3 original tenants remain.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/settings (custom_subdomain)", "issue": "Uniqueness is only an application-level find_one check, with no unique index on settings.custom_subdomain, so two concurrent saves could both succeed."},
+      {"endpoint": "GET /api/invoices/{id}", "issue": "Uses setdefault, so an invoice that already has a plan or logo saved in its seller data returns those old values (e.g. the plan at issue time). PrintDoc is unaffected because it puts current settings on top ({...inv.seller, ...settings}); other API consumers could get the old plan."},
+      {"endpoint": "plan limits", "issue": "storage_mb (500MB/10GB/50GB) is still display-only and not enforced (carried over from iter24)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PrintDoc (BASIC tenant, /print/nir/:id)", "issue": "The backend 403 for BASIC is correct, but the page only shows a plain unstyled error div. Low priority UX.", "selector": "[data-testid='print-doc-nir']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings > Plan & Branding", "issues": ["The logo upload is the browser's default file input ('Choose File'), not styled like the shadcn components; cosmetic."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/iter25_fixture.py",
+    "/app/backend/tests/test_iter25_plan_matrix_branding.py",
+    "/app/backend/tests/test_iter25b_tenant_scope_subdomain.py",
+    "/app/test_reports/pytest/iter25.xml",
+    "/app/test_reports/pytest/iter25b.xml"
+  ],
+  "action_items": [
+    "Optional: add a unique sparse index on settings.custom_subdomain to close the race condition.",
+    "Optional: in GET /invoices/{id}, decide whether the current tenant plan should override the plan saved in the seller data (today it is setdefault).",
+    "Optional: decide on storage_mb enforcement.",
+    "Optional: give PrintDoc a styled 'not available on BASIC' message instead of the raw error text."
+  ],
+  "critical_code_review_comments": [
+    "enforce_work_order_quota now uses raw_db with only tenant_id: correctly counted per tenant.",
+    "The BASIC cap of 3 users is enforced in both /users and /platform/tenants/{id}/admins.",
+    "PrintDoc Header gates the custom logo on subscription_plan !== 'BASIC', so a leftover logo on a BASIC tenant is never shown."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter25b_tenant_scope_subdomain.py"],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "100% (all PrintDoc and Settings checks; BASIC NIR 403 is expected)"},
+  "seed_data_creation": "TEMP25 tenants created by iter25_fixture.py and removed on teardown; no real data was modified.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run order: python tests/iter25_fixture.py setup -> pytest tests/test_iter25_plan_matrix_branding.py -n 0 -> pytest tests/test_iter25b_tenant_scope_subdomain.py -n 0 (it depends on the FULL 2nd branch created by the first suite) -> python tests/iter25_fixture.py teardown. TEMP user password is in the fixture (NEW_PW). Fixture state is in /tmp/iter25.json."
+}
