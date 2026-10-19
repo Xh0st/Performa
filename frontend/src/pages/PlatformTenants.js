@@ -205,8 +205,8 @@ export default function PlatformTenants() {
                   setTenant({ ...tenant, subscription_plan: event.target.value });
                 }}
               >
-                <option value="BASIC">BASIC · 1 sucursală</option>
-                <option value="FULL">FULL · locații multiple</option>
+                <option value="BASIC">BASIC</option>
+                <option value="FULL">FULL</option>
               </NativeSelect>
             </Field>
           </div>

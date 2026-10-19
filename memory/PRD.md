@@ -141,6 +141,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   administratorului principal din lista de tenanturi.
 - Mesajele Superadmin comunică acum regula curentă: BASIC include o sucursală, iar FULL permite
   locații multiple, fără a menționa vechea limită de cinci.
+- Selectorul de plan din creare afișează doar valorile BASIC și FULL; regulile de capacitate rămân
+  explicate separat în mesajul informativ.
 - Actualizarea validează unicitatea CUI/email, recalculează automat cota de sucursale la 1 pentru
   BASIC și 999 pentru FULL și păstrează jurnalul de audit.
 - Verificare: API-ul confirmă `SUPERADMIN` ca FULL, build frontend reușit și dialogul de editare
