@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PageHeader, Panel, Loading, Empty, StatusBadge } from "@/components/common";
 import VehicleForm from "@/components/VehicleForm";
+import { PaginationControls, usePagination } from "@/components/Pagination";
 
 const todayS = () => new Date().toISOString().slice(0, 10);
 function Exp({ label, d }) {
@@ -25,6 +26,7 @@ export default function Vehicles() {
   const [detail, setDetail] = useState(null);
   const { data, loading, reload } = useApi(`/vehicles?q=${encodeURIComponent(q)}`, [q]);
   const openDetail = async (id) => setDetail((await api.get(`/vehicles/${id}`)).data);
+  const pagination = usePagination(data || [], `${q}:${data?.length || 0}`);
   return (
     <div data-testid="vehicles-page">
       <PageHeader eyebrow={tr("Parc auto clienți", "Client fleet")} title={tr("Vehicule", "Vehicles")}
@@ -42,7 +44,7 @@ export default function Vehicles() {
                 <th className="px-2">{tr("Proprietar", "Owner")}</th><th className="px-2 text-right">Km</th><th className="px-2">{tr("Expirări", "Expiry")}</th>
               </tr></thead>
               <tbody>
-                {data.map((v) => (
+                {pagination.pageItems.map((v) => (
                   <tr key={v.id} data-testid={`vehicle-row-${v.id}`} onClick={() => openDetail(v.id)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
                     <td className="px-2"><span className="rounded-sm border bg-background px-2 py-0.5 font-mono text-xs font-semibold">{v.plate}</span></td>
                     <td className="px-2 font-mono text-xs">{v.vin}</td>
@@ -56,6 +58,7 @@ export default function Vehicles() {
             </table>
           </div>
         )}
+        <PaginationControls {...pagination} total={data?.length || 0} testid="vehicles-pagination" />
       </Panel>
       <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="vehicle-detail-sheet">

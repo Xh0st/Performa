@@ -8,6 +8,7 @@ import { money, date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, Panel, Loading, StatusBadge, STATUS } from "@/components/common";
+import { PaginationControls, usePagination } from "@/components/Pagination";
 
 const COLS = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "asteapta_piese", "in_lucru", "finalizata", "facturata"];
 
@@ -35,6 +36,8 @@ export default function WorkOrders() {
   const [q, setQ] = useState("");
   const { data, reload } = useApi(view === "kanban" ? "/work-orders?active=true" : "/work-orders", [view]);
   const rows = (data || []).filter((w) => !q || `${w.number} ${w.vehicle.plate} ${w.client_name} ${w.vehicle.make}`.toLowerCase().includes(q.toLowerCase()));
+  const pagination = usePagination(rows, `${q}:${view}:${data?.length || 0}`);
+  const visibleRows = pagination.pageItems;
 
   const drop = async (e, status) => {
     e.preventDefault();
@@ -63,7 +66,7 @@ export default function WorkOrders() {
       {!data ? <Loading /> : view === "kanban" ? (
         <div className="flex gap-3 overflow-x-auto pb-4" data-testid="kanban-board">
           {COLS.filter((c) => c !== "facturata").map((c) => {
-            const items = rows.filter((w) => w.status === c);
+            const items = visibleRows.filter((w) => w.status === c);
             return (
               <div key={c} data-testid={`kanban-col-${c}`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => drop(e, c)} className="w-64 shrink-0 rounded-md border bg-card/60">
                 <div className="flex items-center justify-between border-b px-3 py-2">
@@ -83,7 +86,7 @@ export default function WorkOrders() {
                 <th className="px-2">Client</th><th className="px-2">{tr("Mecanici", "Mechanics")}</th><th className="px-2 text-right">Total</th><th className="px-2 text-right">Status</th>
               </tr></thead>
               <tbody>
-                {rows.map((w) => (
+                {visibleRows.map((w) => (
                   <tr key={w.id} onClick={() => nav(`/work-orders/${w.id}`)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
                     <td className="px-2 font-mono text-xs text-primary">{w.number}</td><td className="px-2">{date(w.created_at)}</td>
                     <td className="px-2"><span className="font-mono text-xs">{w.vehicle.plate}</span> · {w.vehicle.make} {w.vehicle.model}</td>
@@ -96,6 +99,7 @@ export default function WorkOrders() {
           </div>
         </Panel>
       )}
+      <PaginationControls {...pagination} total={rows.length} testid="work-orders-pagination" />
       <p className="mt-2 text-xs text-muted-foreground">{tr(`Trageți cardurile între coloane pentru a schimba statusul. ${STATUS.facturata[0]} se setează automat la emiterea facturii.`,
         "Drag cards between columns to change status. Invoiced is set automatically when the invoice is issued.")}</p>
     </div>
