@@ -1,8 +1,11 @@
 import uuid
 import re
+import io
 from datetime import timedelta, date
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 from fastapi.responses import Response
 from pydantic import BaseModel
 from core import db, ser, oid, iso, now, require, audit, get_or_404, next_seq, get_settings, calc_totals
@@ -565,6 +568,64 @@ async def create_cash_payout(body: CashPayoutIn, user=Depends(require("payments"
     result = await db.cash_movements.insert_one(movement)
     await audit(user, "create", body.kind, str(result.inserted_id), movement["doc_number"])
     return ser(await db.cash_movements.find_one({"_id": result.inserted_id}))
+
+
+async def cash_register_rows(date_from: str, date_to: str, cash_only: bool) -> dict:
+    payment_filter = {"date": {"$gte": date_from, "$lte": f"{date_to}T23:59:59"}}
+    if cash_only:
+        payment_filter["method"] = "numerar"
+    payments = await db.payments.find(payment_filter).sort("date", 1).to_list(5000)
+    movements = await db.cash_movements.find(
+        {"date": {"$gte": date_from, "$lte": f"{date_to}T23:59:59"}},
+    ).sort("date", 1).to_list(5000)
+    rows = [{"date": p["date"], "document": p["doc_number"], "label": p.get("client_name", ""), "in": p["amount"], "out": 0} for p in payments]
+    rows.extend({"date": m["date"], "document": m["doc_number"], "label": m.get("beneficiary", "Depunere bancă"), "in": 0, "out": m["amount"]} for m in movements)
+    rows.sort(key=lambda row: (row["date"], row["document"]))
+    opening = 0.0
+    for row in rows:
+        opening = round(opening + row["in"] - row["out"], 2)
+        row["balance"] = opening
+    return {"items": rows, "opening": 0, "closing": opening, "date_from": date_from, "date_to": date_to}
+
+
+@router.get("/cash-register/report")
+async def cash_register_report(date_from: str, date_to: str, cash_only: bool = True, user=Depends(require("payments"))):
+    return await cash_register_rows(date_from, date_to, cash_only)
+
+
+@router.get("/cash-register/report.pdf")
+async def cash_register_report_pdf(date_from: str, date_to: str, cash_only: bool = True, user=Depends(require("payments"))):
+    report = await cash_register_rows(date_from, date_to, cash_only)
+    output = io.BytesIO()
+    pdf = canvas.Canvas(output, pagesize=A4)
+    pdf.setTitle("Registru de casă")
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(40, 800, "REGISTRU ÎNCASĂRI NUMERAR" if cash_only else "REGISTRU TOATE MIȘCĂRILE")
+    pdf.setFont("Helvetica", 9)
+    pdf.drawString(40, 782, f"Interval: {date_from} - {date_to}")
+    y = 754
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(40, y, "Data")
+    pdf.drawString(105, y, "Document")
+    pdf.drawString(210, y, "Explicație")
+    pdf.drawRightString(425, y, "Intrări")
+    pdf.drawRightString(495, y, "Ieșiri")
+    pdf.drawRightString(555, y, "Sold")
+    pdf.setFont("Helvetica", 8)
+    for row in report["items"]:
+        y -= 16
+        if y < 45:
+            pdf.showPage()
+            y = 780
+            pdf.setFont("Helvetica", 8)
+        pdf.drawString(40, y, row["date"][:10])
+        pdf.drawString(105, y, row["document"])
+        pdf.drawString(210, y, row["label"][:35])
+        pdf.drawRightString(425, y, f"{row['in']:.2f}")
+        pdf.drawRightString(495, y, f"{row['out']:.2f}")
+        pdf.drawRightString(555, y, f"{row['balance']:.2f}")
+    pdf.save()
+    return Response(content=output.getvalue(), media_type="application/pdf")
 
 
 @router.post("/payments/{pid}/reverse")

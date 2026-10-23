@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Printer } from "lucide-react";
-import { useApi } from "@/lib/api";
+import { api, downloadFile, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { money, dt, today } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { PageHeader, Panel, Kpi, Loading, Empty } from "@/components/common";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Empty, Field, Kpi, Loading, PageHeader, Panel } from "@/components/common";
 import { METHODS, DOCS } from "@/pages/InvoiceDetail";
 import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 import { CashDepositForm, CashPayoutForm, PaymentEntryForm } from "@/components/CashPaymentForms";
@@ -15,6 +16,10 @@ import { CashDepositForm, CashPayoutForm, PaymentEntryForm } from "@/components/
 export default function Cash() {
   const { tr } = useLang();
   const [day, setDay] = useState(today());
+  const [reportFrom, setReportFrom] = useState(`${today().slice(0, 8)}01`);
+  const [reportTo, setReportTo] = useState(today());
+  const [reversePayment, setReversePayment] = useState(null);
+  const [reverseReason, setReverseReason] = useState("");
   const { data: reg, reload: reloadRegister } = useApi(`/cash-register?day=${day}`);
   const cashPagination = useServerPagination("cash-payments");
   const cashlessPagination = useServerPagination("cashless-payments");
@@ -24,11 +29,20 @@ export default function Cash() {
   const { data: cashlessPaymentsData, reload: reloadCashlessPayments } = useApi(
     `/payments?method=pos,transfer,online&page=${cashlessPagination.page}&page_size=${PAGE_SIZE}`,
   );
+  const { data: cashReport } = useApi(
+    `/cash-register/report?date_from=${reportFrom}&date_to=${reportTo}&cash_only=true`,
+  );
   const reloadCash = () => {
     reloadRegister();
     reloadCashPayments();
   };
   const reloadCashless = () => reloadCashlessPayments();
+  const reverseReceipt = async () => {
+    await api.post(`/payments/${reversePayment.id}/reverse`, { reason: reverseReason });
+    setReversePayment(null);
+    setReverseReason("");
+    reloadCash();
+  };
   return (
     <div data-testid="cash-page">
       <PageHeader eyebrow={tr("Numerar · POS · transfer · online", "Cash · POS · transfer · online")} title={tr("Încasări & registru de casă", "Payments & cash register")} />
@@ -38,6 +52,7 @@ export default function Cash() {
           <TabsTrigger value="cash" data-testid="cash-tab-cash-payments">{tr("Încasări numerar", "Cash receipts")}</TabsTrigger>
           <TabsTrigger value="cashless" data-testid="cash-tab-cashless-payments">POS / OP</TabsTrigger>
           <TabsTrigger value="payouts" data-testid="cash-tab-payouts">{tr("Plăți & stornări", "Payouts & reversals")}</TabsTrigger>
+          <TabsTrigger value="registers" data-testid="cash-tab-registers">{tr("Registre", "Registers")}</TabsTrigger>
         </TabsList>
         <TabsContent value="register">
           <div className="mb-4 flex items-center gap-2">
@@ -81,7 +96,7 @@ export default function Cash() {
                       <td className="px-2">{dt(p.date)}</td><td className="px-2">{tr(...METHODS[p.method])}</td><td className="px-2">{p.client_name}</td>
                       <td className="px-2"><Link className="font-mono text-xs text-primary" to={`/invoices/${p.invoice_id}`}>{p.invoice_ref}</Link></td>
                       <td className="px-2 text-right font-mono">{money(p.amount)}</td>
-                      <td className="px-2 text-right"><Button variant="ghost" size="icon" data-testid={`cash-payment-print-${p.id}`} onClick={() => window.open(`/print/receipt/${p.id}`, "_blank")}><Printer className="h-4 w-4" /></Button></td>
+                      <td className="px-2 text-right"><Button variant="ghost" size="icon" data-testid={`cash-payment-print-${p.id}`} onClick={() => window.open(`/print/receipt/${p.id}`, "_blank")}><Printer className="h-4 w-4" /></Button><Button variant="ghost" size="sm" data-testid={`cash-payment-reverse-${p.id}`} disabled={!!p.reversed_at} onClick={() => setReversePayment(p)}>{tr("Stornează", "Reverse")}</Button></td>
                     </tr>
                   ))}
                 </tbody></table>
@@ -111,7 +126,25 @@ export default function Cash() {
             <p className="mt-4 text-xs text-muted-foreground">{tr("Stornarea chitanțelor și bonurilor fiscale se face din lista Încasări numerar, cu motiv obligatoriu și confirmare.", "Reverse receipts from Cash receipts with a required reason and confirmation.")}</p>
           </Panel>
         </TabsContent>
+        <TabsContent value="registers">
+          <Panel title={tr("Registre pe interval", "Registers by period")}>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label={tr("De la", "From")}><Input data-testid="cash-register-from-input" type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)} /></Field>
+              <Field label={tr("Până la", "To")}><Input data-testid="cash-register-to-input" type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)} /></Field>
+              <Button data-testid="cash-register-cash-pdf-button" onClick={() => downloadFile(`/cash-register/report.pdf?date_from=${reportFrom}&date_to=${reportTo}&cash_only=true`, "registru_incasari_numerar.pdf")}>{tr("PDF încasări numerar", "Cash receipts PDF")}</Button>
+              <Button variant="outline" data-testid="cash-register-all-pdf-button" onClick={() => downloadFile(`/cash-register/report.pdf?date_from=${reportFrom}&date_to=${reportTo}&cash_only=false`, "registru_toate_miscarile.pdf")}>{tr("PDF toate mișcările", "All movements PDF")}</Button>
+            </div>
+            <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[680px] text-sm" data-testid="cash-register-report-table"><tbody>{(cashReport?.items || []).map((item) => <tr key={`${item.date}-${item.document}`} className="h-9 border-b border-border/50"><td>{dt(item.date)}</td><td className="font-mono">{item.document}</td><td>{item.label}</td><td className="text-right font-mono">{item.in ? money(item.in) : "—"}</td><td className="text-right font-mono">{item.out ? money(item.out) : "—"}</td><td className="text-right font-mono">{money(item.balance)}</td></tr>)}</tbody></table></div>
+          </Panel>
+        </TabsContent>
       </Tabs>
+      <Dialog open={!!reversePayment} onOpenChange={(open) => !open && setReversePayment(null)}>
+        <DialogContent data-testid="cash-reversal-dialog">
+          <DialogHeader><DialogTitle>{tr("Stornare document numerar", "Reverse cash document")}</DialogTitle></DialogHeader>
+          <Field label={tr("Motiv obligatoriu", "Required reason")}><Input data-testid="cash-reversal-reason-input" value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} /></Field>
+          <DialogFooter><Button variant="outline" onClick={() => setReversePayment(null)}>{tr("Renunță", "Cancel")}</Button><Button data-testid="cash-reversal-confirm-button" disabled={!reverseReason.trim()} onClick={reverseReceipt}>{tr("Confirmă stornarea", "Confirm reversal")}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
