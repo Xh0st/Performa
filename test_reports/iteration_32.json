@@ -1,0 +1,50 @@
+{
+  "summary": "Tested the 'Plăți & stornări' tab, cash receipt reversal and the two range registers with PDF, on both backend and frontend. New suite test_iter32_cash_payouts_registers.py has 12 tests: 8 pass and 4 fail. Working: payout validation (bad kind, empty beneficiary or amount 0 gives 400); a payout above the available cash gives 400 'depășește'; decont (DC-) and dispoziție de plată (DP-) are created; reversal requires a reason (422 if missing, 400 for whitespace); a valid reversal returns paid_amount and status on the invoice (paid→unpaid, partial when another chitanță remains), creates an ST- receipt_reversal movement (out = amount, reference = original doc, reason stored) and sets reversed_at; a second reversal and reversing a POS payment both give 400; the report with cash_only=true excludes POS and cash_only=false includes it; balance after each row is consistent; both PDFs return 200 application/pdf (%PDF). In the UI the payout form saves with a toast and resets, Save is disabled when the amount is above the available cash, the reversal dialog stays disabled with an empty or whitespace reason and the Reverse button is disabled after a reversal, and both PDF buttons download. CRITICAL: payouts and reversals do NOT change the daily cash register balance (GET /cash-register), and that balance is the one shown in the UI and used for validation.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/cash-register (cash_register())", "issue": "opening, total_out and closing only count kind='bank_deposit'. expense_settlement, payment_order and receipt_reversal are ignored, and reversed payments (reversed_at) still count in total_in. Reproduced: closing was 800 before and after DC 50 + DP 30, 921 before and after a 121 RON reversal, and in the UI it stayed at 650 RON after a 25+15 payout and a 150 RON reversal. This breaks the requirement 'Deconturile/plățile afectează soldul de casă'.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/cash-register/payouts and /deposits", "issue": "The available-cash check uses cash_register() closing, which ignores earlier payouts and reversals, so repeated payouts can go past the real cash. Reproduced: a 630 RON payout was accepted while the real balance (report) was 620 RON.", "priority": "CRITICAL"},
+      {"endpoint": "GET /api/cash-register/report (+ .pdf)", "issue": "opening is hardcoded to 0 and the running balance starts from 0 at date_from, ignoring all movements before the interval. Reproduced: next-day opening 0 while the previous closing was 670. In the UI the range 01.10–23.10 shows a balance of -15.154,04 RON because the cash collected before October is not carried over.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/payments/{pid}/reverse", "issue": "No check that there is enough cash for the refund, and the operation is not atomic: there is a race between the reversed_at check and the update, so two concurrent requests can both reverse the same payment. Use find_one_and_update with reversed_at: {$exists: false}."},
+      {"endpoint": "GET /api/cash-register/report.pdf", "issue": "Uses the standard Helvetica font, which cannot render Ă/Ș/Ț (title 'REGISTRU ÎNCASĂRI…', 'Explicație', 'Ieșiri', client names). Register Roboto via TTFont as anexa5.py and account_statement_pdf.py already do. There is also no Content-Disposition header, no totals row and no repeated header on new pages."},
+      {"endpoint": "GET /api/cash-register/report", "issue": "date_from and date_to are not validated: 'bad' returns 200 with an empty list. Also, the date $lte f'{date_to}T23:59:59' misses rows in the last second, e.g. 23:59:59.5."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Cash.js reverseReceipt", "issue": "No try/catch and no success or error toast. A backend 400 turns into an unhandled promise rejection and the dialog stays open silently.", "selector": "[data-testid='cash-reversal-confirm-button']", "priority": "MEDIUM"},
+      {"component": "CashPayoutForm", "issue": "No saving or disabled state while the request runs, so a double-click creates 2 documents. The form has no notes field.", "selector": "[data-testid='cash-payout-save-button']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Payout/reversal → Registre tab", "issue": "The cashReport useApi is not reloaded in reloadCash, so DC/DP/ST rows created in the session do not show in the Registre table until a page reload (verified).", "affected_selectors": ["[data-testid='cash-register-report-table']"]},
+      {"flow": "Payout/reversal → Registru de casă KPIs", "issue": "The closing KPI does not change after a payout or reversal (backend bug above). The 'Depuneri bancă' KPI label is also wrong once payouts exist.", "affected_selectors": ["[data-testid='cash-closing']", "[data-testid='cash-out']"]}
+    ],
+    "design_issues": [
+      {"screen": "Registre tab", "issues": ["The report table has no header row (Data/Document/Explicație/Intrări/Ieșiri/Sold) and no opening or closing rows", "The on-screen table only shows the cash_only=true view and there is no on-screen 'toate mișcările' view", "Uses the native input type=date instead of the shadcn calendar"]},
+      {"screen": "Plăți & stornări tab", "issues": ["Does not show the available cash or a list of payouts and reversals, so the user cannot see what was created"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter32_cash_payouts_registers.py", "/app/backend/tests/iter32_ui_fixture.py", "/app/test_reports/pytest/pytest_iter32.xml"],
+  "action_items": [
+    "cash_register(): include all cash_movements kinds (bank_deposit, expense_settlement, payment_order, receipt_reversal) in opening and total_out, then re-test the payout and deposit limits",
+    "cash_register_rows(): compute opening from all cash movements before date_from (respecting cash_only) and start the running balance from it",
+    "Reverse endpoint: make it atomic (find_one_and_update on reversed_at), consider a cash-available check, and handle errors in the frontend with toasts",
+    "Reload cashReport after payouts and reversals, and add a saving state to CashPayoutForm",
+    "Use the Roboto TTF font in the register PDF so Romanian diacritics render",
+    "Leftover temp data from before this run: 9 clients named 'TEST_Client XXXXXX' created 2026-10-23 20:32–20:35. Not created by this agent, so left in place for the main agent to remove"
+  ],
+  "critical_code_review_comments": [
+    "routes_finance.py has 661 lines and is close to the 700 limit. Move the cash register code (cash_register, payouts, deposits, reversal, reports, PDF) into routes_cash.py",
+    "The daily cash_register and cash_register_rows use different balance logic. Use one shared balance helper",
+    "The reversal loop updates invoices one by one with no rollback; a failure midway leaves a partial state"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter32_cash_payouts_registers.py", "/app/backend/tests/iter32_ui_fixture.py"],
+  "success_rate": {"backend": "67% (8/12)", "frontend": "70%"},
+  "seed_data_creation": "None persisted. All TEST_ data from the pytest run and the UI fixture (clients, invoices, payments, DC/DP/ST movements, audit logs) was removed and counters restored. Existing real data DB-000001 and DC-000001 (ELIT ROMANIA) was untouched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_iter32_cash_payouts_registers.py -n 0 -v. The 4 expected failures (daily closing ignores payouts and reversal, cumulative payout limit, report opening) should pass after the fixes. UI fixture: python tests/iter32_ui_fixture.py setup|teardown (PF client + 150 RON invoice + chitanță; ids printed). Testids: cash-tab-payouts, cash-payout-{kind-select|beneficiary-input|amount-input|reference-input|save-button}, cash-payment-reverse-{id}, cash-reversal-{dialog|reason-input|confirm-button}, cash-tab-registers, cash-register-{from|to}-input, cash-register-{cash|all}-pdf-button, cash-register-report-table. The real tenant has a DB-000001 deposit of 34720.95, which makes the range balances negative when the range starts late.",
+  "rca of the issue": "cash_register() was written in iter31 for deposits only; this iteration's new cash_movements kinds were never added to its $match/find filters ({'kind': 'bank_deposit'}). Payout and deposit validation call cash_register(), so the limit check is also wrong. cash_register_rows() sets opening=0 instead of aggregating before date_from."
+}
