@@ -155,7 +155,7 @@ function ReceiptDoc({ s, p }) {
   return (
     <>
       <Header s={s} title={title} number={p.doc_number} dateStr={dt(p.date)} />
-      <p className="text-[13px] leading-7">Am primit de la <b>{p.client_name}</b> suma de <b className="font-mono">{money(p.amount)}</b>, reprezentând contravaloarea facturii <b>{p.invoice_ref}</b>.{p.reference && ` Referință: ${p.reference}.`}</p>
+      <p className="text-[13px] leading-7">Am primit de la <b>{p.client_name}</b> suma de <b className="font-mono">{money(p.amount)}</b>, reprezentând contravaloarea {p.allocations?.length > 1 ? "facturilor" : "facturii"} <b>{p.invoice_ref}</b>.{p.reference && ` Referință: ${p.reference}.`}</p>
       <Sign labels={["Casier", "Client"]} />
     </>
   );

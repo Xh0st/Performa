@@ -244,6 +244,31 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   validate. Datele temporare identificate în liste au fost curățate. Livrare testată de agent,
   în așteptarea confirmării de acceptanță a utilizatorului.
 
+## P1: condiții comerciale client și Fișă de cont (2026-10-23)
+- Persoanele juridice au termen preferențial opțional în zile și limită de credit implicită de
+  0 RON. Fără termen setat, condiția este CASH. Persoanele fizice sunt protejate server-side de
+  termen sau limită de credit.
+- Emiterea unei facturi fiscale peste plafon afișează avertisment, dar nu blochează operațiunea.
+  Fișa de client afișează condiția de plată, plafonul și expunerea curentă.
+- Pagina clientului are taburile paginate (20 rânduri): Istoric Comenzi, Facturi și Fișa Cont.
+  Fișa cont include interval, sold inițial/final, facturi, încasări, stornări și export PDF.
+  Vehiculele din pagina clientului deschid acum pagina de detaliu vehicul.
+- Verificare: API PJ/PF, valoare implicită 0 RON, Fișă cont și PDF verificate; documentul PDF a
+  fost randat și verificat vizual. Livrare testată, în așteptarea acceptanței utilizatorului.
+
+## P1: încasări, numerar și registru de casă (2026-10-23)
+- Încasări & registru de casă are taburi pentru Registru de casă, Încasări numerar și POS / OP.
+  Înregistrarea selectează clientul și factura restantă sau aplică automat FIFO după scadență.
+- Pentru numerar se emit chitanță sau, doar la persoane fizice, bon fiscal înregistrat ca document
+  emis la casa de marcat existentă. POS, OP și online sunt separate de numerar.
+- Registrul calculează numai intrările de numerar și depunerile bancare; depunerile parțiale sau
+  totale nu pot depăși soldul disponibil. Plățile FIFO apar corect pe fiecare factură și o singură
+  dată în Fișa de cont.
+- După înregistrarea unei chitanțe sau a unui bon fiscal, documentul se deschide automat în pagina
+  de tipărire. Operatorul poate astfel tipări imediat documentul emis.
+- Verificare: 18/18 teste de regresie financiară trecute după corecția atomică a alocării FIFO,
+  controlului bonului fiscal PJ/PF, filtrelor, listelor și depunerilor. Build frontend reușit.
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)

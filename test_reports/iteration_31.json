@@ -1,0 +1,52 @@
+{
+  "summary": "Tested the Payments & cash register extension (backend + frontend, desktop 1920 and mobile 390). New pytest suite test_iter31_cash_payments.py: 18 tests, 14 passed. Working: chitanță on a selected invoice; bon fiscal for PF; FIFO allocation by due_date (proforma and credit notes skipped; allocations and comma-joined invoice_ref kept on the payment); POS gets POS- numbers and OP gets OP- numbers; FIFO and selected invoice both work on the POS/OP tab; filters method=numerar and method=pos,transfer give the correct totals; pagination is 20 per page; cash register shows only cash, closing = opening + in - out; partial and total bank deposits work, deposits over the available cash or of 0 are rejected; print shows 'BON FISCAL' for doc_type bon_fiscal; client regressions OK (PJ credit_limit 0, PF with term/credit gets 400, account statement lists the FIFO payment once). UI: Bon fiscal option only for PF, error toasts show, KPIs and the deposit form update, no horizontal overflow on mobile. CRITICAL bug: allocate_payment writes paid_amount/status to invoices BEFORE all validation passes. A rejected payment (400) still leaves invoices marked paid with no payment record. Reproduced in the UI: a PF client paid 170 RON, but after a rejected 1000 RON FIFO attempt both invoices (300 RON) showed status 'paid', while the account statement still showed 130 RON due. HIGH bug: a PJ client can receive a bon fiscal. The backend does not check client type, and the Cash form keeps cash_document='fiscal_receipt' when the user switches from a PF client to a PJ client. Reproduced as BF-000002 for 'TEST_UI PJ Casa'. All test data was removed and counters restored.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/payments (allocate_payment)", "issue": "Not atomic. Invoices are updated one by one in the loop. Only afterwards does the code check 'remaining > 0' (overflow) and cash_document validity (create_payment lines 379-381, which run AFTER allocate_payment). Result: a 400 response still leaves invoices with a higher paid_amount and status paid/partial, and no payment is stored. Reproduced 3 ways: (a) FIFO amount above the total balance: mid/late invoices went to 200/300 paid; (b) selected invoice of 70 with amount 100: invoice set to paid with 70; (c) cash_document='xxx': invoice paid_amount 10. A mid-loop 409 has the same effect. Fix: validate everything before writing (method, cash_document, client type, total due >= amount). Compute the allocations in memory first, then apply them, ideally in a Mongo transaction or with compensation/rollback on failure.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/payments", "issue": "cash_document='fiscal_receipt' is accepted for PJ clients (and for any client). The backend must return 400 when client.type != 'pf'.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/invoices/{id} payments[]", "issue": "Lists payments by payment.invoice_id, which holds only the FIRST allocation. A FIFO payment CH 120 RON (100 to U1 + 20 to U2) appears in full (120) on invoice U1 and not at all on U2. Query on allocations.invoice_id and show the allocated amount per invoice."},
+      {"endpoint": "GET /api/cash-register", "issue": "Loads every cash payment and deposit (to_list 5000) to compute the opening balance. This will not scale and silently truncates past 5000 rows. Use a $match/$group aggregation for date < day."},
+      {"endpoint": "GET /api/payments (POS/OP tab)", "issue": "Payments with method 'online' (still selectable in the InvoiceDetail PayDialog) appear in neither the Cash receipts tab nor the POS/OP tab."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CashPaymentForms.PaymentEntryForm", "issue": "When the client changes, cashDocument is not reset. After choosing PF + Bon fiscal and then switching to a PJ client, the select shows 'Chitanță' (the option no longer exists) but the state stays 'fiscal_receipt', so the POST sends fiscal_receipt and a bon fiscal is issued to the PJ. Reset cashDocument to 'receipt' in the client onChange, or when client.type !== 'pf'.", "selector": "[data-testid='payment-entry-cash-document-select']", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Cash receipt overflow", "issue": "The UI shows the correct error toast, but because of the backend atomicity bug the invoices are already marked paid. The invoice dropdown then hides them as 'paid' although money is still due.", "affected_selectors": ["[data-testid='payment-entry-cash-save-button']"]}
+    ],
+    "design_issues": [
+      {"screen": "Cash > Încasări numerar / POS-OP form", "issues": ["The invoice dropdown shows the invoice gross ('TSTUU2 · 200 RON') instead of the remaining balance, so after a partial payment the user does not see what is still due.", "Invoice options are sorted by created_at desc, not by due date (FIFO order)."]},
+      {"screen": "Cash > POS / OP", "issues": ["The table has no header (thead). It also lacks the Document type, Invoice link and Print columns that the Cash receipts table has, so the two tabs are inconsistent."]},
+      {"screen": "Cash > Registru de casă", "issues": ["The KPI for bank deposits is labelled 'Plăți' (Payouts); 'Depuneri bancă' would be clearer.", "The day picker is a native <input type=date> rather than the shadcn Calendar."]},
+      {"screen": "InvoiceDetail PayDialog", "issues": ["Bon fiscal is shown only when buyer.cnp exists, while the Cash page uses client.type === 'pf'. A PF without a CNP cannot get a bon fiscal from the invoice page."]},
+      {"screen": "Print receipt", "issues": ["With several FIFO invoices the text reads 'contravaloarea facturii TSTUU1, TSTUU2' (singular). Consider 'facturilor'."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter31_cash_payments.py", "/app/backend/tests/cash_ui_fixtures.py", "/app/test_reports/pytest/pytest_iter31.xml"],
+  "action_items": [
+    "CRITICAL: make allocate_payment/create_payment atomic. Do all validation (method, cash_document, PF-only bon fiscal, amount <= total due) before any write, then apply the allocations in a transaction or with rollback.",
+    "HIGH: reject cash_document=fiscal_receipt server-side for non-PF clients.",
+    "HIGH: reset cashDocument to 'receipt' in PaymentEntryForm when the client changes or is not PF.",
+    "Show FIFO payments on every allocated invoice in GET /invoices/{id}, with the allocated amount, using allocations.invoice_id.",
+    "Show the remaining balance in the invoice dropdown, sorted by due_date.",
+    "Add a header to the POS/OP table; decide where 'online' payments are listed; align the bon fiscal condition in InvoiceDetail with client type."
+  ],
+  "critical_code_review_comments": [
+    "routes_finance.create_payment: the cash_document check runs after allocate_payment has already changed invoices.",
+    "routes_finance.allocate_payment: the optimistic lock (match on paid_amount) per invoice is good, but a failure partway leaves the earlier invoices updated. Needs a transaction or compensation.",
+    "routes_finance.cash_register: full collection scan in Python on every call; create_cash_deposit calls it again. Use aggregation.",
+    "GET /payments/{pid} requires the 'invoices' permission while the list uses 'payments'. Both include casier today, but keep them consistent."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter31_cash_payments.py", "/app/backend/tests/cash_ui_fixtures.py"],
+  "success_rate": {"backend": "78% (14/18)", "frontend": "85% (all flows work; 1 HIGH bug: PJ can get a bon fiscal after a client switch)"},
+  "test_credentials": "andrei.melek@gmail.com (admin) from /app/memory/test_credentials.md. Auth playbook: bcrypt $2b$ OK, httpOnly Secure cookies OK, CORS has an explicit origin and credentials=true OK.",
+  "seed_data_creation": "None left behind. Fixtures were TEST_ clients and invoices in the admin's tenant/branch (series TSTC/TSTU). All payments, deposits, invoices, clients and audit logs were deleted, and pay_*/cash_deposit counters restored (pay_bon_fiscal removed; it did not exist before). Note: cash_movements DB-000001 (34,720.95 RON, ref 'depunere cash', created 23.10.2026 21:50 just before testing started) was NOT created by the testing agent and was left in place. It zeroes today's register.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run with: cd /app/backend && python -m pytest tests/test_iter31_cash_payments.py -n 0 -v. Use -n 0 because pytest.ini uses xdist with loadscope, so classes run on separate workers with separate fixtures. The 4 expected failures (atomicity x3, PJ bon fiscal) should pass after the fixes. For UI: python tests/cash_ui_fixtures.py setup|teardown creates a PF client with 2 invoices (100 RON due 01-05, 200 RON due 02-05) and a PJ client with 1 invoice (500 RON); the ids are printed. Cash page testids: cash-tab-register/cash-payments/cashless-payments, payment-entry-{cash|cashless}-{client-select|invoice-select|amount-input|reference-input|save-button}, payment-entry-cash-document-select, payment-entry-cashless-method-select, cash-deposit-amount-input/save-button, cash-opening/in/out/closing.",
+  "rca of the issue": "Phantom paid invoices: create_payment calls allocate_payment, which runs update_one on each invoice inside the loop. The overflow check (remaining > 0) and the cash_document check run after those writes, and nothing rolls them back. Repro: an invoice of 70, POST /payments {invoice_id, amount:100, method:numerar} returns 400, yet the invoice is now status=paid, paid_amount=70, and no payment exists. Mitigation: pre-compute the allocations from a read-only pass and validate everything first, then write inside a session/transaction. PJ bon fiscal: there is no server-side check, and the React state for cashDocument survives a client change because the hidden <option> makes the select display the first option while the state value stays the same."
+}

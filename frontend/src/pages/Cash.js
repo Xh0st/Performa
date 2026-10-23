@@ -22,7 +22,7 @@ export default function Cash() {
     `/payments?method=numerar&page=${cashPagination.page}&page_size=${PAGE_SIZE}`,
   );
   const { data: cashlessPaymentsData, reload: reloadCashlessPayments } = useApi(
-    `/payments?method=pos,transfer&page=${cashlessPagination.page}&page_size=${PAGE_SIZE}`,
+    `/payments?method=pos,transfer,online&page=${cashlessPagination.page}&page_size=${PAGE_SIZE}`,
   );
   const reloadCash = () => {
     reloadRegister();
@@ -48,7 +48,7 @@ export default function Cash() {
               <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
                 <Kpi testid="cash-opening" label={tr("Sold inițial", "Opening")} value={money(reg.opening)} />
                 <Kpi testid="cash-in" label={tr("Încasări", "Receipts")} value={money(reg.total_in)} accent="text-emerald-500" />
-                <Kpi testid="cash-out" label={tr("Plăți", "Payouts")} value={money(reg.total_out)} accent="text-rose-500" />
+                <Kpi testid="cash-out" label={tr("Depuneri bancă", "Bank deposits")} value={money(reg.total_out)} accent="text-rose-500" />
                 <Kpi testid="cash-closing" label={tr("Sold final", "Closing")} value={money(reg.closing)} />
               </div>
               <Panel>
@@ -94,7 +94,7 @@ export default function Cash() {
             <PaymentEntryForm onSaved={reloadCashless} />
             {!cashlessPaymentsData ? <Loading /> : (
               <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm" data-testid="cashless-payments-table"><tbody>
+                <table className="w-full min-w-[720px] text-sm" data-testid="cashless-payments-table"><thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground"><th className="px-2 py-2">{tr("Document", "Document")}</th><th className="px-2">{tr("Data", "Date")}</th><th className="px-2">{tr("Metodă", "Method")}</th><th className="px-2">Client</th><th className="px-2 text-right">{tr("Sumă", "Amount")}</th></tr></thead><tbody>
                   {(cashlessPaymentsData.items || []).map((p) => (
                     <tr key={p.id} className="h-10 border-b border-border/50"><td className="font-mono text-xs">{p.doc_number}</td><td>{dt(p.date)}</td><td>{tr(...METHODS[p.method])}</td><td>{p.client_name}</td><td className="text-right font-mono">{money(p.amount)}</td></tr>
                   ))}

@@ -26,9 +26,13 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
     clientId ? `/clients/${clientId}/invoices?page=1&page_size=100` : null,
   );
   const client = (clients || []).find((item) => item.id === clientId);
-  const invoices = (invoicesData?.items || []).filter(
-    (invoice) => invoice.type === "fiscal" && invoice.status !== "paid" && invoice.kind !== "credit_note",
-  );
+  const invoices = (invoicesData?.items || [])
+    .filter((invoice) => invoice.type === "fiscal" && invoice.status !== "paid" && invoice.kind !== "credit_note")
+    .map((invoice) => ({
+      ...invoice,
+      due: invoice.totals.gross - invoice.paid_amount - (invoice.credited_amount || 0),
+    }))
+    .sort((left, right) => String(left.due_date).localeCompare(String(right.due_date)));
 
   useEffect(() => {
     if (cashOnly) setMethod(CASH_METHOD);
@@ -37,7 +41,7 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
   const save = async () => {
     setSaving(true);
     try {
-      await api.post("/payments", {
+      const response = await api.post("/payments", {
         client_id: clientId,
         invoice_id: invoiceId,
         amount: Number(amount),
@@ -46,6 +50,9 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
         reference,
       });
       toast.success(tr("Încasare înregistrată", "Payment recorded"));
+      if (cashOnly && ["chitanta", "bon_fiscal"].includes(response.data.doc_type)) {
+        window.open(`/print/receipt/${response.data.id}`, "_blank", "noopener,noreferrer");
+      }
       setInvoiceId("");
       setAmount("");
       setReference("");
@@ -66,6 +73,7 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
           onChange={(event) => {
             setClientId(event.target.value);
             setInvoiceId("");
+            setCashDocument("receipt");
           }}
         >
           <option value="">{tr("Selectează clientul", "Select client")}</option>
@@ -82,7 +90,7 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
           <option value="">{tr("FIFO automat", "Automatic FIFO")}</option>
           {invoices.map((invoice) => (
             <option key={invoice.id} value={invoice.id}>
-              {invoice.series}{invoice.number} · {invoice.totals.gross} RON
+              {invoice.series}{invoice.number} · {invoice.due.toFixed(2)} RON
             </option>
           ))}
         </NativeSelect>
