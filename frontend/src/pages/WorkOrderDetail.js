@@ -116,6 +116,12 @@ export default function WorkOrderDetail() {
   const invoice = async (type) => {
     try {
       const r = await api.post(`/invoices/from-work-order/${id}`, { type });
+      if (r.data.credit_warning) {
+        const warning = r.data.credit_warning;
+        toast.warning(
+          `${tr("Limita de credit este depășită", "Credit limit exceeded")}: ${warning.projected.toFixed(2)} RON / ${warning.limit.toFixed(2)} RON`,
+        );
+      }
       toast.success(`${tr("Document emis", "Document issued")} ${r.data.series}${r.data.number}`);
       nav(`/invoices/${r.data.id}`);
     } catch (e) {

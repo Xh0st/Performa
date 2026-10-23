@@ -8,8 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Field, NativeSelect } from "@/components/common";
 
-const EMPTY = { type: "pf", name: "", cnp: "", cui: "", reg_com: "", representative: "", phone: "", email: "", address: "", city: "", county: "RO-B",
-  is_fleet: false, budget_limit: 0, gdpr_consent: false, notes: "" };
+const EMPTY = {
+  type: "pf",
+  name: "",
+  cnp: "",
+  cui: "",
+  reg_com: "",
+  representative: "",
+  phone: "",
+  email: "",
+  address: "",
+  city: "",
+  county: "RO-B",
+  is_fleet: false,
+  budget_limit: 0,
+  payment_terms_days: null,
+  credit_limit: null,
+  gdpr_consent: false,
+  notes: "",
+};
 
 export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
   const { tr } = useLang();
@@ -25,7 +42,17 @@ export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
   const save = async () => {
     setBusy(true);
     try {
-      const body = { ...f, budget_limit: Number(f.budget_limit) || 0 };
+      const isCompany = f.type === "pj";
+      const body = {
+        ...f,
+        budget_limit: Number(f.budget_limit) || 0,
+        payment_terms_days: isCompany && f.payment_terms_days !== ""
+          ? Number(f.payment_terms_days) || null
+          : null,
+        credit_limit: isCompany && f.credit_limit !== ""
+          ? Number(f.credit_limit)
+          : null,
+      };
       const r = initial?.id ? await api.put(`/clients/${initial.id}`, body) : await api.post("/clients", body);
       toast.success(tr("Client salvat", "Client saved"));
       onSaved?.(r.data);
@@ -51,7 +78,16 @@ export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
         <DialogHeader><DialogTitle className="font-heading text-2xl uppercase">{initial?.id ? tr("Editare client", "Edit client") : tr("Client nou", "New client")}</DialogTitle></DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={tr("Tip client", "Client type")}>
-            <NativeSelect data-testid="client-type-select" value={f.type} onChange={set("type")}>
+            <NativeSelect
+              data-testid="client-type-select"
+              value={f.type}
+              onChange={(event) => setF({
+                ...f,
+                type: event.target.value,
+                payment_terms_days: event.target.value === "pj" ? f.payment_terms_days : null,
+                credit_limit: event.target.value === "pj" ? f.credit_limit : null,
+              })}
+            >
               <option value="pf">{tr("Persoană fizică", "Individual")}</option>
               <option value="pj">{tr("Persoană juridică", "Company")}</option>
             </NativeSelect>
@@ -78,6 +114,28 @@ export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
             <>
               <div className="flex items-center gap-3 pt-5"><Switch data-testid="client-fleet-switch" checked={f.is_fleet} onCheckedChange={set("is_fleet")} /><span className="text-sm">{tr("Client flotă", "Fleet client")}</span></div>
               <Field label={tr("Limită buget / comandă (RON)", "Budget limit / order (RON)")}><Input data-testid="client-budget-input" type="number" value={f.budget_limit} onChange={set("budget_limit")} /></Field>
+              <Field label={tr("Termen de plată preferențial (zile)", "Preferred payment term (days)")}>
+                <Input
+                  data-testid="client-payment-terms-input"
+                  type="number"
+                  min="1"
+                  max="365"
+                  placeholder="CASH"
+                  value={f.payment_terms_days ?? ""}
+                  onChange={set("payment_terms_days")}
+                />
+              </Field>
+              <Field label={tr("Limită de credit (RON)", "Credit limit (RON)")}>
+                <Input
+                  data-testid="client-credit-limit-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Fără limită"
+                  value={f.credit_limit ?? ""}
+                  onChange={set("credit_limit")}
+                />
+              </Field>
             </>
           )}
           <div className="flex items-center gap-3 sm:col-span-2">

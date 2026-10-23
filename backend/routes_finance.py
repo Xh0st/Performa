@@ -9,6 +9,7 @@ from core import db, ser, oid, iso, now, require, audit, get_or_404, next_seq, g
 from routes_stock import consume_fifo, receive_stock
 from efactura import build_ubl
 from pagination import fetch_page, page_response
+from client_finance import client_credit_position
 
 router = APIRouter(prefix="/api")
 DOC_BY_METHOD = {"numerar": ("chitanta", "CH"), "pos": ("bon_pos", "POS"), "transfer": ("ordin_plata", "OP"), "online": ("confirmare_online", "WEB")}
@@ -101,9 +102,13 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
     key = "invoice" if body.type == "fiscal" else "proforma"
     seq = await next_seq(key)
     issue = date.today()
+    payment_terms_days = c.get("payment_terms_days") if c.get("type") == "pj" else None
+    payment_terms_days = payment_terms_days if payment_terms_days and payment_terms_days > 0 else 0
     inv = {"type": body.type, "series": s.get("invoice_series", "SRV") if body.type == "fiscal" else s.get("proforma_series", "PF"),
            "number": f"{seq:06d}", "issue_date": issue.isoformat(),
-           "due_date": (issue + timedelta(days=s.get("payment_terms_days", 15))).isoformat(),
+           "due_date": (issue + timedelta(days=payment_terms_days)).isoformat(),
+           "payment_terms_days": payment_terms_days,
+           "payment_condition": "CASH" if not payment_terms_days else f"{payment_terms_days} zile",
            "currency": "RON", "work_order_id": wid, "work_order_number": w["number"], "client_id": w["client_id"],
            "vehicle": f"{v['make']} {v['model']} · {v['plate']} · VIN {v['vin']}", "mileage": w.get("mileage_in"),
            "seller": {k: s.get(k, "") for k in ("name", "cui", "reg_com", "address", "city", "county_code", "iban", "bank", "phone", "email", "capital", "subscription_plan", "custom_logo_data_url")},
@@ -118,6 +123,16 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
             if ln["type"] in ("part", "consumable") and ln.get("product_id"):
                 inv["cogs"] += await consume_fifo(ln["product_id"], ln["qty"], ref)
         inv["cogs"] = round(inv["cogs"], 2)
+    credit_warning = None
+    if body.type == "fiscal" and c.get("type") == "pj" and c.get("credit_limit") is not None:
+        position = await client_credit_position(w["client_id"])
+        projected = round(position["outstanding"] + totals["gross"], 2)
+        if projected > c["credit_limit"]:
+            credit_warning = {
+                "limit": c["credit_limit"],
+                "outstanding": position["outstanding"],
+                "projected": projected,
+            }
     r = await db.invoices.insert_one(inv)
     if body.type == "fiscal":
         await db.work_orders.update_one({"_id": w["_id"]}, {"$set": {"status": "facturata", "invoice_id": str(r.inserted_id), "invoiced_at": iso()},
@@ -141,7 +156,10 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
                 "at": iso(),
             })
         schedule_auto_send(await db.invoices.find_one({"_id": r.inserted_id}))
-    return ser(await db.invoices.find_one({"_id": r.inserted_id}, {"efactura.xml": 0}))
+    result = ser(await db.invoices.find_one({"_id": r.inserted_id}, {"efactura.xml": 0}))
+    if credit_warning:
+        result["credit_warning"] = credit_warning
+    return result
 
 
 @router.get("/invoices/{iid}")

@@ -1,11 +1,14 @@
 import re
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import Response
 from pydantic import BaseModel
-from core import db, ser, oid, iso, require, audit, get_or_404
+from core import db, ser, oid, iso, require, audit, get_or_404, get_settings
 from vehicle_catalog import MAKES, decode_vin
 from cui_lookup import lookup_cui
 from pagination import fetch_page, page_response
+from account_statement_pdf import build_account_statement_pdf
+from client_finance import account_statement, client_credit_position
 
 router = APIRouter(prefix="/api")
 
@@ -24,6 +27,8 @@ class ClientIn(BaseModel):
     county: str = ""
     is_fleet: bool = False
     budget_limit: float = 0
+    payment_terms_days: Optional[int] = None
+    credit_limit: Optional[float] = None
     gdpr_consent: bool = False
     notes: str = ""
 
@@ -66,6 +71,16 @@ def validate_client(b: ClientIn):
         raise HTTPException(400, "CNP invalid")
     if b.type == "pj" and not b.cui:
         raise HTTPException(400, "CUI obligatoriu pentru persoane juridice")
+    if b.type == "pf":
+        if b.payment_terms_days not in (None, 0) or b.credit_limit not in (None, 0):
+            raise HTTPException(400, "Persoanele fizice nu pot avea termen de plată sau limită de credit")
+        b.payment_terms_days = None
+        b.credit_limit = None
+    if b.type == "pj" and b.payment_terms_days is not None:
+        if b.payment_terms_days < 1 or b.payment_terms_days > 365:
+            raise HTTPException(400, "Termenul de plată trebuie să fie între 1 și 365 zile")
+    if b.type == "pj" and b.credit_limit is not None and b.credit_limit < 0:
+        raise HTTPException(400, "Limita de credit nu poate fi negativă")
 
 
 def search_filter(q: str, fields):
@@ -131,10 +146,137 @@ async def create_client(body: ClientIn, user=Depends(require("crm"))):
 async def get_client(cid: str, user=Depends(require("crm"))):
     c = ser(await get_or_404("clients", cid))
     c["vehicles"] = [ser(v) for v in await db.vehicles.find({"client_id": cid}).to_list(500)]
-    c["work_orders"] = [ser(w) for w in await db.work_orders.find(
-        {"client_id": cid}, {"reception.photos": 0, "reception.signature": 0, "quotes": 0}).sort("created_at", -1).to_list(500)]
-    c["invoices"] = [ser(i) for i in await db.invoices.find({"client_id": cid}, {"efactura.xml": 0}).sort("issue_date", -1).to_list(500)]
+    c["work_order_count"] = await db.work_orders.count_documents({"client_id": cid})
+    c["invoice_count"] = await db.invoices.count_documents({"client_id": cid, "type": "fiscal"})
+    c["financial_summary"] = await client_credit_position(cid)
     return c
+
+
+async def client_work_order_rows(client_id: str, query: str, page: int, page_size: int) -> dict:
+    flt = {"client_id": client_id}
+    if query.strip():
+        rx = {"$regex": re.escape(query.strip()), "$options": "i"}
+        vehicle_ids = [
+            str(item["_id"])
+            async for item in db.vehicles.find(
+                {
+                    "client_id": client_id,
+                    "$or": [{"plate": rx}, {"vin": rx}, {"make": rx}, {"model": rx}],
+                },
+                {"_id": 1},
+            )
+        ]
+        flt["$or"] = [
+            {"number": rx},
+            {"complaint": rx},
+            {"vehicle_id": {"$in": vehicle_ids}},
+        ]
+    projection = {"reception.photos": 0, "reception.signature": 0, "quotes": 0}
+    rows, total, current_page, size = await fetch_page(
+        db.work_orders,
+        flt,
+        [("created_at", -1)],
+        page,
+        page_size,
+        projection,
+    )
+    vehicle_ids = [oid(item["vehicle_id"]) for item in rows if item.get("vehicle_id")]
+    vehicles = {
+        str(item["_id"]): item
+        for item in await db.vehicles.find({"_id": {"$in": vehicle_ids}}).to_list(500)
+    }
+    items = []
+    for row in rows:
+        item = ser(row)
+        vehicle = vehicles.get(item.get("vehicle_id"), {})
+        item["vehicle_label"] = " · ".join(
+            value for value in [vehicle.get("plate"), vehicle.get("make"), vehicle.get("model")] if value
+        )
+        items.append(item)
+    return page_response(items, total, current_page, size)
+
+
+@router.get("/clients/{cid}/work-orders")
+async def client_work_orders(
+    cid: str,
+    q: str = "",
+    page: int = 1,
+    page_size: int = 20,
+    user=Depends(require("crm")),
+):
+    await get_or_404("clients", cid)
+    return await client_work_order_rows(cid, q, page, page_size)
+
+
+@router.get("/clients/{cid}/invoices")
+async def client_invoices(
+    cid: str,
+    q: str = "",
+    page: int = 1,
+    page_size: int = 20,
+    user=Depends(require("crm")),
+):
+    await get_or_404("clients", cid)
+    flt = {"client_id": cid}
+    if q.strip():
+        rx = {"$regex": re.escape(q.strip()), "$options": "i"}
+        flt["$or"] = [{"series": rx}, {"number": rx}, {"vehicle": rx}, {"work_order_number": rx}]
+    rows, total, current_page, size = await fetch_page(
+        db.invoices,
+        flt,
+        [("issue_date", -1), ("created_at", -1)],
+        page,
+        page_size,
+        {"efactura.xml": 0},
+    )
+    return page_response([ser(item) for item in rows], total, current_page, size)
+
+
+async def client_statement(cid: str, date_from: str, date_to: str, page: int, page_size: int) -> tuple[dict, dict]:
+    client = ser(await get_or_404("clients", cid))
+    try:
+        statement = await account_statement(cid, date_from, date_to, page, page_size)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return client, statement
+
+
+@router.get("/clients/{cid}/account-statement")
+async def client_account_statement(
+    cid: str,
+    date_from: str = "",
+    date_to: str = "",
+    page: int = 1,
+    page_size: int = 20,
+    user=Depends(require("crm")),
+):
+    _, statement = await client_statement(cid, date_from, date_to, page, page_size)
+    statement.pop("all_items", None)
+    return statement
+
+
+@router.get("/clients/{cid}/account-statement.pdf")
+async def client_account_statement_pdf(
+    cid: str,
+    date_from: str = "",
+    date_to: str = "",
+    user=Depends(require("crm")),
+):
+    client, statement = await client_statement(cid, date_from, date_to, 1, 20)
+    settings = await get_settings()
+    premium = settings.get("subscription_plan") in {"FULL", "ENTERPRISE"}
+    content = build_account_statement_pdf(
+        client,
+        statement,
+        include_footer=not premium,
+        custom_logo_data_url=settings.get("custom_logo_data_url", "") if premium else "",
+    )
+    filename = f"fisa_cont_{cid}_{date_from or 'toate'}.pdf"
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.put("/clients/{cid}")

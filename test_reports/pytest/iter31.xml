@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="23" skipped="0" tests="43" time="5.493" timestamp="2026-10-23T21:19:27.823597+00:00" hostname="agent-env-100ab832-4aa8-4607-9745-da91f4b33ede"><testcase classname="tests.test_iter29_cookie_auth_stock.TestCookieAuth" name="test_login_sets_httponly_cookies" time="0.723" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[invoices]" time="1.100" /><testcase classname="tests.test_iter29_cookie_auth_stock.TestCookieAuth" name="test_me_via_cookie_only" time="0.500" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[work-orders]" time="0.088" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[clients]" time="0.094" /><testcase classname="tests.test_iter29_cookie_auth_stock.TestCookieAuth" name="test_refresh_via_cookie" time="0.723" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[vehicles]" time="0.123" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[products]" time="0.100" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[nirs]" time="0.302" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[supplier-returns]" time="0.078" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[payments]" time="0.264" /><testcase classname="tests.test_iter29_cookie_auth_stock.TestCookieAuth" name="test_refresh_without_cookie_401" time="0.151" /><testcase classname="tests.test_iter29_cookie_auth_stock.TestCookieAuth" name="test_logout_then_me_401" time="0.729" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[warranties]" time="0.306" /><testcase classname="tests.test_iter30_server_pagination" name="test_contract[warranty-claims]" time="0.075" /><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[invoices]" time="0.169"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[work-orders]" time="0.204"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter29_cookie_auth_stock.TestCookieAuth" name="test_me_without_auth_401" time="0.169" /><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[clients]" time="0.078"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter29_cookie_auth_stock.TestCookieAuth" name="test_cors_credentials_explicit_origin" time="0.316" /><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[vehicles]" time="0.089"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[products]" time="0.074"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[nirs]" time="0.075"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[supplier-returns]" time="0.125"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter29_cookie_auth_stock.TestStatic" name="test_no_dynamic_imports" time="0.000" /><testcase classname="tests.test_iter29_cookie_auth_stock.TestStatic" name="test_no_hardcoded_secrets" time="0.001" /><testcase classname="tests.test_iter29_cookie_auth_stock.TestStockFlows" name="test_nir_then_return" time="0.107"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 in (200, 201)&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter29_cookie_auth_stock.py:85: in test_nir_then_return
+    assert sup.status_code in (200, 201), sup.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 in (200, 201)
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[payments]" time="0.108"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[warranties]" time="0.096"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_walk_no_duplicates_matches_legacy[warranty-claims]" time="0.072"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:67: in test_walk_no_duplicates_matches_legacy
+    ids, meta = walk(s, path, params)
+                ^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_page_size_capped" time="0.069"><failure message="KeyError: 'page_size'">tests/test_iter30_server_pagination.py:79: in test_page_size_capped
+    assert d["page_size"] == 100
+           ^^^^^^^^^^^^^^
+E   KeyError: 'page_size'</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_invoice_filters[params0]" time="0.097"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:88: in test_invoice_filters
+    ids, meta = walk(s, "invoices", params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_invoice_filters[params1]" time="0.073"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:88: in test_invoice_filters
+    ids, meta = walk(s, "invoices", params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_invoice_filters[params2]" time="0.135"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:88: in test_invoice_filters
+    ids, meta = walk(s, "invoices", params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_invoice_filters[params3]" time="0.086"><failure message="AssertionError: {&quot;detail&quot;:&quot;Sesiune invalidată&quot;}&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:88: in test_invoice_filters
+    ids, meta = walk(s, "invoices", params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_iter30_server_pagination.py:38: in walk
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Sesiune invalidată"}
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_invoice_filter_semantics" time="0.107"><failure message="KeyError: 0">tests/test_iter30_server_pagination.py:97: in test_invoice_filter_semantics
+    sample = allinv[0]
+             ^^^^^^^^^
+E   KeyError: 0</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_work_order_search" time="0.115"><failure message="KeyError: 0">tests/test_iter30_server_pagination.py:121: in test_work_order_search
+    wo = allwo[0]
+         ^^^^^^^^
+E   KeyError: 0</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_work_order_active_legacy" time="0.084"><failure message="assert (401 == 200)&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:133: in test_work_order_active_legacy
+    assert r.status_code == 200 and isinstance(r.json(), list)
+E   assert (401 == 200)
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_legacy_lists[products]" time="0.087"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:140: in test_legacy_lists
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_legacy_lists[suppliers]" time="0.084"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:140: in test_legacy_lists
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_legacy_lists[warranties]" time="0.080"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:140: in test_legacy_lists
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_legacy_lists[clients]" time="0.084"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_iter30_server_pagination.py:140: in test_legacy_lists
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_iter30_server_pagination" name="test_unauth_rejected" time="0.301" /></testsuite></testsuites>
