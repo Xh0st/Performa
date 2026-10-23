@@ -17,6 +17,7 @@ export default function Cash() {
   const { tr } = useLang();
   const [day, setDay] = useState(today());
   const [cashQuery, setCashQuery] = useState("");
+  const [cashlessQuery, setCashlessQuery] = useState("");
   const [reportFrom, setReportFrom] = useState(`${today().slice(0, 8)}01`);
   const [reportTo, setReportTo] = useState(today());
   const [reversePayment, setReversePayment] = useState(null);
@@ -28,7 +29,7 @@ export default function Cash() {
     `/payments?method=numerar&q=${encodeURIComponent(cashQuery)}&page=${cashPagination.page}&page_size=${PAGE_SIZE}`,
   );
   const { data: cashlessPaymentsData, reload: reloadCashlessPayments } = useApi(
-    `/payments?method=pos,transfer,online&page=${cashlessPagination.page}&page_size=${PAGE_SIZE}`,
+    `/payments?method=pos,transfer,online&q=${encodeURIComponent(cashlessQuery)}&page=${cashlessPagination.page}&page_size=${PAGE_SIZE}`,
   );
   const { data: cashReport } = useApi(
     `/cash-register/report?date_from=${reportFrom}&date_to=${reportTo}&cash_only=true`,
@@ -48,7 +49,7 @@ export default function Cash() {
     <div data-testid="cash-page">
       <PageHeader eyebrow={tr("Numerar · POS · transfer · online", "Cash · POS · transfer · online")} title={tr("Încasări & registru de casă", "Payments & cash register")} />
       <Tabs defaultValue="register">
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto whitespace-nowrap">
           <TabsTrigger value="register" data-testid="cash-tab-register">{tr("Registru de casă", "Cash register")}</TabsTrigger>
           <TabsTrigger value="cash" data-testid="cash-tab-cash-payments">{tr("Încasări numerar", "Cash receipts")}</TabsTrigger>
           <TabsTrigger value="cashless" data-testid="cash-tab-cashless-payments">POS / OP</TabsTrigger>
@@ -110,6 +111,7 @@ export default function Cash() {
         <TabsContent value="cashless">
           <Panel>
             <PaymentEntryForm onSaved={reloadCashless} />
+            <div className="mt-4 max-w-md"><Input data-testid="cashless-payments-search-input" placeholder={tr("Caută client, CUI sau document…", "Search client, tax ID or document…")} value={cashlessQuery} onChange={(event) => setCashlessQuery(event.target.value)} /></div>
             {!cashlessPaymentsData ? <Loading /> : (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[720px] text-sm" data-testid="cashless-payments-table"><thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground"><th className="px-2 py-2">{tr("Document", "Document")}</th><th className="px-2">{tr("Data", "Date")}</th><th className="px-2">{tr("Metodă", "Method")}</th><th className="px-2">Client</th><th className="px-2 text-right">{tr("Sumă", "Amount")}</th></tr></thead><tbody>
