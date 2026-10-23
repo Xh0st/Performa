@@ -14,7 +14,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { PageHeader, Panel, Loading, Badge, PAY_STATUS, EF_STATUS, Field, NativeSelect } from "@/components/common";
 
 export const METHODS = { numerar: ["Numerar", "Cash"], pos: ["Card POS", "Card POS"], transfer: ["Transfer bancar", "Bank transfer"], online: ["Online", "Online"] };
-export const DOCS = { chitanta: ["Chitanță", "Receipt"], bon_fiscal: ["Bon fiscal", "Fiscal receipt"], bon_pos: ["Bon POS", "POS slip"], ordin_plata: ["Ordin de plată", "Payment order"], confirmare_online: ["Confirmare online", "Online confirmation"] };
+export const DOCS = {
+  chitanta: ["Chitanță", "Receipt"],
+  bon_fiscal: ["Bon fiscal", "Fiscal receipt"],
+  dispozitie_incasare: ["Dispoziție de încasare", "Collection order"],
+  bon_pos: ["Bon POS", "POS slip"],
+  ordin_plata: ["Ordin de plată", "Payment order"],
+  confirmare_online: ["Confirmare online", "Online confirmation"],
+};
 
 function PayDialog({ inv, open, onOpenChange, onSaved }) {
   const { tr } = useLang();
@@ -123,7 +130,7 @@ export default function InvoiceDetail() {
             <Panel title={tr("Încasări", "Payments")}>
               {inv.payments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between border-b border-border/50 py-2 text-sm">
-                  <div><div className="font-mono text-xs">{p.doc_number}</div><div className="text-[11px] text-muted-foreground">{tr(...DOCS[p.doc_type])} · {dt(p.date)}</div></div>
+                  <div><div className="font-mono text-xs">{p.doc_number}</div><div className="text-[11px] text-muted-foreground">{tr(...(DOCS[p.doc_type] || [p.doc_type, p.doc_type]))} · {dt(p.date)}</div></div>
                   <div className="flex items-center gap-2"><span className="font-mono">{money(p.amount)}</span>
                     <Button variant="ghost" size="icon" data-testid={`print-receipt-${p.doc_number}`} onClick={() => window.open(`/print/receipt/${p.id}`, "_blank")}><Printer className="h-4 w-4" /></Button></div>
                 </div>
