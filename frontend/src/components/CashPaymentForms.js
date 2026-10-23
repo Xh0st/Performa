@@ -120,6 +120,11 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
           </NativeSelect>
         </Field>
       )}
+      {cashOnly && client && (
+        <div className="flex items-end pb-2 text-xs text-muted-foreground" data-testid="cash-payment-limit-info">
+          {tr("Plafon zilnic numerar", "Daily cash limit")}: {client.type === "pj" ? "5.000" : "10.000"} RON
+        </div>
+      )}
       <Field label={tr("Sumă (RON)", "Amount (RON)")}>
         <Input
           data-testid={`payment-entry-${cashOnly ? "cash" : "cashless"}-amount-input`}
@@ -206,6 +211,7 @@ export function CashDepositForm({ available, onSaved }) {
 
 export function CashPayoutForm({ available, onSaved }) {
   const { tr } = useLang();
+  const { data: suppliers } = useApi("/suppliers");
   const [kind, setKind] = useState("expense_settlement");
   const [beneficiary, setBeneficiary] = useState("");
   const [amount, setAmount] = useState("");
@@ -237,6 +243,20 @@ export function CashPayoutForm({ available, onSaved }) {
           <option value="payment_order">{tr("Dispoziție de plată", "Payment order")}</option>
         </NativeSelect>
       </Field>
+      {kind === "payment_order" && (
+        <Field label={tr("Furnizor", "Supplier")}>
+          <NativeSelect
+            data-testid="cash-payout-supplier-select"
+            value={beneficiary}
+            onChange={(event) => setBeneficiary(event.target.value)}
+          >
+            <option value="">{tr("Selectează furnizorul", "Select supplier")}</option>
+            {(suppliers || []).map((supplier) => (
+              <option key={supplier.id} value={supplier.name}>{supplier.name}</option>
+            ))}
+          </NativeSelect>
+        </Field>
+      )}
       <Field label={tr("Beneficiar", "Beneficiary")}><Input data-testid="cash-payout-beneficiary-input" value={beneficiary} onChange={(event) => setBeneficiary(event.target.value)} /></Field>
       <Field label={tr("Sumă (RON)", "Amount (RON)")}><Input data-testid="cash-payout-amount-input" type="number" min="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
       <Field label={tr("Referință", "Reference")}><Input data-testid="cash-payout-reference-input" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>

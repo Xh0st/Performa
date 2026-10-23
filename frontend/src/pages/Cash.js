@@ -24,13 +24,17 @@ export default function Cash() {
   const [day, setDay] = useState(today());
   const [cashQuery, setCashQuery] = useState("");
   const [cashlessQuery, setCashlessQuery] = useState("");
+  const [payoutQuery, setPayoutQuery] = useState("");
   const [reportFrom, setReportFrom] = useState(`${today().slice(0, 8)}01`);
   const [reportTo, setReportTo] = useState(today());
   const [reversePayment, setReversePayment] = useState(null);
   const [reverseReason, setReverseReason] = useState("");
+  const [reverseError, setReverseError] = useState("");
+  const [reversing, setReversing] = useState(false);
   const { data: reg, reload: reloadRegister } = useApi(`/cash-register?day=${day}`);
   const cashPagination = useServerPagination("cash-payments");
   const cashlessPagination = useServerPagination("cashless-payments");
+  const payoutPagination = useServerPagination(payoutQuery);
   const { data: cashPaymentsData, reload: reloadCashPayments } = useApi(
     `/payments?method=numerar&q=${encodeURIComponent(cashQuery)}&page=${cashPagination.page}&page_size=${PAGE_SIZE}`,
   );
@@ -40,12 +44,17 @@ export default function Cash() {
   const { data: cashReport } = useApi(
     `/cash-register/report?date_from=${reportFrom}&date_to=${reportTo}&cash_only=true`,
   );
+  const { data: payoutsData, reload: reloadPayouts } = useApi(
+    `/cash-movements?q=${encodeURIComponent(payoutQuery)}&page=${payoutPagination.page}&page_size=${PAGE_SIZE}`,
+  );
   const reloadCash = () => {
     reloadRegister();
     reloadCashPayments();
   };
   const reloadCashless = () => reloadCashlessPayments();
   const reverseReceipt = async () => {
+    setReversing(true);
+    setReverseError("");
     try {
       await api.post(`/payments/${reversePayment.id}/reverse`, { reason: reverseReason });
       toast.success(tr("Document stornat", "Document reversed"));
@@ -53,7 +62,11 @@ export default function Cash() {
       setReverseReason("");
       reloadCash();
     } catch (error) {
-      toast.error(errMsg(error));
+      const message = errMsg(error);
+      setReverseError(message);
+      toast.error(message);
+    } finally {
+      setReversing(false);
     }
   };
   return (
@@ -139,8 +152,10 @@ export default function Cash() {
         </TabsContent>
         <TabsContent value="payouts">
           <Panel title={tr("Ieșiri de numerar", "Cash payouts")}>
-            <CashPayoutForm available={reg?.closing || 0} onSaved={reloadCash} />
-            <p className="mt-4 text-xs text-muted-foreground">{tr("Stornarea chitanțelor și bonurilor fiscale se face din lista Încasări numerar, cu motiv obligatoriu și confirmare.", "Reverse receipts from Cash receipts with a required reason and confirmation.")}</p>
+            <CashPayoutForm available={reg?.closing || 0} onSaved={() => { reloadCash(); reloadPayouts(); }} />
+            <Input data-testid="cash-payouts-search-input" className="mt-4 max-w-md" placeholder={tr("Caută beneficiar sau document…", "Search beneficiary or document…")} value={payoutQuery} onChange={(event) => setPayoutQuery(event.target.value)} />
+            <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-sm" data-testid="cash-payouts-table"><tbody>{(payoutsData?.items || []).map((movement) => <tr key={movement.id} className="h-10 border-b border-border/50"><td className="font-mono">{movement.doc_number}</td><td>{dt(movement.date)}</td><td>{movement.beneficiary}</td><td>{movement.kind}</td><td className="text-right font-mono">{money(movement.amount)}</td></tr>)}</tbody></table></div>
+            <PaginationControls {...payoutPagination} total={payoutsData?.total || 0} totalPages={payoutsData?.total_pages || 1} testid="cash-payouts-pagination" />
           </Panel>
         </TabsContent>
         <TabsContent value="registers">
@@ -155,11 +170,18 @@ export default function Cash() {
           </Panel>
         </TabsContent>
       </Tabs>
-      <Dialog open={!!reversePayment} onOpenChange={(open) => !open && setReversePayment(null)}>
+      <Dialog open={!!reversePayment} onOpenChange={(open) => {
+        if (!open) {
+          setReversePayment(null);
+          setReverseReason("");
+          setReverseError("");
+        }
+      }}>
         <DialogContent data-testid="cash-reversal-dialog">
           <DialogHeader><DialogTitle>{tr("Stornare document numerar", "Reverse cash document")}</DialogTitle></DialogHeader>
           <Field label={tr("Motiv obligatoriu", "Required reason")}><Input data-testid="cash-reversal-reason-input" value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} /></Field>
-          <DialogFooter><Button variant="outline" onClick={() => setReversePayment(null)}>{tr("Renunță", "Cancel")}</Button><Button data-testid="cash-reversal-confirm-button" disabled={!reverseReason.trim()} onClick={reverseReceipt}>{tr("Confirmă stornarea", "Confirm reversal")}</Button></DialogFooter>
+          {reverseError && <p data-testid="cash-reversal-error" className="text-sm text-destructive">{reverseError}</p>}
+          <DialogFooter><Button variant="outline" onClick={() => setReversePayment(null)}>{tr("Renunță", "Cancel")}</Button><Button data-testid="cash-reversal-confirm-button" disabled={reversing || !reverseReason.trim()} onClick={reverseReceipt}>{reversing ? tr("Se stornează…", "Reversing…") : tr("Confirmă stornarea", "Confirm reversal")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

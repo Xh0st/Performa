@@ -426,6 +426,25 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
             raise HTTPException(400, "Document de numerar invalid")
         if body.cash_document == "fiscal_receipt" and client.get("type") != "pf":
             raise HTTPException(400, "Bonul fiscal este disponibil numai pentru persoane fizice")
+        cash_limit = 5_000 if client.get("type") == "pj" else 10_000
+        payment_day = now().date().isoformat()
+        daily_cash = await db.payments.aggregate([
+            {
+                "$match": {
+                    "client_id": client_id,
+                    "method": "numerar",
+                    "date": {"$regex": f"^{payment_day}"},
+                    "reversed_at": {"$exists": False},
+                }
+            },
+            {"$group": {"_id": None, "amount": {"$sum": "$amount"}}},
+        ]).to_list(1)
+        collected_today = daily_cash[0]["amount"] if daily_cash else 0
+        if collected_today + body.amount > cash_limit + 0.001:
+            raise HTTPException(
+                400,
+                f"Limita zilnică de numerar pentru acest client este {cash_limit:.2f} RON",
+            )
         doc_type, prefix = CASH_DOCUMENTS[body.cash_document]
     else:
         doc_type, prefix = DOC_BY_METHOD[body.method]
@@ -583,6 +602,22 @@ async def create_cash_payout(body: CashPayoutIn, user=Depends(require("payments"
     result = await db.cash_movements.insert_one(movement)
     await audit(user, "create", body.kind, str(result.inserted_id), movement["doc_number"])
     return ser(await db.cash_movements.find_one({"_id": result.inserted_id}))
+
+
+@router.get("/cash-movements")
+async def list_cash_movements(q: str = "", page: int = 1, page_size: int = 20, user=Depends(require("payments"))):
+    flt = {"kind": {"$in": ["expense_settlement", "payment_order", "receipt_reversal"]}}
+    if q.strip():
+        rx = {"$regex": re.escape(q.strip()), "$options": "i"}
+        flt["$or"] = [{"beneficiary": rx}, {"doc_number": rx}, {"reference": rx}]
+    rows, total, current_page, size = await fetch_page(
+        db.cash_movements,
+        flt,
+        [("date", -1)],
+        page,
+        page_size,
+    )
+    return page_response([ser(row) for row in rows], total, current_page, size)
 
 
 async def cash_register_rows(date_from: str, date_to: str, cash_only: bool) -> dict:
