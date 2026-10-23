@@ -206,6 +206,28 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   lateral mobil, păstrând proporțiile și contrastul în temele aplicației.
 - Verificare: logo vizibil în cele trei zone, fără erori de consolă; build frontend reușit.
 
+## Corecții code review P0: sesiuni și stabilitate UI (2026-10-23)
+- Clientul web folosește exclusiv cookie-uri HttpOnly pentru sesiune. `erp_token` și headerul
+  Bearer au fost eliminate din `localStorage`, Axios și fluxul AI; preferințele vizuale locale
+  (limbă, temă și sidebar) sunt păstrate separat.
+- Login, refresh, schimbarea parolei inițiale și schimbarea sucursalei nu mai expun JWT-ul în
+  răspunsurile JSON. Refresh-ul este protejat împotriva apelurilor paralele, iar eșecul lui
+  marchează sesiunea interfeței ca neautentificată.
+- JWT-urile includ o versiune de sesiune. Logout-ul, schimbarea parolei și schimbarea sucursalei
+  invalidează tokenurile anterioare server-side; tokenurile replay după logout sunt respinse.
+- Testele RAR și e-Factura folosesc credențiale de test citite din documentația de test și tokenuri
+  temporare, fără parole sau secrete hardcodate. Importurile dinamice de `ObjectId` au fost
+  înlocuite cu importuri statice.
+- Dependențele Hooks au fost corectate pentru API, VIN, OAuth e-Factura și semnătură. Rândurile
+  editabile NIR/retur folosesc identificatori locali stabili, iar cheile bazate exclusiv pe index
+  au fost eliminate din zonele revizuite.
+- Verificare: build frontend curat; 10/10 teste P0 cookie/auth/stoc trecute; login UI, refresh,
+  logout, revocare token replay, AI cu cookie, NIR, retur, VIN și e-Factura au fost testate.
+  Datele temporare create de test au fost curățate. Livrare testată de agent, în așteptarea
+  confirmării de acceptanță a utilizatorului.
+- Test debt cunoscut, preexistent: patru suite legacy de fixture-uri nu sunt compatibile cu
+  izolarea multi-tenant și trebuie mutate într-un tenant TEST dedicat înainte de reactivare.
+
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp
 - e-Factura în mediul „Simulare” (implicit) – Test/Producție sunt integrări reale ANAF (necesită Client ID/Secret + autorizare SPV cu certificat)
@@ -224,8 +246,10 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 ## Backlog
 - P0: date reale firmă în Setări (acum placeholder), certificat/OAuth ANAF real; confirmare de
   acceptanță pentru migrarea multi-tenant.
-- P1: retestare end-to-end invalidare deviz după editarea liniilor; regresie UBL TVA mixt; contract
-  API RAR AutoPass, endpointuri oficiale, token și validare Sandbox; notificări reale (ITP/RCA),
+- P1: încheiere testare UI Facturi (status, căutare, interval date, VIN, mobil) și paginare
+  server-side pentru listele cu volum mare; retestare end-to-end invalidare deviz după editarea
+  liniilor; regresie UBL TVA mixt; izolare suite legacy într-un tenant TEST dedicat; contract API
+  RAR AutoPass, endpointuri oficiale, token și validare Sandbox; notificări reale (ITP/RCA),
   portal client complet, achiziții furnizori + comparare prețuri, rapoarte executive (TVA,
   producție, marjă, retenție), flotă cu aprobări multiple.
 - P2: warehouse/currency complet, AI stock forecast & retention, aplicație mobilă mecanic, backup,
@@ -239,6 +263,8 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
 - Confirmați în UI lista Superadmin actualizată, emailul Tenant Admin și resetarea parolei temporare
   pentru tenanturile comerciale.
 - Retestați end-to-end invalidarea devizului după editarea pieselor sau manoperei aprobate.
+- Testați și finalizați filtrele Facturi, inclusiv căutarea după VIN, apoi mutați paginarea pe API.
+- Planificați izolarea fixture-urilor legacy RAR/e-Factura/storno/multi-tenant într-un tenant TEST.
 - Obțineți documentația contractuală RAR, endpointurile Test/Producție și tokenul de acces.
 - Validați un payload într-un mediu RAR Sandbox înainte de activarea transportului extern.
 - Implementați rapoarte executive de eficiență, marjă, timp de staționare și retenție/flotă.

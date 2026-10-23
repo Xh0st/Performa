@@ -203,8 +203,22 @@ def verify_password(p: str, h: str) -> bool:
     return bcrypt.checkpw(p.encode(), h.encode())
 
 
-def make_token(user_id: str, kind: str, minutes: int, tenant_id: str = "", branch_id: str = "") -> str:
-    payload = {"sub": user_id, "type": kind, "tenant_id": tenant_id, "branch_id": branch_id, "exp": now() + timedelta(minutes=minutes)}
+def make_token(
+    user_id: str,
+    kind: str,
+    minutes: int,
+    tenant_id: str = "",
+    branch_id: str = "",
+    session_version: int = 0,
+) -> str:
+    payload = {
+        "sub": user_id,
+        "type": kind,
+        "tenant_id": tenant_id,
+        "branch_id": branch_id,
+        "session_version": session_version,
+        "exp": now() + timedelta(minutes=minutes),
+    }
     return jwt.encode(payload, os.environ["JWT_SECRET"], algorithm=JWT_ALG)
 
 
@@ -287,6 +301,8 @@ async def get_current_user(request: Request) -> dict:
     user = await raw_db.users.find_one({"_id": ObjectId(payload["sub"])})
     if not user or not user.get("active", True):
         raise HTTPException(401, "User not found")
+    if payload.get("session_version", 0) != user.get("session_version", 0):
+        raise HTTPException(401, "Sesiune invalidată")
     u = ser(user)
     u["platform_role"] = user.get("platform_role")
     u["tenant_id"] = user.get("tenant_id", "")

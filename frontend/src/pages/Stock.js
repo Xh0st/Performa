@@ -16,7 +16,10 @@ import NirEfacturaView from "@/components/NirEfacturaView";
 import { PaginationControls, usePagination } from "@/components/Pagination";
 
 const P_EMPTY = { code: "", name: "", oe_code: "", aftermarket_code: "", brand: "", category: "piese", unit: "buc", location: "", warehouse: "Depozit Central", sale_price: 0, min_stock: 0, vat_rate: 21, warranty_months: 24 };
-const createRowId = () => window.crypto.randomUUID();
+const createRowId = () => {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `row-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
 const createNirLine = () => ({ row_id: createRowId(), product_id: "", qty: 1, unit_cost: 0, lot: "" });
 
 function ProductDialog({ open, onOpenChange, initial, onSaved }) {

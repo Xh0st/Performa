@@ -43,11 +43,25 @@ def set_cookies(response: Response, user: dict):
     user_id = str(user["_id"])
     tenant_id = user.get("tenant_id", "")
     branch_id = user.get("active_branch_id", "")
-    access = make_token(user_id, "access", ACCESS_MIN, tenant_id, branch_id)
-    refresh = make_token(user_id, "refresh", 60 * 24 * 7, tenant_id, branch_id)
+    session_version = user.get("session_version", 0)
+    access = make_token(
+        user_id,
+        "access",
+        ACCESS_MIN,
+        tenant_id,
+        branch_id,
+        session_version,
+    )
+    refresh = make_token(
+        user_id,
+        "refresh",
+        60 * 24 * 7,
+        tenant_id,
+        branch_id,
+        session_version,
+    )
     response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none", max_age=ACCESS_MIN * 60, path="/")
     response.set_cookie("refresh_token", refresh, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
-    return access
 
 
 def user_out(u: dict):
@@ -91,13 +105,24 @@ async def login(body: LoginIn, request: Request, response: Response):
         raise HTTPException(401, "Email sau parolă incorectă")
     await ensure_active_context(user)
     await db.login_attempts.delete_many({"identifier": ident})
-    token = set_cookies(response, user)
+    set_cookies(response, user)
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": iso()}})
-    return {"user": user_out(user), "token": token}
+    return {"user": user_out(user)}
 
 
 @router.post("/auth/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    token = request.cookies.get("access_token") or request.cookies.get("refresh_token")
+    if token:
+        try:
+            payload = jwt.decode(token, os.environ["JWT_SECRET"], algorithms=[JWT_ALG])
+            if payload.get("type") in {"access", "refresh"}:
+                await raw_db.users.update_one(
+                    {"_id": oid(payload.get("sub", ""))},
+                    {"$inc": {"session_version": 1}},
+                )
+        except (jwt.InvalidTokenError, HTTPException):
+            pass
     response.delete_cookie("access_token", path="/", secure=True, samesite="none")
     response.delete_cookie("refresh_token", path="/", secure=True, samesite="none")
     return {"ok": True}
@@ -135,7 +160,10 @@ async def change_initial_password(
     )
     updated = await raw_db.users.find_one({"_id": current["_id"]})
     await audit(user, "change_initial_password", "user", user["id"])
-    return {"user": await user_context_out(updated), "token": set_cookies(response, updated)}
+    await raw_db.users.update_one({"_id": current["_id"]}, {"$inc": {"session_version": 1}})
+    updated = await raw_db.users.find_one({"_id": current["_id"]})
+    set_cookies(response, updated)
+    return {"user": await user_context_out(updated)}
 
 
 @router.post("/auth/refresh")
@@ -153,7 +181,8 @@ async def refresh(request: Request, response: Response):
     if not user:
         raise HTTPException(401, "User not found")
     await ensure_active_context(user)
-    return {"token": set_cookies(response, user)}
+    set_cookies(response, user)
+    return {"ok": True}
 
 
 class BranchSwitchIn(BaseModel):
@@ -165,9 +194,13 @@ async def switch_active_branch(body: BranchSwitchIn, response: Response, user=De
     branch = await raw_db.branches.find_one({"_id": body.branch_id, "tenant_id": user["tenant_id"], "status": "ACTIVE"})
     if not branch or body.branch_id not in (await raw_db.users.find_one({"_id": oid(user["id"])}))["assigned_branch_ids"]:
         raise HTTPException(403, "Acces interzis la punctul de lucru")
-    await raw_db.users.update_one({"_id": oid(user["id"])}, {"$set": {"active_branch_id": body.branch_id}})
+    await raw_db.users.update_one(
+        {"_id": oid(user["id"])},
+        {"$set": {"active_branch_id": body.branch_id}, "$inc": {"session_version": 1}},
+    )
     updated = await raw_db.users.find_one({"_id": oid(user["id"])})
-    return {"token": set_cookies(response, updated), "user": user_out(updated)}
+    set_cookies(response, updated)
+    return {"user": user_out(updated)}
 
 
 class UserIn(BaseModel):

@@ -4,6 +4,22 @@ import { useCallback, useEffect, useState } from "react";
 export const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export const api = axios.create({ baseURL: API_URL, withCredentials: true });
+let refreshRequest = null;
+
+const refreshSession = () => {
+  if (!refreshRequest) {
+    refreshRequest = axios
+      .post(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
+      .finally(() => {
+        refreshRequest = null;
+      });
+  }
+  return refreshRequest;
+};
+
+const notifyAuthExpired = () => {
+  window.dispatchEvent(new Event("performa-auth-expired"));
+};
 
 api.interceptors.response.use(
   (r) => r,
@@ -17,10 +33,10 @@ api.interceptors.response.use(
     ) {
       cfg._retry = true;
       try {
-        await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
+        await refreshSession();
         return api(cfg);
       } catch {
-        // The protected route redirects unauthenticated users after refresh failure.
+        notifyAuthExpired();
       }
     }
     return Promise.reject(err);

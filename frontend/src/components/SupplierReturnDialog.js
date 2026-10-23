@@ -9,7 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Field, NativeSelect } from "@/components/common";
 
-const createFreeLine = () => ({ row_id: window.crypto.randomUUID(), product_id: "", qty: 1 });
+const createFreeLine = () => ({
+  row_id: window.crypto?.randomUUID?.() || `row-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  product_id: "",
+  qty: 1,
+});
 
 function NirLines({ nirId, qty, setQty }) {
   const { tr } = useLang();

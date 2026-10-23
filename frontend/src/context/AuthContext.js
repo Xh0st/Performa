@@ -19,6 +19,12 @@ export function AuthProvider({ children }) {
     loadUser();
   }, [loadUser]);
 
+  useEffect(() => {
+    const handleExpiredSession = () => setUser(false);
+    window.addEventListener("performa-auth-expired", handleExpiredSession);
+    return () => window.removeEventListener("performa-auth-expired", handleExpiredSession);
+  }, []);
+
   const login = useCallback(async (email, password) => {
     await api.post("/auth/login", { email, password });
     const refreshed = await api.get("/auth/me");

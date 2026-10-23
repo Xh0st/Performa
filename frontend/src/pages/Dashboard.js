@@ -61,7 +61,7 @@ export default function Dashboard() {
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <Panel title={tr("Venituri vs. profit (6 luni)", "Revenue vs. profit (6 months)")} className="xl:col-span-2" testid="dashboard-revenue-chart">
           <div className="h-72">
-            <ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={d.series}>
                 <defs>
                   <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#E05600" stopOpacity={0.4} /><stop offset="100%" stopColor="#E05600" stopOpacity={0} /></linearGradient>
@@ -80,7 +80,7 @@ export default function Dashboard() {
         </Panel>
         <Panel title={tr("Comenzi pe status", "Orders by status")} testid="dashboard-status-chart">
           <div className="h-72">
-            <ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={statusData} layout="vertical" margin={{ left: 20 }}>
                 <XAxis type="number" hide />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={110} />

@@ -1,0 +1,40 @@
+{
+  "summary": "Verified the P0 code-review hardening for Performa Auto ERP. Cookie-only auth works: login sets HttpOnly + Secure + SameSite=None access_token and refresh_token cookies; /auth/me and /auth/refresh work with cookies alone; after logout, /auth/me and /auth/refresh both return 401, and the protected route sends the user to /login. The browser does not store erp_token. localStorage holds only erp_lang, erp_theme and PostHog keys, and no /api request (including /ai/stream) sends an Authorization header. The AI stream sends credentials:include with the cookie and returned a real Gemini answer. NIR save and supplier return save work in the UI, including adding and removing local lines; after deleting a middle line the remaining lines keep their values, and there were no React key or hook warnings. VehicleForm VIN auto-decode works (NHTSA). e-Factura settings loads, the ?oauth=ok toast shows once and the query param is cleared. The dashboard loads without error elements. Static checks pass: no hardcoded passwords or .env secrets in test_rar_autopass.py and test_efactura.py, and no __import__/importlib in test_tenancy.py or test_storno_returns.py. Playbook checks: hashes use bcrypt $2b$; lockout returns 429 on the 6th attempt (tested with a fake email); CORS uses explicit origins with credentials. NOTE: the four edited legacy test suites have failures (28 failed/errored), but the pre-change versions (HEAD~3) fail identically when run, so these are pre-existing stale fixtures, not regressions. NOTE: /app/test_reports/iteration_28.json does not exist; this report is iteration_29.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login, /api/auth/refresh, /api/auth/change-initial-password", "issue": "Still return the access JWT in the JSON body ('token'). The frontend ignores it, but this partly undoes the HttpOnly protection, because any XSS can read it from the response. Low/medium: consider dropping it for browser clients (tests/API clients rely on it, so add a separate header-based login or a flag)."},
+      {"endpoint": "POST /api/auth/logout", "issue": "Stateless logout: it only deletes the cookies. An access token copied earlier stays valid for up to ACCESS_MIN = 8h, because core.get_current_user still accepts Bearer tokens and there is no revocation or token version. Low/medium."},
+      {"endpoint": "POST /api/auth/refresh", "issue": "Does not check user.active before issuing new cookies (login does). A deactivated user with a valid refresh cookie can keep refreshing for 7 days unless get_current_user blocks it. Low."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console (all dialogs)", "issues": ["Radix warning: Missing Description / aria-describedby on DialogContent (a11y, low)", "Recharts 'width(-1) height(-1)' warnings on the dashboard at first render (low)", "'<span> cannot be a child of <option>' on the AI vehicle select and in dialogs. Likely caused by dev visual-edit instrumentation wrapping option text; check that options render plain text (low)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter29_cookie_auth_stock.py", "/app/test_reports/pytest/iter29.xml"],
+  "action_items": [
+    "LOW (test debt, pre-existing): test_storno_returns.py has 18 errors. storno_fixtures.setup raises KeyError 'id' at inv['id'] because fixtures insert raw Mongo docs without tenant_id/branch_id, so the scoped API returns 404 or an error body. Update the fixtures for multi-tenancy.",
+    "LOW (test debt, pre-existing): test_rar_autopass.py has 4 failures: raw rar config lookup returns None, and the invoice from the fixture work order returns 404 'Not found'. Same cause: fixtures are not tenant-scoped.",
+    "LOW (test debt, pre-existing): test_tenancy.py has 3 failures: /suppliers returns 403 because the demo tenant plan is not FULL/ENTERPRISE, and suspended-tenant returns 422. The fixtures need a FULL plan and an updated payload.",
+    "LOW (test debt, pre-existing): test_efactura.py has 4 failures. It uses hardcoded legacy invoice IDs (INV_A/INV_B), and the issuer IBAN placeholder validation now marks them 'invalid' instead of 'error'/'pending'. It also mutates the real e-Factura config/logs and legacy invoices on each run.",
+    "LOW/MEDIUM (security): stop returning 'token' in the login/refresh JSON for browser clients; add server-side revocation (token_version) on logout; check user active on refresh."
+  ],
+  "critical_code_review_comments": [
+    "api.js: the refresh interceptor has no single-flight lock. N parallel 401s fire N /auth/refresh calls (works, but noisy). Consider a shared promise.",
+    "api.js: on refresh failure the request is rejected but the AuthContext user state is not cleared. The redirect only happens on the next /auth/me or route guard. Minor.",
+    "Stock.js/SupplierReturnDialog.js: window.crypto.randomUUID needs a secure context and Safari 15.4+. Fine on HTTPS preview/prod, but it breaks over plain-HTTP LAN access. Add a fallback.",
+    "VehicleForm useVinDecode: auto-decode runs again on any re-render where enabled toggles while vin.length === 17 (e.g. reopening the dialog with a VIN preset). Acceptable.",
+    "Legacy test suites write to the real owner tenant (e-Factura config/logs, invoices, NIR/return counters). Isolate them in a dedicated TEST tenant."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter29_cookie_auth_stock.py"],
+  "success_rate": {"backend": "100% of new iter29 tests (10/10); edited legacy suites have the same results before and after (pre-existing failures)", "frontend": "100% (login, storage audit, AI stream credentials, NIR, supplier return, VehicleForm VIN, e-Factura OAuth toast, logout)"},
+  "test_credentials": "From /app/memory/test_credentials.md (owner andrei.melek@gmail.com). Not exposed.",
+  "seed_data_creation": "Created in the owner tenant: TEST_SUP_<hex> suppliers, 'TEST prod <hex>' products (code TEST-<hex>), NIR-2026-00014/00015 plus a UI NIR 'TEST-UI-NIR', supplier returns RET-2026-00004..00006. Running the legacy test_efactura.py also added e-Factura log entries and reset the config to simulare with an empty client_id.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run new tests with: export REACT_APP_BACKEND_URL then pytest tests/test_iter29_cookie_auth_stock.py (pytest.ini adds xdist -n). Legacy suites test_efactura/test_rar_autopass/test_tenancy/test_storno_returns fail identically at HEAD~3, so they are not regressions. Use -n 0 for rar."
+}
