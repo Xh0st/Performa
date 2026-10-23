@@ -5,6 +5,20 @@ import { Button } from "@/components/ui/button";
 
 export const PAGE_SIZE = 20;
 
+export function useServerPagination(resetKey = "", totalPages) {
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [resetKey]);
+
+  useEffect(() => {
+    if (totalPages && page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  return { page, setPage };
+}
+
 export function usePagination(items, resetKey = "") {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));

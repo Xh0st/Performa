@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from core import db, ser, oid, iso, require, audit, get_or_404, next_seq, now
+from pagination import fetch_page, page_response
 
 router = APIRouter(prefix="/api")
 
@@ -63,13 +64,54 @@ class ReturnIn(BaseModel):
 
 
 @router.get("/products")
-async def list_products(q: str = "", low: bool = False, user=Depends(require("workorders"))):
+async def list_products(
+    q: str = "",
+    low: bool = False,
+    page: int = 0,
+    page_size: int = 20,
+    user=Depends(require("workorders")),
+):
     flt = {}
     if q:
         rx = {"$regex": re.escape(q), "$options": "i"}
         flt = {"$or": [{"code": rx}, {"name": rx}, {"oe_code": rx}, {"aftermarket_code": rx}, {"brand": rx}]}
-    items = [ser(p) for p in await db.products.find(flt).sort("name", 1).to_list(5000)]
-    return [p for p in items if p["stock_qty"] <= p.get("min_stock", 0)] if low else items
+    if low:
+        flt["$expr"] = {
+            "$lte": ["$stock_qty", {"$ifNull": ["$min_stock", 0]}],
+        }
+    if not page:
+        rows = [ser(item) for item in await db.products.find(flt).sort("name", 1).to_list(5000)]
+        return rows
+    rows, total, current_page, size = await fetch_page(
+        db.products,
+        flt,
+        [("name", 1)],
+        page,
+        page_size,
+    )
+    totals = await db.products.aggregate([
+        {"$match": flt},
+        {
+            "$group": {
+                "_id": None,
+                "stock_value": {
+                    "$sum": {
+                        "$multiply": [
+                            {"$cond": [{"$gt": ["$stock_qty", 0]}, "$stock_qty", 0]},
+                            {"$ifNull": ["$avg_cost", 0]},
+                        ]
+                    }
+                },
+            }
+        },
+    ]).to_list(1)
+    return page_response(
+        [ser(item) for item in rows],
+        total,
+        current_page,
+        size,
+        summary={"stock_value": round((totals[0] if totals else {}).get("stock_value", 0), 2)},
+    )
 
 
 @router.post("/products")
@@ -158,8 +200,17 @@ async def returned_by_nir(nid: str) -> dict:
 
 
 @router.get("/nirs")
-async def list_nirs(user=Depends(require("stock"))):
-    return [ser(n) for n in await db.nirs.find().sort("date", -1).to_list(1000)]
+async def list_nirs(page: int = 0, page_size: int = 20, user=Depends(require("stock"))):
+    if not page:
+        return [ser(item) for item in await db.nirs.find().sort("date", -1).to_list(1000)]
+    rows, total, current_page, size = await fetch_page(
+        db.nirs,
+        {},
+        [("date", -1)],
+        page,
+        page_size,
+    )
+    return page_response([ser(item) for item in rows], total, current_page, size)
 
 
 @router.get("/nirs/{nid}")
@@ -172,8 +223,17 @@ async def get_nir(nid: str, user=Depends(require("stock"))):
 
 
 @router.get("/supplier-returns")
-async def list_returns(user=Depends(require("stock"))):
-    return [ser(r) for r in await db.supplier_returns.find().sort("created_at", -1).to_list(1000)]
+async def list_returns(page: int = 0, page_size: int = 20, user=Depends(require("stock"))):
+    if not page:
+        return [ser(item) for item in await db.supplier_returns.find().sort("created_at", -1).to_list(1000)]
+    rows, total, current_page, size = await fetch_page(
+        db.supplier_returns,
+        {},
+        [("created_at", -1)],
+        page,
+        page_size,
+    )
+    return page_response([ser(item) for item in rows], total, current_page, size)
 
 
 @router.get("/supplier-returns/{rid}")

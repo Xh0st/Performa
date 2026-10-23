@@ -1,4 +1,5 @@
 import uuid
+import re
 from datetime import timedelta, date
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 from core import db, ser, oid, iso, now, require, audit, get_or_404, next_seq, get_settings, calc_totals
 from routes_stock import consume_fifo, receive_stock
 from efactura import build_ubl
+from pagination import fetch_page, page_response
 
 router = APIRouter(prefix="/api")
 DOC_BY_METHOD = {"numerar": ("chitanta", "CH"), "pos": ("bon_pos", "POS"), "transfer": ("ordin_plata", "OP"), "online": ("confirmare_online", "WEB")}
@@ -17,13 +19,60 @@ class InvoiceIn(BaseModel):
 
 
 @router.get("/invoices")
-async def list_invoices(status: str = "", type: str = "", user=Depends(require("invoices"))):
+async def list_invoices(
+    status: str = "",
+    type: str = "",
+    q: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    page: int = 0,
+    page_size: int = 20,
+    user=Depends(require("invoices")),
+):
     flt = {}
     if status:
         flt["status"] = status
     if type:
         flt["type"] = type
-    return [ser(i) for i in await db.invoices.find(flt, {"efactura.xml": 0}).sort("created_at", -1).to_list(2000)]
+    if q.strip():
+        rx = {"$regex": re.escape(q.strip()), "$options": "i"}
+        flt["$or"] = [
+            {"series": rx},
+            {"number": rx},
+            {"buyer.name": rx},
+            {"buyer.cui": rx},
+            {"vehicle": rx},
+            {"work_order_number": rx},
+        ]
+    if date_from or date_to:
+        flt["issue_date"] = {}
+        if date_from:
+            flt["issue_date"]["$gte"] = date_from
+        if date_to:
+            flt["issue_date"]["$lte"] = date_to
+    projection = {"efactura.xml": 0}
+    if not page:
+        rows = await db.invoices.find(flt, projection).sort("created_at", -1).to_list(2000)
+        return [ser(item) for item in rows]
+    rows, total, current_page, size = await fetch_page(
+        db.invoices,
+        flt,
+        [("created_at", -1)],
+        page,
+        page_size,
+        projection,
+    )
+    summary = await db.invoices.aggregate([
+        {"$match": flt},
+        {"$group": {"_id": None, "gross": {"$sum": "$totals.gross"}}},
+    ]).to_list(1)
+    return page_response(
+        [ser(item) for item in rows],
+        total,
+        current_page,
+        size,
+        summary={"gross": round((summary[0] if summary else {}).get("gross", 0), 2)},
+    )
 
 
 @router.post("/invoices/from-work-order/{wid}")
@@ -259,9 +308,24 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
 
 
 @router.get("/payments")
-async def list_payments(day: str = "", user=Depends(require("payments"))):
+async def list_payments(
+    day: str = "",
+    page: int = 0,
+    page_size: int = 20,
+    user=Depends(require("payments")),
+):
     flt = {"date": {"$regex": f"^{day}"}} if day else {}
-    return [ser(p) for p in await db.payments.find(flt).sort("date", -1).to_list(2000)]
+    if not page:
+        rows = await db.payments.find(flt).sort("date", -1).to_list(2000)
+        return [ser(item) for item in rows]
+    rows, total, current_page, size = await fetch_page(
+        db.payments,
+        flt,
+        [("date", -1)],
+        page,
+        page_size,
+    )
+    return page_response([ser(item) for item in rows], total, current_page, size)
 
 
 @router.get("/payments/{pid}")

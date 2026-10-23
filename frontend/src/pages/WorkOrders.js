@@ -8,7 +8,7 @@ import { money, date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, Panel, Loading, StatusBadge, STATUS } from "@/components/common";
-import { PaginationControls, usePagination } from "@/components/Pagination";
+import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 
 const COLS = ["noua", "diagnosticare", "asteapta_oferta", "aprobata", "asteapta_piese", "in_lucru", "finalizata", "facturata"];
 
@@ -34,10 +34,16 @@ export default function WorkOrders() {
   const nav = useNavigate();
   const [view, setView] = useState("kanban");
   const [q, setQ] = useState("");
-  const { data, reload } = useApi(view === "kanban" ? "/work-orders?active=true" : "/work-orders", [view]);
-  const rows = (data || []).filter((w) => !q || `${w.number} ${w.vehicle.plate} ${w.client_name} ${w.vehicle.make}`.toLowerCase().includes(q.toLowerCase()));
-  const pagination = usePagination(rows, `${q}:${view}:${data?.length || 0}`);
-  const visibleRows = pagination.pageItems;
+  const pagination = useServerPagination(`${q}:${view}`);
+  const params = new URLSearchParams({ q });
+  if (view === "kanban") {
+    params.set("active", "true");
+  } else {
+    params.set("page", String(pagination.page));
+    params.set("page_size", String(PAGE_SIZE));
+  }
+  const { data, reload } = useApi(`/work-orders?${params.toString()}`);
+  const rows = Array.isArray(data) ? data : data?.items || [];
 
   const drop = async (e, status) => {
     e.preventDefault();
@@ -86,7 +92,7 @@ export default function WorkOrders() {
                 <th className="px-2">Client</th><th className="px-2">{tr("Mecanici", "Mechanics")}</th><th className="px-2 text-right">Total</th><th className="px-2 text-right">Status</th>
               </tr></thead>
               <tbody>
-                {visibleRows.map((w) => (
+                {rows.map((w) => (
                   <tr key={w.id} data-testid={`work-order-row-${w.number}`} onClick={() => nav(`/work-orders/${w.id}`)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
                     <td className="px-2 font-mono text-xs text-primary">{w.number}</td><td className="px-2">{date(w.created_at)}</td>
                     <td className="px-2"><span className="font-mono text-xs">{w.vehicle.plate}</span> · {w.vehicle.make} {w.vehicle.model}</td>
@@ -99,7 +105,14 @@ export default function WorkOrders() {
           </div>
         </Panel>
       )}
-      <PaginationControls {...pagination} total={rows.length} testid="work-orders-pagination" />
+      {view === "list" && (
+        <PaginationControls
+          {...pagination}
+          total={data?.total || 0}
+          totalPages={data?.total_pages || 1}
+          testid="work-orders-pagination"
+        />
+      )}
       <p className="mt-2 text-xs text-muted-foreground">{tr(`Trageți cardurile între coloane pentru a schimba statusul. ${STATUS.facturata[0]} se setează automat la emiterea facturii.`,
         "Drag cards between columns to change status. Invoiced is set automatically when the invoice is issued.")}</p>
     </div>

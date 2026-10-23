@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from core import db, ser, oid, iso, require, audit, get_or_404
 from vehicle_catalog import MAKES, decode_vin
 from cui_lookup import lookup_cui
+from pagination import fetch_page, page_response
 
 router = APIRouter(prefix="/api")
 
@@ -80,17 +81,40 @@ async def cui_lookup(body: CuiLookupIn, user=Depends(require("crm"))):
 
 
 @router.get("/clients")
-async def list_clients(q: str = "", user=Depends(require("crm"))):
+async def list_clients(
+    q: str = "",
+    type: str = "",
+    page: int = 0,
+    page_size: int = 20,
+    user=Depends(require("crm")),
+):
     flt = search_filter(q, ["name", "cnp", "cui", "phone", "email"]) if q else {}
-    clients = await db.clients.find(flt).sort("name", 1).to_list(1000)
+    if type:
+        flt["type"] = type
+    if page:
+        clients, total, current_page, size = await fetch_page(
+            db.clients,
+            flt,
+            [("name", 1)],
+            page,
+            page_size,
+        )
+    else:
+        clients = await db.clients.find(flt).sort("name", 1).to_list(1000)
+    client_ids = [str(item["_id"]) for item in clients]
     counts = {}
-    async for v in db.vehicles.aggregate([{"$group": {"_id": "$client_id", "n": {"$sum": 1}}}]):
+    async for v in db.vehicles.aggregate([
+        {"$match": {"client_id": {"$in": client_ids}}},
+        {"$group": {"_id": "$client_id", "n": {"$sum": 1}}},
+    ]):
         counts[v["_id"]] = v["n"]
     out = []
     for c in clients:
         d = ser(c)
         d["vehicle_count"] = counts.get(d["id"], 0)
         out.append(d)
+    if page:
+        return page_response(out, total, current_page, size)
     return out
 
 
@@ -156,11 +180,26 @@ async def vin_decode(vin: str, user=Depends(require("vehicles"))):
 
 
 @router.get("/vehicles")
-async def list_vehicles(q: str = "", client_id: str = "", user=Depends(require("vehicles"))):
+async def list_vehicles(
+    q: str = "",
+    client_id: str = "",
+    page: int = 0,
+    page_size: int = 20,
+    user=Depends(require("vehicles")),
+):
     flt = search_filter(q, ["vin", "plate", "make", "model"]) if q else {}
     if client_id:
         flt["client_id"] = client_id
-    return await attach_owner(await db.vehicles.find(flt).sort("plate", 1).to_list(2000))
+    if not page:
+        return await attach_owner(await db.vehicles.find(flt).sort("plate", 1).to_list(2000))
+    rows, total, current_page, size = await fetch_page(
+        db.vehicles,
+        flt,
+        [("plate", 1)],
+        page,
+        page_size,
+    )
+    return page_response(await attach_owner(rows), total, current_page, size)
 
 
 @router.post("/vehicles")

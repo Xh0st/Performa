@@ -9,12 +9,17 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader, Panel, Kpi, Loading, Empty } from "@/components/common";
 import { METHODS, DOCS } from "@/pages/InvoiceDetail";
+import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 
 export default function Cash() {
   const { tr } = useLang();
   const [day, setDay] = useState(today());
   const { data: reg } = useApi(`/cash-register?day=${day}`, [day]);
-  const { data: pays } = useApi("/payments");
+  const pagination = useServerPagination("payments");
+  const { data: paymentsData } = useApi(
+    `/payments?page=${pagination.page}&page_size=${PAGE_SIZE}`,
+  );
+  const pays = paymentsData?.items;
   return (
     <div data-testid="cash-page">
       <PageHeader eyebrow={tr("Numerar · POS · transfer · online", "Cash · POS · transfer · online")} title={tr("Încasări & registru de casă", "Payments & cash register")} />
@@ -69,6 +74,12 @@ export default function Cash() {
                 </tbody></table>
               </div>
             )}
+            <PaginationControls
+              {...pagination}
+              total={paymentsData?.total || 0}
+              totalPages={paymentsData?.total_pages || 1}
+              testid="payments-pagination"
+            />
           </Panel>
         </TabsContent>
       </Tabs>

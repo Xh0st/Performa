@@ -13,7 +13,7 @@ import { PageHeader, Panel, Loading, Field, NativeSelect, Empty } from "@/compon
 import EfacturaInbox from "@/components/EfacturaInbox";
 import SupplierReturnDialog from "@/components/SupplierReturnDialog";
 import NirEfacturaView from "@/components/NirEfacturaView";
-import { PaginationControls, usePagination } from "@/components/Pagination";
+import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 
 const P_EMPTY = { code: "", name: "", oe_code: "", aftermarket_code: "", brand: "", category: "piese", unit: "buc", location: "", warehouse: "Depozit Central", sale_price: 0, min_stock: 0, vat_rate: 21, warranty_months: 24 };
 const createRowId = () => {
@@ -159,14 +159,23 @@ export default function Stock() {
   const [moves, setMoves] = useState(null);
   const [ret, setRet] = useState(null);
   const [efNir, setEfNir] = useState(null);
-  const { data: returns, reload: reloadR } = useApi("/supplier-returns");
-  const { data: products, reload } = useApi(`/products?q=${encodeURIComponent(q)}&low=${low}`, [q, low]);
-  const { data: nirs, reload: reloadN } = useApi("/nirs");
+  const productPagination = useServerPagination(`${q}:${low}`);
+  const nirPagination = useServerPagination("nirs");
+  const returnPagination = useServerPagination("returns");
+  const { data: returnsData, reload: reloadR } = useApi(
+    `/supplier-returns?page=${returnPagination.page}&page_size=${PAGE_SIZE}`,
+  );
+  const { data: productsData, reload } = useApi(
+    `/products?q=${encodeURIComponent(q)}&low=${low}&page=${productPagination.page}&page_size=${PAGE_SIZE}`,
+  );
+  const { data: nirsData, reload: reloadN } = useApi(
+    `/nirs?page=${nirPagination.page}&page_size=${PAGE_SIZE}`,
+  );
   const { data: suppliers, reload: reloadS } = useApi("/suppliers");
-  const value = (products || []).reduce((s, p) => s + Math.max(p.stock_qty, 0) * p.avg_cost, 0);
-  const productPagination = usePagination(products || [], `${q}:${low}:${products?.length || 0}`);
-  const nirPagination = usePagination(nirs || [], String(nirs?.length || 0));
-  const returnPagination = usePagination(returns || [], String(returns?.length || 0));
+  const products = productsData?.items;
+  const nirs = nirsData?.items;
+  const returns = returnsData?.items;
+  const value = productsData?.summary?.stock_value || 0;
   const openMoves = async (p) => setMoves({ p, ...(await api.get(`/products/${p.id}/moves`)).data });
 
   return (
@@ -204,7 +213,7 @@ export default function Stock() {
                     <th className="px-2 text-right">{tr("Preț vânzare", "Sale price")}</th><th className="px-2 text-right">{tr("Marjă", "Margin")}</th>
                   </tr></thead>
                   <tbody>
-                    {productPagination.pageItems.map((p) => {
+                    {products.map((p) => {
                       const lowS = p.stock_qty <= p.min_stock;
                       return (
                         <tr key={p.id} data-testid={`product-row-${p.code}`} onClick={() => openMoves(p)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
@@ -220,7 +229,12 @@ export default function Stock() {
                 </table>
               </div>
             )}
-            <PaginationControls {...productPagination} total={products?.length || 0} testid="products-pagination" />
+            <PaginationControls
+              {...productPagination}
+              total={productsData?.total || 0}
+              totalPages={productsData?.total_pages || 1}
+              testid="products-pagination"
+            />
           </Panel>
         </TabsContent>
         <TabsContent value="nir">
@@ -230,7 +244,7 @@ export default function Stock() {
                 <th className="px-2 py-2">{tr("Număr", "Number")}</th><th className="px-2">{tr("Data", "Date")}</th><th className="px-2">{tr("Furnizor", "Supplier")}</th>
                 <th className="px-2">{tr("Factură / aviz", "Invoice / note")}</th><th className="px-2 text-right">{tr("Valoare", "Value")}</th><th />
               </tr></thead><tbody>
-                {nirPagination.pageItems.map((n) => (
+                {nirs.map((n) => (
                   <tr key={n.id} className="h-10 border-b border-border/50">
                     <td className="px-2 font-mono text-xs text-primary">{n.number}</td><td className="px-2">{date(n.date)}</td><td className="px-2">{n.supplier_name}</td>
                     <td className="px-2 font-mono text-xs">{n.invoice_no} {n.aviz_no}</td><td className="px-2 text-right font-mono">{money(n.total)}</td>
@@ -242,7 +256,12 @@ export default function Stock() {
                 ))}
               </tbody></table>
             )}
-            <PaginationControls {...nirPagination} total={nirs?.length || 0} testid="nirs-pagination" />
+            <PaginationControls
+              {...nirPagination}
+              total={nirsData?.total || 0}
+              totalPages={nirsData?.total_pages || 1}
+              testid="nirs-pagination"
+            />
           </Panel>
         </TabsContent>
         <TabsContent value="returns">
@@ -253,7 +272,7 @@ export default function Stock() {
                   <th className="px-2 py-2">{tr("Număr", "Number")}</th><th className="px-2">{tr("Data", "Date")}</th><th className="px-2">{tr("Furnizor", "Supplier")}</th>
                   <th className="px-2">NIR</th><th className="px-2">{tr("Motiv", "Reason")}</th><th className="px-2 text-right">{tr("Articole", "Items")}</th><th className="px-2 text-right">{tr("Valoare", "Value")}</th><th />
                 </tr></thead><tbody>
-                  {returnPagination.pageItems.map((r) => (
+                  {returns.map((r) => (
                     <tr key={r.id} data-testid={`return-row-${r.number}`} className="h-10 border-b border-border/50">
                       <td className="px-2 font-mono text-xs text-primary">{r.number}</td><td className="px-2">{date(r.date)}</td><td className="px-2">{r.supplier_name}</td>
                       <td className="px-2 font-mono text-xs">{r.nir_number || "FIFO"}</td><td className="px-2 text-xs">{r.reason}</td>
@@ -264,7 +283,12 @@ export default function Stock() {
                 </tbody></table>
               </div>
             )}
-            <PaginationControls {...returnPagination} total={returns?.length || 0} testid="returns-pagination" />
+            <PaginationControls
+              {...returnPagination}
+              total={returnsData?.total || 0}
+              totalPages={returnsData?.total_pages || 1}
+              testid="returns-pagination"
+            />
           </Panel>
         </TabsContent>
         <TabsContent value="einbox"><EfacturaInbox onNirChange={() => { reload(); reloadN(); reloadS(); }} /></TabsContent>

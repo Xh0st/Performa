@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, Loading, NativeSelect, PageHeader, Panel } from "@/components/common";
+import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 
 const STATUS = {
   in_asteptare: "În așteptare",
@@ -147,8 +148,16 @@ function ClaimDialog({ open, onOpenChange, onSaved }) {
 
 export default function Warranties() {
   const { tr } = useLang();
-  const { data: warranties, reload: reloadWarranties } = useApi("/warranties?status=");
-  const { data: claims, reload: reloadClaims } = useApi("/warranty-claims");
+  const warrantyPagination = useServerPagination("warranties");
+  const claimPagination = useServerPagination("warranty-claims");
+  const { data: warrantiesData, reload: reloadWarranties } = useApi(
+    `/warranties?status=&page=${warrantyPagination.page}&page_size=${PAGE_SIZE}`,
+  );
+  const { data: claimsData, reload: reloadClaims } = useApi(
+    `/warranty-claims?page=${claimPagination.page}&page_size=${PAGE_SIZE}`,
+  );
+  const warranties = warrantiesData?.items;
+  const claims = claimsData?.items;
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState(null);
@@ -198,6 +207,12 @@ export default function Warranties() {
               </div>
             ))}
             {!warranties.length && <div className="py-6 text-center text-sm text-muted-foreground" data-testid="warranty-certificates-empty">{tr("Nu există certificate.", "No certificates.")}</div>}
+            <PaginationControls
+              {...warrantyPagination}
+              total={warrantiesData?.total || 0}
+              totalPages={warrantiesData?.total_pages || 1}
+              testid="warranty-certificates-pagination"
+            />
           </div>
         </Panel>
         <Panel
@@ -209,6 +224,12 @@ export default function Warranties() {
             <table className="w-full min-w-[850px] text-sm" data-testid="warranty-claims-table"><thead><tr className="border-b text-left text-xs uppercase text-muted-foreground"><th className="px-2 py-2">{tr("Dosar", "Claim")}</th><th>{tr("Factură", "Invoice")}</th><th>{tr("Comandă", "Work order")}</th><th>{tr("Tehnic", "Technical")}</th><th>{tr("Retur", "Return")}</th><th>{tr("Soluție", "Resolution")}</th><th /></tr></thead><tbody>{claims.map((claim) => <tr key={claim.id} className="border-b"><td className="px-2 py-2 font-mono">{claim.number}</td><td>{claim.invoice_ref}</td><td className="font-mono"><Link className="text-primary" to={`/work-orders/${claim.work_order_id}`}>{claim.work_order_number}</Link></td><td>{STATUS[claim.technical_result]}</td><td>{STATUS[claim.supplier_return_status]}</td><td>{STATUS[claim.resolution]}</td><td><Button variant="ghost" size="icon" data-testid={`edit-warranty-claim-${claim.number}`} onClick={() => edit(claim)}><Wrench className="h-4 w-4" /></Button></td></tr>)}</tbody></table>
           </div>
           {!claims.length && <div className="py-6 text-center text-sm text-muted-foreground" data-testid="warranty-claims-empty">{tr("Nu există dosare deschise.", "No open claims.")}</div>}
+          <PaginationControls
+            {...claimPagination}
+            total={claimsData?.total || 0}
+            totalPages={claimsData?.total_pages || 1}
+            testid="warranty-claims-pagination"
+          />
         </Panel>
       </div>
       <ClaimDialog open={open} onOpenChange={setOpen} onSaved={reload} />

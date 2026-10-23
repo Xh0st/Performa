@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, Panel, Loading, Empty } from "@/components/common";
 import ClientForm from "@/components/ClientForm";
-import { PaginationControls, usePagination } from "@/components/Pagination";
+import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 
 export default function Clients() {
   const { tr } = useLang();
@@ -15,9 +15,15 @@ export default function Clients() {
   const [q, setQ] = useState("");
   const [type, setType] = useState("");
   const [open, setOpen] = useState(false);
-  const { data, loading, reload } = useApi(`/clients?q=${encodeURIComponent(q)}`, [q]);
-  const rows = (data || []).filter((c) => !type || c.type === type);
-  const pagination = usePagination(rows, `${q}:${type}:${data?.length || 0}`);
+  const pagination = useServerPagination(`${q}:${type}`);
+  const params = new URLSearchParams({
+    q,
+    type,
+    page: String(pagination.page),
+    page_size: String(PAGE_SIZE),
+  });
+  const { data, loading, reload } = useApi(`/clients?${params.toString()}`);
+  const rows = data?.items || [];
   return (
     <div data-testid="clients-page">
       <PageHeader eyebrow="CRM" title={tr("Clienți", "Clients")}
@@ -42,7 +48,7 @@ export default function Clients() {
                 <th className="px-2">Email</th><th className="px-2">{tr("Localitate", "City")}</th><th className="px-2 text-right">{tr("Vehicule", "Vehicles")}</th>
               </tr></thead>
               <tbody>
-                {pagination.pageItems.map((c) => (
+                {rows.map((c) => (
                   <tr key={c.id} data-testid={`client-row-${c.id}`} onClick={() => nav(`/clients/${c.id}`)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
                     <td className="px-2 font-medium"><span className="flex items-center gap-2">{c.type === "pj" ? <Building2 className="h-4 w-4 text-cyan-500" /> : <User className="h-4 w-4 text-muted-foreground" />}{c.name}
                       {c.is_fleet && <span className="rounded-sm bg-primary/10 px-1.5 text-[10px] font-bold uppercase text-primary">{tr("Flotă", "Fleet")}</span>}</span></td>
@@ -55,7 +61,12 @@ export default function Clients() {
             </table>
           </div>
         )}
-        <PaginationControls {...pagination} total={rows.length} testid="clients-pagination" />
+        <PaginationControls
+          {...pagination}
+          total={data?.total || 0}
+          totalPages={data?.total_pages || 1}
+          testid="clients-pagination"
+        />
       </Panel>
       <ClientForm open={open} onOpenChange={setOpen} onSaved={reload} />
     </div>

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from core import (db, raw_db, ser, oid, iso, now, require, audit, enforce_work_order_quota, get_or_404, next_seq,
                   get_settings, calc_totals, WO_STATUSES)
 from tenant_context import set_scope
+from pagination import fetch_page, page_response
 
 router = APIRouter(prefix="/api")
 LIGHT = {"reception.photos": 0, "reception.signature": 0, "qc.mechanic_signature": 0, "qc.chief_signature": 0}
@@ -164,16 +165,44 @@ async def enrich(wos):
 
 
 @router.get("/work-orders")
-async def list_work_orders(status: str = "", q: str = "", active: bool = False, user=Depends(require("workorders"))):
+async def list_work_orders(
+    status: str = "",
+    q: str = "",
+    active: bool = False,
+    page: int = 0,
+    page_size: int = 20,
+    user=Depends(require("workorders")),
+):
     flt = {}
     if status:
         flt["status"] = status
     elif active:
         flt["status"] = {"$nin": list(LOCKED)}
-    if q:
-        flt["number"] = {"$regex": re.escape(q), "$options": "i"}
+    if q.strip():
+        rx = {"$regex": re.escape(q.strip()), "$options": "i"}
+        clients = await db.clients.find({"name": rx}, {"_id": 1}).to_list(1000)
+        vehicles = await db.vehicles.find(
+            {"$or": [{"plate": rx}, {"vin": rx}, {"make": rx}, {"model": rx}]},
+            {"_id": 1},
+        ).to_list(1000)
+        flt["$or"] = [
+            {"number": rx},
+            {"client_id": {"$in": [str(item["_id"]) for item in clients]}},
+            {"vehicle_id": {"$in": [str(item["_id"]) for item in vehicles]}},
+        ]
     proj = LIGHT | {"quotes": 0}
-    return await enrich(await db.work_orders.find(flt, proj).sort("created_at", -1).to_list(1000))
+    if not page:
+        rows = await db.work_orders.find(flt, proj).sort("created_at", -1).to_list(1000)
+        return await enrich(rows)
+    rows, total, current_page, size = await fetch_page(
+        db.work_orders,
+        flt,
+        [("created_at", -1)],
+        page,
+        page_size,
+        proj,
+    )
+    return page_response(await enrich(rows), total, current_page, size)
 
 
 @router.post("/work-orders")

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from core import db, get_or_404, get_settings, iso, next_seq, oid, require, ser
 from warranty_pdf import build_certificate
+from pagination import fetch_page, page_response
 
 
 router = APIRouter(prefix="/api")
@@ -32,13 +33,35 @@ class ClaimUpdateIn(BaseModel):
 
 
 @router.get("/warranties")
-async def list_warranties(status: str = "active", user=Depends(require("warranties"))):
+async def list_warranties(
+    status: str = "active",
+    page: int = 0,
+    page_size: int = 20,
+    user=Depends(require("warranties")),
+):
     today = date.today().isoformat()
-    rows = [ser(item) for item in await db.warranty_certificates.find().sort("created_at", -1).to_list(2000)]
+    flt = {}
+    if status == "active":
+        flt["lines"] = {"$elemMatch": {"valid_to": {"$gte": today}}}
+    elif status == "expired":
+        flt["lines"] = {"$not": {"$elemMatch": {"valid_to": {"$gte": today}}}}
+    if page:
+        documents, total, current_page, size = await fetch_page(
+            db.warranty_certificates,
+            flt,
+            [("created_at", -1)],
+            page,
+            page_size,
+        )
+    else:
+        documents = await db.warranty_certificates.find(flt).sort("created_at", -1).to_list(2000)
+    rows = [ser(item) for item in documents]
     for row in rows:
         row["active_lines"] = [line for line in row["lines"] if line["valid_to"] >= today]
         row["status"] = "active" if row["active_lines"] else "expired"
-    return [row for row in rows if not status or row["status"] == status]
+    if page:
+        return page_response(rows, total, current_page, size)
+    return rows
 
 
 @router.get("/warranties/invoices")
@@ -77,8 +100,18 @@ async def certificate_pdf(iid: str, user=Depends(require("warranties"))):
 
 
 @router.get("/warranty-claims")
-async def list_claims(user=Depends(require("warranties"))):
-    return [ser(item) for item in await db.warranty_claims.find().sort("created_at", -1).to_list(2000)]
+async def list_claims(page: int = 0, page_size: int = 20, user=Depends(require("warranties"))):
+    if not page:
+        rows = await db.warranty_claims.find().sort("created_at", -1).to_list(2000)
+        return [ser(item) for item in rows]
+    rows, total, current_page, size = await fetch_page(
+        db.warranty_claims,
+        {},
+        [("created_at", -1)],
+        page,
+        page_size,
+    )
+    return page_response([ser(item) for item in rows], total, current_page, size)
 
 
 @router.post("/warranty-claims")

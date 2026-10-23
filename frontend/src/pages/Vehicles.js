@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PageHeader, Panel, Loading, Empty, StatusBadge } from "@/components/common";
 import VehicleForm from "@/components/VehicleForm";
-import { PaginationControls, usePagination } from "@/components/Pagination";
+import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 
 const todayS = () => new Date().toISOString().slice(0, 10);
 function Exp({ label, d }) {
@@ -24,9 +24,15 @@ export default function Vehicles() {
   const [q, setQ] = useState("");
   const [form, setForm] = useState({ open: false, initial: null });
   const [detail, setDetail] = useState(null);
-  const { data, loading, reload } = useApi(`/vehicles?q=${encodeURIComponent(q)}`, [q]);
+  const pagination = useServerPagination(q);
+  const params = new URLSearchParams({
+    q,
+    page: String(pagination.page),
+    page_size: String(PAGE_SIZE),
+  });
+  const { data, loading, reload } = useApi(`/vehicles?${params.toString()}`);
   const openDetail = async (id) => setDetail((await api.get(`/vehicles/${id}`)).data);
-  const pagination = usePagination(data || [], `${q}:${data?.length || 0}`);
+  const rows = data?.items || [];
   return (
     <div data-testid="vehicles-page">
       <PageHeader eyebrow={tr("Parc auto clienți", "Client fleet")} title={tr("Vehicule", "Vehicles")}
@@ -36,7 +42,7 @@ export default function Vehicles() {
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input data-testid="vehicles-search-input" className="pl-9" placeholder={tr("Caută VIN, nr. înmatriculare, marcă…", "Search VIN, plate, make…")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        {loading && !data ? <Loading /> : !data?.length ? <Empty text={tr("Niciun vehicul.", "No vehicles.")} /> : (
+        {loading && !data ? <Loading /> : !rows.length ? <Empty text={tr("Niciun vehicul.", "No vehicles.")} /> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="vehicles-table">
               <thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -44,7 +50,7 @@ export default function Vehicles() {
                 <th className="px-2">{tr("Proprietar", "Owner")}</th><th className="px-2 text-right">Km</th><th className="px-2">{tr("Expirări", "Expiry")}</th>
               </tr></thead>
               <tbody>
-                {pagination.pageItems.map((v) => (
+                {rows.map((v) => (
                   <tr key={v.id} data-testid={`vehicle-row-${v.id}`} onClick={() => openDetail(v.id)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
                     <td className="px-2"><span className="rounded-sm border bg-background px-2 py-0.5 font-mono text-xs font-semibold">{v.plate}</span></td>
                     <td className="px-2 font-mono text-xs">{v.vin}</td>
@@ -58,7 +64,12 @@ export default function Vehicles() {
             </table>
           </div>
         )}
-        <PaginationControls {...pagination} total={data?.length || 0} testid="vehicles-pagination" />
+        <PaginationControls
+          {...pagination}
+          total={data?.total || 0}
+          totalPages={data?.total_pages || 1}
+          testid="vehicles-pagination"
+        />
       </Panel>
       <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="vehicle-detail-sheet">

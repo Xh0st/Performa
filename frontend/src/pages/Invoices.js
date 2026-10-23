@@ -6,7 +6,7 @@ import { money, date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, Panel, Loading, Badge, PAY_STATUS, EF_STATUS, Empty, NativeSelect } from "@/components/common";
-import { PaginationControls, usePagination } from "@/components/Pagination";
+import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 
 export default function Invoices() {
   const { tr } = useLang();
@@ -16,23 +16,20 @@ export default function Invoices() {
   const [q, setQ] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const { data } = useApi(`/invoices?type=${type}&status=${status}`, [type, status]);
-  const rows = (data || []).filter((invoice) => {
-    const value = [
-      invoice.series,
-      invoice.number,
-      invoice.buyer?.name,
-      invoice.buyer?.cui,
-      invoice.vehicle?.vin,
-      invoice.vehicle_vin,
-      invoice.work_order_number,
-    ].join(" ").toLowerCase();
-    return value.includes(q.toLowerCase())
-      && (!dateFrom || invoice.issue_date >= dateFrom)
-      && (!dateTo || invoice.issue_date <= dateTo);
+  const filters = `${type}:${status}:${q}:${dateFrom}:${dateTo}`;
+  const pagination = useServerPagination(filters);
+  const params = new URLSearchParams({
+    type,
+    status,
+    q,
+    date_from: dateFrom,
+    date_to: dateTo,
+    page: String(pagination.page),
+    page_size: String(PAGE_SIZE),
   });
-  const total = rows.reduce((s, i) => s + i.totals.gross, 0);
-  const pagination = usePagination(rows, `${type}:${status}:${q}:${dateFrom}:${dateTo}:${data?.length || 0}`);
+  const { data } = useApi(`/invoices?${params.toString()}`);
+  const rows = data?.items || [];
+  const total = data?.summary?.gross || 0;
   return (
     <div data-testid="invoices-page">
       <PageHeader eyebrow="ANAF · e-Factura · SPV" title={tr("Facturi", "Invoices")} />
@@ -58,7 +55,7 @@ export default function Invoices() {
           <Input data-testid="invoices-date-from-input" className="h-9 w-36" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
           <Input data-testid="invoices-date-to-input" className="h-9 w-36" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
           <div className="flex-1" />
-          <span className="font-mono text-sm">{rows.length} · {money(total)}</span>
+          <span className="font-mono text-sm">{data?.total || 0} · {money(total)}</span>
         </div>
         {!data ? <Loading /> : !rows.length ? <Empty text={tr("Niciun document.", "No documents.")} /> : (
           <div className="overflow-x-auto">
@@ -69,7 +66,7 @@ export default function Invoices() {
                 <th className="px-2 text-center">{tr("Încasare", "Payment")}</th><th className="px-2 text-center">e-Factura</th>
               </tr></thead>
               <tbody>
-                {pagination.pageItems.map((i) => (
+                {rows.map((i) => (
                   <tr key={i.id} data-testid={`invoice-row-${i.series}${i.number}`} onClick={() => nav(`/invoices/${i.id}`)} className="h-10 cursor-pointer border-b border-border/50 hover:bg-accent/60">
                     <td className="px-2 font-mono text-xs font-semibold text-primary">{i.series}{i.number}{i.kind === "credit_note" && <span data-testid={`invoice-storno-tag-${i.series}${i.number}`} className="ml-1 rounded-sm bg-violet-500/15 px-1 text-[10px] text-violet-500">STORNO {i.original_ref}</span>}{i.storno_status && <span className="ml-1 text-[10px] text-violet-500">{i.storno_status === "total" ? tr("stornată", "credited") : tr("storno parțial", "part. credited")}</span>}</td><td className="px-2">{date(i.issue_date)}</td>
                     <td className={`px-2 ${i.status !== "paid" && i.due_date < new Date().toISOString().slice(0, 10) ? "text-rose-500" : ""}`}>{date(i.due_date)}</td>
@@ -83,7 +80,12 @@ export default function Invoices() {
             </table>
           </div>
         )}
-        <PaginationControls {...pagination} total={rows.length} testid="invoices-pagination" />
+        <PaginationControls
+          {...pagination}
+          total={data?.total || 0}
+          totalPages={data?.total_pages || 1}
+          testid="invoices-pagination"
+        />
       </Panel>
     </div>
   );
