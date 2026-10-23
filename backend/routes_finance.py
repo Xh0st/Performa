@@ -328,6 +328,18 @@ class CashDepositIn(BaseModel):
     notes: str = ""
 
 
+class CashPayoutIn(BaseModel):
+    kind: str
+    beneficiary: str
+    amount: float
+    reference: str = ""
+    notes: str = ""
+
+
+class CashReversalIn(BaseModel):
+    reason: str
+
+
 def invoice_due(invoice: dict) -> float:
     return round(
         invoice["totals"]["gross"]
@@ -526,4 +538,63 @@ async def create_cash_deposit(body: CashDepositIn, user=Depends(require("payment
     }
     result = await db.cash_movements.insert_one(doc)
     await audit(user, "create", "cash_deposit", str(result.inserted_id), doc["doc_number"])
+    return ser(await db.cash_movements.find_one({"_id": result.inserted_id}))
+
+
+@router.post("/cash-register/payouts")
+async def create_cash_payout(body: CashPayoutIn, user=Depends(require("payments"))):
+    if body.kind not in {"expense_settlement", "payment_order"}:
+        raise HTTPException(400, "Tip plată invalid")
+    if body.amount <= 0 or not body.beneficiary.strip():
+        raise HTTPException(400, "Beneficiarul și suma sunt obligatorii")
+    register = await cash_register(user=user)
+    if body.amount > register["closing"] + 0.001:
+        raise HTTPException(400, "Plata depășește numerarul disponibil în casă")
+    prefix = "DC" if body.kind == "expense_settlement" else "DP"
+    sequence = await next_seq(f"cash_{body.kind}")
+    movement = {
+        "kind": body.kind,
+        "amount": round(body.amount, 2),
+        "doc_number": f"{prefix}-{sequence:06d}",
+        "beneficiary": body.beneficiary.strip(),
+        "reference": body.reference,
+        "notes": body.notes,
+        "date": iso(),
+        "created_by": user["name"],
+    }
+    result = await db.cash_movements.insert_one(movement)
+    await audit(user, "create", body.kind, str(result.inserted_id), movement["doc_number"])
+    return ser(await db.cash_movements.find_one({"_id": result.inserted_id}))
+
+
+@router.post("/payments/{pid}/reverse")
+async def reverse_cash_payment(pid: str, body: CashReversalIn, user=Depends(require("payments"))):
+    payment = await get_or_404("payments", pid)
+    if payment.get("method") != "numerar" or payment.get("doc_type") not in {"chitanta", "bon_fiscal"}:
+        raise HTTPException(400, "Se pot storna doar chitanțe și bonuri fiscale")
+    if payment.get("reversed_at"):
+        raise HTTPException(400, "Documentul este deja stornat")
+    if not body.reason.strip():
+        raise HTTPException(400, "Motivul stornării este obligatoriu")
+    allocations = payment.get("allocations") or [{"invoice_id": payment["invoice_id"], "amount": payment["amount"]}]
+    for allocation in allocations:
+        invoice = await get_or_404("invoices", allocation["invoice_id"])
+        paid = round(max(0, invoice.get("paid_amount", 0) - allocation["amount"]), 2)
+        status = "paid" if paid + invoice.get("credited_amount", 0) >= invoice["totals"]["gross"] - 0.001 else ("partial" if paid else "unpaid")
+        await db.invoices.update_one({"_id": invoice["_id"]}, {"$set": {"paid_amount": paid, "status": status}})
+    sequence = await next_seq("cash_receipt_reversal")
+    movement = {
+        "kind": "receipt_reversal",
+        "amount": payment["amount"],
+        "doc_number": f"ST-{sequence:06d}",
+        "beneficiary": payment.get("client_name", ""),
+        "reference": payment["doc_number"],
+        "reason": body.reason.strip(),
+        "payment_id": pid,
+        "date": iso(),
+        "created_by": user["name"],
+    }
+    result = await db.cash_movements.insert_one(movement)
+    await db.payments.update_one({"_id": payment["_id"]}, {"$set": {"reversed_at": iso(), "reversed_by": user["name"]}})
+    await audit(user, "reverse", "payment", pid, movement["doc_number"])
     return ser(await db.cash_movements.find_one({"_id": result.inserted_id}))

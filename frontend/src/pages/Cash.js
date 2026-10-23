@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader, Panel, Kpi, Loading, Empty } from "@/components/common";
 import { METHODS, DOCS } from "@/pages/InvoiceDetail";
 import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
-import { CashDepositForm, PaymentEntryForm } from "@/components/CashPaymentForms";
+import { CashDepositForm, CashPayoutForm, PaymentEntryForm } from "@/components/CashPaymentForms";
 
 export default function Cash() {
   const { tr } = useLang();
@@ -37,6 +37,7 @@ export default function Cash() {
           <TabsTrigger value="register" data-testid="cash-tab-register">{tr("Registru de casă", "Cash register")}</TabsTrigger>
           <TabsTrigger value="cash" data-testid="cash-tab-cash-payments">{tr("Încasări numerar", "Cash receipts")}</TabsTrigger>
           <TabsTrigger value="cashless" data-testid="cash-tab-cashless-payments">POS / OP</TabsTrigger>
+          <TabsTrigger value="payouts" data-testid="cash-tab-payouts">{tr("Plăți & stornări", "Payouts & reversals")}</TabsTrigger>
         </TabsList>
         <TabsContent value="register">
           <div className="mb-4 flex items-center gap-2">
@@ -102,6 +103,12 @@ export default function Cash() {
               </div>
             )}
             <PaginationControls {...cashlessPagination} total={cashlessPaymentsData?.total || 0} totalPages={cashlessPaymentsData?.total_pages || 1} testid="cashless-payments-pagination" />
+          </Panel>
+        </TabsContent>
+        <TabsContent value="payouts">
+          <Panel title={tr("Ieșiri de numerar", "Cash payouts")}>
+            <CashPayoutForm available={reg?.closing || 0} onSaved={reloadCash} />
+            <p className="mt-4 text-xs text-muted-foreground">{tr("Stornarea chitanțelor și bonurilor fiscale se face din lista Încasări numerar, cu motiv obligatoriu și confirmare.", "Reverse receipts from Cash receipts with a required reason and confirmation.")}</p>
           </Panel>
         </TabsContent>
       </Tabs>

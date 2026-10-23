@@ -201,3 +201,45 @@ export function CashDepositForm({ available, onSaved }) {
     </div>
   );
 }
+
+
+export function CashPayoutForm({ available, onSaved }) {
+  const { tr } = useLang();
+  const [kind, setKind] = useState("expense_settlement");
+  const [beneficiary, setBeneficiary] = useState("");
+  const [amount, setAmount] = useState("");
+  const [reference, setReference] = useState("");
+
+  const save = async () => {
+    try {
+      await api.post("/cash-register/payouts", {
+        kind,
+        beneficiary,
+        amount: Number(amount),
+        reference,
+      });
+      toast.success(tr("Plată înregistrată", "Payout recorded"));
+      setBeneficiary("");
+      setAmount("");
+      setReference("");
+      onSaved();
+    } catch (error) {
+      toast.error(errMsg(error));
+    }
+  };
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-5">
+      <Field label={tr("Document", "Document")}>
+        <NativeSelect data-testid="cash-payout-kind-select" value={kind} onChange={(event) => setKind(event.target.value)}>
+          <option value="expense_settlement">{tr("Decont cheltuieli", "Expense settlement")}</option>
+          <option value="payment_order">{tr("Dispoziție de plată", "Payment order")}</option>
+        </NativeSelect>
+      </Field>
+      <Field label={tr("Beneficiar", "Beneficiary")}><Input data-testid="cash-payout-beneficiary-input" value={beneficiary} onChange={(event) => setBeneficiary(event.target.value)} /></Field>
+      <Field label={tr("Sumă (RON)", "Amount (RON)")}><Input data-testid="cash-payout-amount-input" type="number" min="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
+      <Field label={tr("Referință", "Reference")}><Input data-testid="cash-payout-reference-input" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
+      <div className="flex items-end"><Button data-testid="cash-payout-save-button" disabled={!beneficiary || !amount || Number(amount) > available} onClick={save}>{tr("Înregistrează", "Record")}</Button></div>
+    </div>
+  );
+}
