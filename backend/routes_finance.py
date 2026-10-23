@@ -12,7 +12,15 @@ from pagination import fetch_page, page_response
 from client_finance import client_credit_position
 
 router = APIRouter(prefix="/api")
-DOC_BY_METHOD = {"numerar": ("chitanta", "CH"), "pos": ("bon_pos", "POS"), "transfer": ("ordin_plata", "OP"), "online": ("confirmare_online", "WEB")}
+DOC_BY_METHOD = {
+    "pos": ("bon_pos", "POS"),
+    "transfer": ("ordin_plata", "OP"),
+    "online": ("confirmare_online", "WEB"),
+}
+CASH_DOCUMENTS = {
+    "receipt": ("chitanta", "CH"),
+    "fiscal_receipt": ("bon_fiscal", "BF"),
+}
 
 
 class InvoiceIn(BaseModel):
@@ -294,33 +302,102 @@ async def efactura_xml(iid: str, user=Depends(require("invoices"))):
 
 
 class PaymentIn(BaseModel):
-    invoice_id: str
+    invoice_id: str = ""
+    client_id: str = ""
     amount: float
     method: str
+    cash_document: str = "receipt"
     reference: str = ""
+
+
+class CashDepositIn(BaseModel):
+    amount: float
+    reference: str = ""
+    notes: str = ""
+
+
+def invoice_due(invoice: dict) -> float:
+    return round(
+        invoice["totals"]["gross"]
+        - invoice.get("paid_amount", 0)
+        - invoice.get("credited_amount", 0),
+        2,
+    )
+
+
+async def allocate_payment(client_id: str, amount: float, invoice_id: str = "") -> list[dict]:
+    if invoice_id:
+        invoices = [await get_or_404("invoices", invoice_id)]
+    else:
+        invoices = await db.invoices.find(
+            {"client_id": client_id, "type": "fiscal", "kind": {"$ne": "credit_note"}},
+        ).sort([("due_date", 1), ("issue_date", 1), ("created_at", 1)]).to_list(5000)
+    remaining = round(amount, 2)
+    allocations = []
+    for invoice in invoices:
+        due = invoice_due(invoice)
+        if due <= 0:
+            continue
+        applied = round(min(remaining, due), 2)
+        paid = round(invoice.get("paid_amount", 0) + applied, 2)
+        status = "paid" if paid + invoice.get("credited_amount", 0) >= invoice["totals"]["gross"] - 0.001 else "partial"
+        updated = await db.invoices.update_one(
+            {"_id": invoice["_id"], "paid_amount": invoice.get("paid_amount", 0)},
+            {"$set": {"paid_amount": paid, "status": status}},
+        )
+        if updated.modified_count == 0:
+            raise HTTPException(409, "Factura a fost modificată între timp. Reîncercați.")
+        allocations.append({
+            "invoice_id": str(invoice["_id"]),
+            "invoice_ref": f"{invoice['series']}{invoice['number']}",
+            "amount": applied,
+        })
+        remaining = round(remaining - applied, 2)
+        if remaining <= 0:
+            break
+    if remaining > 0:
+        raise HTTPException(400, "Suma depășește soldul facturilor fiscale restante")
+    return allocations
 
 
 @router.post("/payments")
 async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
-    if body.method not in DOC_BY_METHOD:
+    if body.method not in {"numerar", *DOC_BY_METHOD}:
         raise HTTPException(400, "Metodă de plată invalidă")
-    inv = await get_or_404("invoices", body.invoice_id)
-    if inv["type"] != "fiscal" or inv.get("kind") == "credit_note":
-        raise HTTPException(400, "Încasările se înregistrează pe facturi fiscale (nu pe facturi de stornare)")
-    due = round(inv["totals"]["gross"] - inv.get("paid_amount", 0) - inv.get("credited_amount", 0), 2)
-    if body.amount <= 0 or body.amount > due + 0.001:
-        raise HTTPException(400, f"Suma trebuie să fie între 0 și {due:.2f} RON")
-    paid = round(inv.get("paid_amount", 0) + body.amount, 2)
-    status = "paid" if paid + inv.get("credited_amount", 0) >= inv["totals"]["gross"] - 0.001 else "partial"
-    upd = await db.invoices.update_one({"_id": inv["_id"], "paid_amount": inv.get("paid_amount", 0)},
-                                       {"$set": {"paid_amount": paid, "status": status}})
-    if upd.modified_count == 0:
-        raise HTTPException(409, "Factura a fost modificată între timp. Reîncercați.")
-    doc_type, prefix = DOC_BY_METHOD[body.method]
+    if body.amount <= 0:
+        raise HTTPException(400, "Suma trebuie să fie mai mare decât zero")
+    invoice = await get_or_404("invoices", body.invoice_id) if body.invoice_id else None
+    client_id = body.client_id or (invoice or {}).get("client_id", "")
+    if not client_id:
+        raise HTTPException(400, "Selectați clientul sau factura fiscală restantă")
+    client = await get_or_404("clients", client_id)
+    if invoice and (invoice["type"] != "fiscal" or invoice.get("kind") == "credit_note"):
+        raise HTTPException(400, "Încasările se înregistrează numai pe facturi fiscale")
+    if invoice and invoice["client_id"] != client_id:
+        raise HTTPException(400, "Factura selectată nu aparține clientului")
+    allocations = await allocate_payment(client_id, body.amount, body.invoice_id)
+    if body.method == "numerar":
+        if body.cash_document not in CASH_DOCUMENTS:
+            raise HTTPException(400, "Document de numerar invalid")
+        doc_type, prefix = CASH_DOCUMENTS[body.cash_document]
+    else:
+        doc_type, prefix = DOC_BY_METHOD[body.method]
     seq = await next_seq(f"pay_{doc_type}")
-    p = {"invoice_id": body.invoice_id, "invoice_ref": f"{inv['series']}{inv['number']}", "client_name": inv["buyer"]["name"],
-         "amount": round(body.amount, 2), "method": body.method, "doc_type": doc_type, "doc_number": f"{prefix}-{seq:06d}",
-         "reference": body.reference, "date": iso(), "cashier": user["name"]}
+    refs = ", ".join(item["invoice_ref"] for item in allocations)
+    p = {
+        "invoice_id": allocations[0]["invoice_id"],
+        "invoice_ref": refs,
+        "client_id": client_id,
+        "client_name": client["name"],
+        "allocations": allocations,
+        "amount": round(body.amount, 2),
+        "method": body.method,
+        "doc_type": doc_type,
+        "doc_number": f"{prefix}-{seq:06d}",
+        "reference": body.reference,
+        "date": iso(),
+        "cashier": user["name"],
+    }
     r = await db.payments.insert_one(p)
     await audit(user, "create", "payment", str(r.inserted_id), p["doc_number"])
     return ser(await db.payments.find_one({"_id": r.inserted_id}))
@@ -329,6 +406,7 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
 @router.get("/payments")
 async def list_payments(
     day: str = "",
+    method: str = "",
     page: int = 0,
     page_size: int = 20,
     user=Depends(require("payments")),
@@ -339,6 +417,9 @@ async def list_payments(
         except ValueError as exc:
             raise HTTPException(422, "Data trebuie să fie în format YYYY-MM-DD") from exc
     flt = {"date": {"$regex": f"^{re.escape(day)}"}} if day else {}
+    if method:
+        methods = [value for value in method.split(",") if value]
+        flt["method"] = {"$in": methods} if len(methods) > 1 else methods[0]
     if not page:
         rows = await db.payments.find(flt).sort("date", -1).to_list(2000)
         return [ser(item) for item in rows]
@@ -360,9 +441,44 @@ async def get_payment(pid: str, user=Depends(require("invoices"))):
 @router.get("/cash-register")
 async def cash_register(day: str = "", user=Depends(require("payments"))):
     day = day or now().date().isoformat()
-    before = await db.payments.aggregate([{"$match": {"method": "numerar", "date": {"$lt": day}}},
-                                          {"$group": {"_id": None, "s": {"$sum": "$amount"}}}]).to_list(1)
-    opening = round(before[0]["s"], 2) if before else 0.0
-    entries = [ser(p) for p in await db.payments.find({"method": "numerar", "date": {"$regex": f"^{day}"}}).sort("date", 1).to_list(1000)]
-    total_in = round(sum(e["amount"] for e in entries), 2)
-    return {"day": day, "opening": opening, "entries": entries, "total_in": total_in, "total_out": 0, "closing": round(opening + total_in, 2)}
+    receipts = await db.payments.find({"method": "numerar"}).sort("date", 1).to_list(5000)
+    deposits = await db.cash_movements.find({"kind": "bank_deposit"}).sort("date", 1).to_list(5000)
+    opening = round(
+        sum(item["amount"] for item in receipts if item["date"][:10] < day)
+        - sum(item["amount"] for item in deposits if item["date"][:10] < day),
+        2,
+    )
+    entries = [
+        {**ser(item), "direction": "in", "label": item["doc_type"]}
+        for item in receipts if item["date"][:10] == day
+    ]
+    entries.extend(
+        {**ser(item), "direction": "out", "label": "depunere_banca", "client_name": "Depunere bancă"}
+        for item in deposits if item["date"][:10] == day
+    )
+    entries.sort(key=lambda item: item["date"])
+    total_in = round(sum(item["amount"] for item in entries if item["direction"] == "in"), 2)
+    total_out = round(sum(item["amount"] for item in entries if item["direction"] == "out"), 2)
+    return {"day": day, "opening": opening, "entries": entries, "total_in": total_in, "total_out": total_out, "closing": round(opening + total_in - total_out, 2)}
+
+
+@router.post("/cash-register/deposits")
+async def create_cash_deposit(body: CashDepositIn, user=Depends(require("payments"))):
+    if body.amount <= 0:
+        raise HTTPException(400, "Suma depunerii trebuie să fie mai mare decât zero")
+    register = await cash_register(user=user)
+    if body.amount > register["closing"] + 0.001:
+        raise HTTPException(400, "Depunerea depășește numerarul disponibil în casă")
+    seq = await next_seq("cash_deposit")
+    doc = {
+        "kind": "bank_deposit",
+        "amount": round(body.amount, 2),
+        "doc_number": f"DB-{seq:06d}",
+        "reference": body.reference,
+        "notes": body.notes,
+        "date": iso(),
+        "created_by": user["name"],
+    }
+    result = await db.cash_movements.insert_one(doc)
+    await audit(user, "create", "cash_deposit", str(result.inserted_id), doc["doc_number"])
+    return ser(await db.cash_movements.find_one({"_id": result.inserted_id}))

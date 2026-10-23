@@ -101,7 +101,7 @@ async def account_statement(
     ).to_list(5000)
     invoice_ids = [str(item["_id"]) for item in invoices]
     payments = await db.payments.find(
-        {"invoice_id": {"$in": invoice_ids}},
+        {"$or": [{"client_id": client_id}, {"invoice_id": {"$in": invoice_ids}}]},
         {"doc_number": 1, "invoice_ref": 1, "amount": 1, "date": 1},
     ).to_list(5000)
     movements = [_invoice_movement(item) for item in invoices]

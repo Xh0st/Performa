@@ -14,15 +14,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { PageHeader, Panel, Loading, Badge, PAY_STATUS, EF_STATUS, Field, NativeSelect } from "@/components/common";
 
 export const METHODS = { numerar: ["Numerar", "Cash"], pos: ["Card POS", "Card POS"], transfer: ["Transfer bancar", "Bank transfer"], online: ["Online", "Online"] };
-export const DOCS = { chitanta: ["Chitanță", "Receipt"], bon_pos: ["Bon POS", "POS slip"], ordin_plata: ["Ordin de plată", "Payment order"], confirmare_online: ["Confirmare online", "Online confirmation"] };
+export const DOCS = { chitanta: ["Chitanță", "Receipt"], bon_fiscal: ["Bon fiscal", "Fiscal receipt"], bon_pos: ["Bon POS", "POS slip"], ordin_plata: ["Ordin de plată", "Payment order"], confirmare_online: ["Confirmare online", "Online confirmation"] };
 
 function PayDialog({ inv, open, onOpenChange, onSaved }) {
   const { tr } = useLang();
   const due = Math.round((inv.totals.gross - inv.paid_amount - (inv.credited_amount || 0)) * 100) / 100;
-  const [f, setF] = useState({ amount: due, method: "numerar", reference: "" });
+  const [f, setF] = useState({ amount: due, method: "numerar", cash_document: "receipt", reference: "" });
   const save = async () => {
     try {
-      await api.post("/payments", { invoice_id: inv.id, amount: Number(f.amount), method: f.method, reference: f.reference });
+      await api.post("/payments", { invoice_id: inv.id, amount: Number(f.amount), method: f.method, cash_document: f.cash_document, reference: f.reference });
       toast.success(tr("Încasare înregistrată", "Payment recorded"));
       onSaved();
       onOpenChange(false);
@@ -41,6 +41,14 @@ function PayDialog({ inv, open, onOpenChange, onSaved }) {
               {Object.entries(METHODS).map(([k, v]) => <option key={k} value={k}>{tr(v[0], v[1])}</option>)}
             </NativeSelect>
           </Field>
+          {f.method === "numerar" && (
+            <Field label={tr("Document numerar", "Cash document")}>
+              <NativeSelect data-testid="payment-cash-document-select" value={f.cash_document} onChange={(e) => setF({ ...f, cash_document: e.target.value })}>
+                <option value="receipt">{tr("Chitanță", "Receipt")}</option>
+                {inv.buyer?.cnp && <option value="fiscal_receipt">{tr("Bon fiscal", "Fiscal receipt")}</option>}
+              </NativeSelect>
+            </Field>
+          )}
           <Field label={tr("Referință (nr. OP / tranzacție)", "Reference")} className="sm:col-span-2"><Input data-testid="payment-reference-input" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} /></Field>
         </div>
         <div className="text-xs text-muted-foreground">{tr("Rest de plată", "Remaining")}: <span className="font-mono">{money(due)}</span></div>
