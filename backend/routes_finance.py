@@ -454,9 +454,18 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
         doc_type, prefix = CASH_DOCUMENTS[body.cash_document]
     else:
         doc_type, prefix = DOC_BY_METHOD[body.method]
+    numbered_cash_documents = {"bon_fiscal", "dispozitie_incasare"}
+    if doc_type in numbered_cash_documents:
+        if not body.reference.strip().isdigit():
+            raise HTTPException(400, "Introduceți numărul numeric al documentului de încasare")
+        doc_number = f"{prefix}-{int(body.reference):06d}"
+        if await db.payments.find_one({"doc_number": doc_number}):
+            raise HTTPException(400, "Numărul documentului este deja înregistrat")
+    else:
+        sequence = await next_seq(f"pay_{doc_type}")
+        doc_number = f"{prefix}-{sequence:06d}"
     allocations = await payment_plan(client_id, body.amount, body.invoice_id)
     await apply_payment_plan(allocations)
-    seq = await next_seq(f"pay_{doc_type}")
     refs = ", ".join(item["invoice_ref"] for item in allocations)
     p = {
         "invoice_id": allocations[0]["invoice_id"],
@@ -467,7 +476,7 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
         "amount": round(body.amount, 2),
         "method": body.method,
         "doc_type": doc_type,
-        "doc_number": f"{prefix}-{seq:06d}",
+        "doc_number": doc_number,
         "reference": body.reference,
         "external_issuer": body.external_issuer.strip(),
         "external_number": body.external_number.strip(),

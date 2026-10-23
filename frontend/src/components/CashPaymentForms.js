@@ -28,6 +28,11 @@ export function PaymentEntryForm({ cashOnly = false, externalReceiptOnly = false
     clientId ? `/clients/${clientId}/invoices?page=1&page_size=100` : null,
   );
   const client = (clients || []).find((item) => item.id === clientId);
+  const referenceLabel = cashDocument === "fiscal_receipt"
+    ? tr("Nr. bon fiscal", "Fiscal receipt no.")
+    : cashDocument === "collection_order"
+      ? tr("Nr. dispoziție de încasare", "Collection order no.")
+      : tr("Referință", "Reference");
   const invoices = (invoicesData?.items || [])
     .filter((invoice) => invoice.type === "fiscal" && invoice.status !== "paid" && invoice.kind !== "credit_note")
     .map((invoice) => ({
@@ -149,7 +154,7 @@ export function PaymentEntryForm({ cashOnly = false, externalReceiptOnly = false
           onChange={(event) => setAmount(event.target.value)}
         />
       </Field>
-      <Field label={tr("Referință", "Reference")}>
+      <Field label={referenceLabel}>
         <Input
           data-testid={`payment-entry-${cashOnly ? "cash" : "cashless"}-reference-input`}
           value={reference}
