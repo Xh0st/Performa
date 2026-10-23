@@ -49,13 +49,15 @@ export default function Cash() {
     <div data-testid="cash-page">
       <PageHeader eyebrow={tr("Numerar · POS · transfer · online", "Cash · POS · transfer · online")} title={tr("Încasări & registru de casă", "Payments & cash register")} />
       <Tabs defaultValue="register">
-        <TabsList className="max-w-full overflow-x-auto whitespace-nowrap">
+        <div className="mb-2 max-w-full overflow-x-auto pb-1">
+        <TabsList className="w-max min-w-max whitespace-nowrap">
           <TabsTrigger value="register" data-testid="cash-tab-register">{tr("Registru de casă", "Cash register")}</TabsTrigger>
           <TabsTrigger value="cash" data-testid="cash-tab-cash-payments">{tr("Încasări numerar", "Cash receipts")}</TabsTrigger>
           <TabsTrigger value="cashless" data-testid="cash-tab-cashless-payments">POS / OP</TabsTrigger>
           <TabsTrigger value="payouts" data-testid="cash-tab-payouts">{tr("Plăți & stornări", "Payouts & reversals")}</TabsTrigger>
           <TabsTrigger value="registers" data-testid="cash-tab-registers">{tr("Registre", "Registers")}</TabsTrigger>
         </TabsList>
+        </div>
         <TabsContent value="register">
           <div className="mb-4 flex items-center gap-2">
             <Input type="date" data-testid="cash-day-input" className="w-48" value={day} onChange={(e) => setDay(e.target.value)} />
@@ -95,7 +97,7 @@ export default function Cash() {
                 </tr></thead><tbody>
                   {(cashPaymentsData.items || []).map((p) => (
                     <tr key={p.id} className="h-10 border-b border-border/50">
-                      <td className="px-2"><div className="font-mono text-xs">{p.doc_number}</div><div className="text-[11px] text-muted-foreground">{tr(...DOCS[p.doc_type])}</div></td>
+                      <td className="px-2"><div className="font-mono text-xs">{p.doc_number}</div><div className="text-[11px] text-muted-foreground">{tr(...(DOCS[p.doc_type] || [p.doc_type, p.doc_type]))}</div></td>
                       <td className="px-2">{dt(p.date)}</td><td className="px-2">{tr(...METHODS[p.method])}</td><td className="px-2">{p.client_name}</td>
                       <td className="px-2"><Link className="font-mono text-xs text-primary" to={`/invoices/${p.invoice_id}`}>{p.invoice_ref}</Link></td>
                       <td className="px-2 text-right font-mono">{money(p.amount)}</td>
