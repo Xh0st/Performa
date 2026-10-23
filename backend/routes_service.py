@@ -180,15 +180,21 @@ async def list_work_orders(
         flt["status"] = {"$nin": list(LOCKED)}
     if q.strip():
         rx = {"$regex": re.escape(q.strip()), "$options": "i"}
-        clients = await db.clients.find({"name": rx}, {"_id": 1}).to_list(1000)
-        vehicles = await db.vehicles.find(
-            {"$or": [{"plate": rx}, {"vin": rx}, {"make": rx}, {"model": rx}]},
-            {"_id": 1},
-        ).to_list(1000)
+        clients = [
+            str(item["_id"])
+            async for item in db.clients.find({"name": rx}, {"_id": 1})
+        ]
+        vehicles = [
+            str(item["_id"])
+            async for item in db.vehicles.find(
+                {"$or": [{"plate": rx}, {"vin": rx}, {"make": rx}, {"model": rx}]},
+                {"_id": 1},
+            )
+        ]
         flt["$or"] = [
             {"number": rx},
-            {"client_id": {"$in": [str(item["_id"]) for item in clients]}},
-            {"vehicle_id": {"$in": [str(item["_id"]) for item in vehicles]}},
+            {"client_id": {"$in": clients}},
+            {"vehicle_id": {"$in": vehicles}},
         ]
     proj = LIGHT | {"quotes": 0}
     if not page:

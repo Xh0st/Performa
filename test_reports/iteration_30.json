@@ -1,0 +1,50 @@
+{
+  "summary": "P1 server-side pagination + Invoice server filters. Backend: new pytest suite test_iter30_server_pagination.py ran 33 tests, 32 passed. The contract {items,total,page,page_size,total_pages} is correct on all 10 endpoints: at most 20 items, page_size capped at 100, legacy unpaged lists still work (products/suppliers/warranties/clients dropdowns), and unauthenticated requests are rejected. Invoice filters type/status/q (number, client, CUI, VIN/plate)/date range match the legacy filtered list, and page 1 and page 2 do not overlap. Two backend bugs: (1) /nirs sorts only by the non-unique 'date' field. Walking all pages gives 1 duplicate and 1 NIR that never appears. (2) /payments?day= puts unescaped user input into a regex, so day='(' returns 500. Frontend (desktop 1920 + mobile 390): Invoices, Work Orders list and Kanban, Clients, Vehicles, Products/NIR/Returns, Payments and Warranties all send page=N&page_size=20, totals and pagers match the active filter, and page 2 does not repeat page 1. Kanban sends no paging and shows all 7 columns with 36 cards. Searching work orders by number, plate or client is done on the server. No 4xx/5xx responses and no console errors. One HIGH bug affects every page: when a filter changes while on page>1, a stale request with the new filter and the old page fires before the page resets to 1. The two responses race, and the late page>1 response can overwrite the correct one. Reproduced on Clients: from page 2, clicking 'Persoane juridice' showed 'Niciun client.' in 2 of 5 tries, although the API returns 3 PJ clients.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/nirs?page=", "issue": "Sort is [('date',-1)] only. 20 of the 22 NIRs share the same date, so skip/limit is not deterministic. Walking all pages gave 1 duplicate and 1 missing NIR, so one NIR can never be seen in the UI. Fix: add a tie-breaker, e.g. [('date',-1),('_id',-1)]. Apply the same to every fetch_page sort (invoices/work-orders created_at have 6/12 tied rows; payments date has 4; clients name, products name and vehicles plate can also tie). Best fix: append ('_id', -1) inside pagination.fetch_page.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/payments?day=(", "issue": "500 'Regular expression is invalid'. The day value goes into $regex without re.escape. Also validate the date format."},
+      {"endpoint": "GET /api/invoices", "issue": "Invoices with status 'credit' exist (3) but the UI status dropdown has no 'credit' option. Confirm this is intended."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "useServerPagination + useApi (all paginated pages: Invoices, WorkOrders list, Clients, Vehicles, Stock products, Cash, Warranties)", "issue": "Race condition. The page resets in a useEffect after render, so the first render after a filter change requests new_filter+old_page (seen in network logs: q=SRV&page=2, then q=SRV&page=1; type=pj&page=2, then type=pj&page=1). useApi does not cancel or ignore stale responses. If the page>1 response arrives last, the table shows the wrong data or is empty. Reproduced in 2 of 5 runs on Clients (page 2, then PJ filter → 'Niciun client.' although total=3). Fix: reset the page in the same state update as the filter (set page 1 inside the filter setters, or use one combined state/reducer). Also make useApi ignore stale responses (request id or AbortController).", "selector": "[data-testid='clients-filter-pj'], [data-testid='invoices-search-input']", "priority": "HIGH"},
+      {"component": "Invoices/WorkOrders/Clients/Vehicles/Stock search inputs", "issue": "No debounce: every keystroke sends one API request. Together with the race above, fast typing can leave stale results on screen. Add a debounce of about 300ms.", "selector": "[data-testid$='-search-input']", "priority": "MEDIUM"},
+      {"component": "Warranties certificates panel", "issue": "The panel is titled 'Certificate active', but the frontend calls /warranties?status= (all), so expired certificates with '0 acoperiri active' are listed. Rename the title or add an active/expired filter.", "selector": "[data-testid='warranty-certificates-panel']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Invoices filters", "issues": ["The De la/Până la fields use the browser's native date input (shows mm/dd/yyyy in a Romanian UI) instead of the shadcn Calendar/DatePicker"]},
+      {"screen": "Invoices mobile (390px)", "issues": ["Table columns are squeezed: the Client column wraps one letter per line. Use min-widths with horizontal scroll or a card layout on mobile"]},
+      {"screen": "All paginated pages", "issues": ["Each page loads its first page twice on mount (2 identical requests). This is likely a StrictMode/dev double-run and minor"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter30_server_pagination.py", "/app/test_reports/pytest/pytest_iter30.xml"],
+  "action_items": [
+    "Add an _id tie-breaker to the sort inside pagination.fetch_page (fixes the NIR duplicate/missing row and prevents the same problem on other endpoints)",
+    "Fix the filter-change race: reset the page to 1 in the same update as the filter, and ignore stale responses in useApi",
+    "Escape the regex for /payments?day (and validate its format)",
+    "Debounce the search inputs",
+    "Replace the native date inputs on Invoices with the shadcn date picker; improve the mobile table layout",
+    "Fix the Warranties 'Certificate active' title or add a status filter",
+    "Update or remove the obsolete tests/test_iter27_pagination_api.py: it asserts there is no server-side pagination (page=1 returns a list), which now fails by design"
+  ],
+  "critical_code_review_comments": [
+    "pagination.fetch_page: a sort on non-unique keys without a unique tie-breaker gives non-deterministic skip/limit",
+    "routes_finance.list_payments: f'^{day}' regex injection gives a 500",
+    "routes_service.list_work_orders: the client/vehicle lookups for q are capped at to_list(1000); this can miss matches in large tenants (use $lookup or no cap)",
+    "Legacy unpaged lists still use to_list(1000-5000), which silently truncates large datasets",
+    "Pagination.useServerPagination: the page resets in useEffect after render, which causes an extra stale request on every filter change"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter30_server_pagination.py"],
+  "success_rate": {"backend": "97% (32/33)", "frontend": "~85% (all flows work; intermittent stale-response bug)"},
+  "test_credentials": "andrei.melek@gmail.com (admin owner), from /app/memory/test_credentials.md",
+  "seed_data_creation": "None created by this agent (read-only tests). Note: the tenant already contains a lot of temporary data from earlier work: about 54 'TEMP Pag Client NN' clients, 54 TMPxxPAG vehicles, 43 'TEMP Pag Product' products, 30 TMP9000xx invoices with 'TEMP Search Client' buyers, 24 TEST-WO-* work orders, about 18 test NIRs, TEST_Client/TEST_RarClient warranty certificates. The main agent should clean these up if they are not intended seed data.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest tests/test_iter30_server_pagination.py. The NIR walk test fails until the tie-breaker is added. To reproduce the race: on /clients go to page 2, click clients-filter-pj, check the row count (expected 3); repeat about 5 times. Pagination testids follow the pattern {name}-pagination-{controls|summary|page-indicator|next-button|previous-button}.",
+  "rca of the issue": "NIR duplicates: MongoDB returns tied documents in no fixed order across separate skip/limit queries; 20 of 22 NIRs share one date. Empty-table race: useServerPagination(resetKey) calls setPage(1) in useEffect, so the render with the new filter builds a URL with the stale page. useApi fires a request for both URLs and keeps whichever response arrives last."
+}

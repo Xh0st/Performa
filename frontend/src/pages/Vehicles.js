@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Search, Pencil } from "lucide-react";
-import { api, useApi } from "@/lib/api";
+import { api, useApi, useDebouncedValue } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { date, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -24,9 +24,10 @@ export default function Vehicles() {
   const [q, setQ] = useState("");
   const [form, setForm] = useState({ open: false, initial: null });
   const [detail, setDetail] = useState(null);
-  const pagination = useServerPagination(q);
+  const debouncedQuery = useDebouncedValue(q);
+  const pagination = useServerPagination(debouncedQuery);
   const params = new URLSearchParams({
-    q,
+    q: debouncedQuery,
     page: String(pagination.page),
     page_size: String(PAGE_SIZE),
   });

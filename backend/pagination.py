@@ -14,7 +14,10 @@ def normalize_pagination(page: int, page_size: int) -> tuple[int, int]:
 async def fetch_page(collection, filter_query, sort, page: int, page_size: int, projection=None):
     current_page, size = normalize_pagination(page, page_size)
     total = await collection.count_documents(filter_query)
-    cursor = collection.find(filter_query, projection).sort(sort)
+    stable_sort = list(sort)
+    if not any(field == "_id" for field, _ in stable_sort):
+        stable_sort.append(("_id", -1))
+    cursor = collection.find(filter_query, projection).sort(stable_sort)
     documents = await cursor.skip((current_page - 1) * size).limit(size).to_list(size)
     return documents, total, current_page, size
 

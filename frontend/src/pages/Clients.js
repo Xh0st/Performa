@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, Building2, User } from "lucide-react";
-import { useApi } from "@/lib/api";
+import { useApi, useDebouncedValue } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,10 @@ export default function Clients() {
   const [q, setQ] = useState("");
   const [type, setType] = useState("");
   const [open, setOpen] = useState(false);
-  const pagination = useServerPagination(`${q}:${type}`);
+  const debouncedQuery = useDebouncedValue(q);
+  const pagination = useServerPagination(`${debouncedQuery}:${type}`);
   const params = new URLSearchParams({
-    q,
+    q: debouncedQuery,
     type,
     page: String(pagination.page),
     page_size: String(PAGE_SIZE),

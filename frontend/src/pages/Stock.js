@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Search, Trash2, Printer, AlertTriangle, FileText, Undo2 } from "lucide-react";
-import { api, errMsg, useApi } from "@/lib/api";
+import { api, errMsg, useApi, useDebouncedValue } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { money, num, date, today } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -159,14 +159,15 @@ export default function Stock() {
   const [moves, setMoves] = useState(null);
   const [ret, setRet] = useState(null);
   const [efNir, setEfNir] = useState(null);
-  const productPagination = useServerPagination(`${q}:${low}`);
+  const debouncedQuery = useDebouncedValue(q);
+  const productPagination = useServerPagination(`${debouncedQuery}:${low}`);
   const nirPagination = useServerPagination("nirs");
   const returnPagination = useServerPagination("returns");
   const { data: returnsData, reload: reloadR } = useApi(
     `/supplier-returns?page=${returnPagination.page}&page_size=${PAGE_SIZE}`,
   );
   const { data: productsData, reload } = useApi(
-    `/products?q=${encodeURIComponent(q)}&low=${low}&page=${productPagination.page}&page_size=${PAGE_SIZE}`,
+    `/products?q=${encodeURIComponent(debouncedQuery)}&low=${low}&page=${productPagination.page}&page_size=${PAGE_SIZE}`,
   );
   const { data: nirsData, reload: reloadN } = useApi(
     `/nirs?page=${nirPagination.page}&page_size=${PAGE_SIZE}`,

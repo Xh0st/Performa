@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,10 @@ export const PAGE_SIZE = 20;
 
 export function useServerPagination(resetKey = "", totalPages) {
   const [page, setPage] = useState(1);
+  const previousResetKey = useRef(resetKey);
+  const hasNewFilters = previousResetKey.current !== resetKey;
+
+  if (hasNewFilters) previousResetKey.current = resetKey;
 
   useEffect(() => {
     setPage(1);
@@ -16,7 +20,7 @@ export function useServerPagination(resetKey = "", totalPages) {
     if (totalPages && page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  return { page, setPage };
+  return { page: hasNewFilters ? 1 : page, setPage };
 }
 
 export function usePagination(items, resetKey = "") {

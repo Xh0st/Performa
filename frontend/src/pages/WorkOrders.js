@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { LayoutGrid, List, Search, User } from "lucide-react";
-import { api, errMsg, useApi } from "@/lib/api";
+import { api, errMsg, useApi, useDebouncedValue } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { money, date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -34,8 +34,9 @@ export default function WorkOrders() {
   const nav = useNavigate();
   const [view, setView] = useState("kanban");
   const [q, setQ] = useState("");
-  const pagination = useServerPagination(`${q}:${view}`);
-  const params = new URLSearchParams({ q });
+  const debouncedQuery = useDebouncedValue(q);
+  const pagination = useServerPagination(`${debouncedQuery}:${view}`);
+  const params = new URLSearchParams({ q: debouncedQuery });
   if (view === "kanban") {
     params.set("active", "true");
   } else {

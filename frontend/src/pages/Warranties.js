@@ -195,7 +195,7 @@ export default function Warranties() {
       />
       <div className="grid min-w-0 gap-4 xl:grid-cols-[.8fr_1.2fr]">
         <Panel
-          title={tr("Certificate active", "Active certificates")}
+          title={tr("Certificate garanție", "Warranty certificates")}
           testid="warranty-certificates-panel"
           className="min-w-0"
         >

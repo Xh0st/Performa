@@ -1,12 +1,56 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApi } from "@/lib/api";
+import { useApi, useDebouncedValue } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
 import { money, date } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarDays, X } from "lucide-react";
 import { PageHeader, Panel, Loading, Badge, PAY_STATUS, EF_STATUS, Empty, NativeSelect } from "@/components/common";
 import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
+
+const toIsoDate = (value) => {
+  if (!value) return "";
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+};
+
+const toDate = (value) => (value ? new Date(`${value}T12:00:00`) : undefined);
+
+function InvoiceDatePicker({ value, onChange, placeholder, testid }) {
+  return (
+    <div className="flex items-center gap-1">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="h-9 w-40 justify-start font-normal"
+            data-testid={testid}
+          >
+            <CalendarDays className="mr-2 h-4 w-4" />
+            {value ? value.split("-").reverse().join(".") : placeholder}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar mode="single" selected={toDate(value)} onSelect={(day) => onChange(toIsoDate(day))} />
+        </PopoverContent>
+      </Popover>
+      {value && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          data-testid={`${testid}-clear-button`}
+          aria-label="Șterge data"
+          onClick={() => onChange("")}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export default function Invoices() {
   const { tr } = useLang();
@@ -16,12 +60,13 @@ export default function Invoices() {
   const [q, setQ] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const filters = `${type}:${status}:${q}:${dateFrom}:${dateTo}`;
+  const debouncedQuery = useDebouncedValue(q);
+  const filters = `${type}:${status}:${debouncedQuery}:${dateFrom}:${dateTo}`;
   const pagination = useServerPagination(filters);
   const params = new URLSearchParams({
     type,
     status,
-    q,
+    q: debouncedQuery,
     date_from: dateFrom,
     date_to: dateTo,
     page: String(pagination.page),
@@ -52,14 +97,14 @@ export default function Invoices() {
             value={q}
             onChange={(event) => setQ(event.target.value)}
           />
-          <Input data-testid="invoices-date-from-input" className="h-9 w-36" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-          <Input data-testid="invoices-date-to-input" className="h-9 w-36" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <InvoiceDatePicker value={dateFrom} onChange={setDateFrom} placeholder={tr("De la", "From")} testid="invoices-date-from-input" />
+          <InvoiceDatePicker value={dateTo} onChange={setDateTo} placeholder={tr("Până la", "To")} testid="invoices-date-to-input" />
           <div className="flex-1" />
           <span className="font-mono text-sm">{data?.total || 0} · {money(total)}</span>
         </div>
         {!data ? <Loading /> : !rows.length ? <Empty text={tr("Niciun document.", "No documents.")} /> : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm" data-testid="invoices-table">
+            <table className="w-full min-w-[950px] text-sm" data-testid="invoices-table">
               <thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <th className="px-2 py-2">{tr("Serie/Nr.", "Series/No.")}</th><th className="px-2">{tr("Data", "Date")}</th><th className="px-2">{tr("Scadență", "Due")}</th>
                 <th className="px-2">Client</th><th className="px-2">{tr("Comandă", "Order")}</th><th className="px-2 text-right">Total</th><th className="px-2 text-right">{tr("Rest", "Due")}</th>

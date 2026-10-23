@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -55,23 +55,44 @@ export function useApi(path) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const requestId = useRef(0);
   const reload = useCallback(async () => {
-    if (!path) return;
+    const currentRequestId = requestId.current + 1;
+    requestId.current = currentRequestId;
+    if (!path) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     setLoading(true);
     try {
       const r = await api.get(path);
-      setData(r.data);
-      setError(null);
+      if (requestId.current === currentRequestId) {
+        setData(r.data);
+        setError(null);
+      }
     } catch (e) {
-      setError(errMsg(e));
+      if (requestId.current === currentRequestId) setError(errMsg(e));
     } finally {
-      setLoading(false);
+      if (requestId.current === currentRequestId) setLoading(false);
     }
   }, [path]);
   useEffect(() => {
     reload();
   }, [reload]);
   return { data, setData, loading, error, reload };
+}
+
+export function useDebouncedValue(value, delay = 300) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delay);
+    return () => window.clearTimeout(timeoutId);
+  }, [delay, value]);
+
+  return debouncedValue;
 }
 
 export async function downloadFile(path, filename) {

@@ -314,7 +314,12 @@ async def list_payments(
     page_size: int = 20,
     user=Depends(require("payments")),
 ):
-    flt = {"date": {"$regex": f"^{day}"}} if day else {}
+    if day:
+        try:
+            date.fromisoformat(day)
+        except ValueError as exc:
+            raise HTTPException(422, "Data trebuie să fie în format YYYY-MM-DD") from exc
+    flt = {"date": {"$regex": f"^{re.escape(day)}"}} if day else {}
     if not page:
         rows = await db.payments.find(flt).sort("date", -1).to_list(2000)
         return [ser(item) for item in rows]
