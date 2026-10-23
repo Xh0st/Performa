@@ -494,7 +494,7 @@ async def cash_register(day: str = "", user=Depends(require("payments"))):
         {"$group": {"_id": None, "amount": {"$sum": "$amount"}}},
     ]).to_list(1)
     before_deposits = await db.cash_movements.aggregate([
-        {"$match": {"kind": "bank_deposit", "date": {"$lt": day}}},
+        {"$match": {"kind": {"$in": ["bank_deposit", "expense_settlement", "payment_order", "receipt_reversal"]}, "date": {"$lt": day}}},
         {"$group": {"_id": None, "amount": {"$sum": "$amount"}}},
     ]).to_list(1)
     opening = round(
@@ -506,7 +506,7 @@ async def cash_register(day: str = "", user=Depends(require("payments"))):
         {"method": "numerar", "date": {"$regex": f"^{re.escape(day)}"}},
     ).sort("date", 1).to_list(1000)
     deposits = await db.cash_movements.find(
-        {"kind": "bank_deposit", "date": {"$regex": f"^{re.escape(day)}"}},
+        {"kind": {"$in": ["bank_deposit", "expense_settlement", "payment_order", "receipt_reversal"]}, "date": {"$regex": f"^{re.escape(day)}"}},
     ).sort("date", 1).to_list(1000)
     entries = [
         {**ser(item), "direction": "in", "label": item["doc_type"]}
@@ -575,17 +575,26 @@ async def cash_register_rows(date_from: str, date_to: str, cash_only: bool) -> d
     if cash_only:
         payment_filter["method"] = "numerar"
     payments = await db.payments.find(payment_filter).sort("date", 1).to_list(5000)
+    opening_payment_filter = {"date": {"$lt": date_from}}
+    if cash_only:
+        opening_payment_filter["method"] = "numerar"
+    opening_payments = await db.payments.find(opening_payment_filter).to_list(5000)
     movements = await db.cash_movements.find(
         {"date": {"$gte": date_from, "$lte": f"{date_to}T23:59:59"}},
     ).sort("date", 1).to_list(5000)
+    opening_movements = await db.cash_movements.find({"date": {"$lt": date_from}}).to_list(5000)
     rows = [{"date": p["date"], "document": p["doc_number"], "label": p.get("client_name", ""), "in": p["amount"], "out": 0} for p in payments]
     rows.extend({"date": m["date"], "document": m["doc_number"], "label": m.get("beneficiary", "Depunere bancă"), "in": 0, "out": m["amount"]} for m in movements)
     rows.sort(key=lambda row: (row["date"], row["document"]))
-    opening = 0.0
+    opening = round(
+        sum(item["amount"] for item in opening_payments)
+        - sum(item["amount"] for item in opening_movements),
+        2,
+    )
     for row in rows:
         opening = round(opening + row["in"] - row["out"], 2)
         row["balance"] = opening
-    return {"items": rows, "opening": 0, "closing": opening, "date_from": date_from, "date_to": date_to}
+    return {"items": rows, "opening": opening if not rows else rows[0]["balance"] - rows[0]["in"] + rows[0]["out"], "closing": opening, "date_from": date_from, "date_to": date_to}
 
 
 @router.get("/cash-register/report")
