@@ -163,6 +163,10 @@ export default function Cash() {
         <TabsContent value="payouts">
           <Panel title={tr("Ieșiri de numerar", "Cash payouts")}>
             <CashPayoutForm available={reg?.closing || 0} onSaved={() => { reloadCash(); reloadPayouts(); }} />
+            <div className="mt-6 border-t border-border pt-5">
+              <h3 className="mb-3 text-sm font-semibold">{tr("Chitanță externă de la client", "External receipt from client")}</h3>
+              <PaymentEntryForm cashOnly externalReceiptOnly onSaved={reloadCash} />
+            </div>
             <Input data-testid="cash-payouts-search-input" className="mt-4 max-w-md" placeholder={tr("Caută beneficiar sau document…", "Search beneficiary or document…")} value={payoutQuery} onChange={(event) => setPayoutQuery(event.target.value)} />
             <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-sm" data-testid="cash-payouts-table"><tbody>{(payoutsData?.items || []).map((movement) => <tr key={movement.id} className="h-10 border-b border-border/50"><td className="font-mono">{movement.doc_number}</td><td>{dt(movement.date)}</td><td>{movement.beneficiary}</td><td>{movement.kind}</td><td className="text-right font-mono">{money(movement.amount)}</td></tr>)}</tbody></table></div>
             <PaginationControls {...payoutPagination} total={payoutsData?.total || 0} totalPages={payoutsData?.total_pages || 1} testid="cash-payouts-pagination" />

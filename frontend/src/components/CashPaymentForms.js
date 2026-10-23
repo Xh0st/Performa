@@ -12,14 +12,14 @@ const CASH_METHOD = "numerar";
 const CASHLESS_METHODS = ["pos", "transfer"];
 
 
-export function PaymentEntryForm({ cashOnly = false, onSaved }) {
+export function PaymentEntryForm({ cashOnly = false, externalReceiptOnly = false, onSaved }) {
   const { tr } = useLang();
   const { data: clients } = useApi("/clients");
   const [clientId, setClientId] = useState("");
   const [invoiceId, setInvoiceId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState(cashOnly ? CASH_METHOD : "pos");
-  const [cashDocument, setCashDocument] = useState("receipt");
+  const [cashDocument, setCashDocument] = useState(externalReceiptOnly ? "external_receipt" : "receipt");
   const [externalIssuer, setExternalIssuer] = useState("");
   const [externalNumber, setExternalNumber] = useState("");
   const [reference, setReference] = useState("");
@@ -39,6 +39,10 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
   useEffect(() => {
     if (cashOnly) setMethod(CASH_METHOD);
   }, [cashOnly]);
+
+  useEffect(() => {
+    if (externalReceiptOnly) setCashDocument("external_receipt");
+  }, [externalReceiptOnly]);
 
   const save = async () => {
     setSaving(true);
@@ -111,7 +115,7 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
           </NativeSelect>
         </Field>
       )}
-      {cashOnly && (
+      {cashOnly && !externalReceiptOnly && (
         <Field label={tr("Document numerar", "Cash document")}>
           <NativeSelect
             data-testid="payment-entry-cash-document-select"
@@ -121,7 +125,6 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
             <option value="receipt">{tr("Chitanță", "Receipt")}</option>
             {client?.type === "pf" && <option value="fiscal_receipt">{tr("Bon fiscal", "Fiscal receipt")}</option>}
             <option value="collection_order">{tr("Dispoziție de încasare", "Collection order")}</option>
-            <option value="external_receipt">{tr("Chitanță externă", "External receipt")}</option>
           </NativeSelect>
         </Field>
       )}
