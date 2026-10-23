@@ -1,5 +1,5 @@
 import os
-import random
+import secrets
 from datetime import timedelta
 from core import db, now, hash_password, verify_password, next_seq, calc_totals
 from routes_stock import receive_stock
@@ -64,7 +64,7 @@ JOBS = [("Revizie periodică", [("FU-OL-001", 1), ("UL-5W30-5", 1), ("FU-AE-002"
 
 
 def make_cnp(sex: int, yy: int, mm: int, dd: int, county: int) -> str:
-    base = f"{sex}{yy:02d}{mm:02d}{dd:02d}{county:02d}{random.randint(100, 999)}"
+    base = f"{sex}{yy:02d}{mm:02d}{dd:02d}{county:02d}{100 + secrets.randbelow(900)}"
     s = sum(int(base[i]) * int("279146358279"[i]) for i in range(12)) % 11
     return base + str(1 if s == 10 else s)
 
@@ -88,7 +88,6 @@ async def seed_admin():
 async def seed_demo():
     if await db.clients.count_documents({}) > 0:
         return
-    random.seed(42)
     t0 = now()
     mech_user = await db.users.find_one({"email": "mecanic@serviceauto.ro"})
     mids = []
@@ -109,7 +108,7 @@ async def seed_demo():
         lines = []
         for code, name, *_rest in chunk:
             p_id, _, cost, _ = pid[code]
-            qty = random.choice([10, 12, 15, 20]) if cost < 500 else 5
+            qty = secrets.choice([10, 12, 15, 20]) if cost < 500 else 5
             await receive_stock(p_id, qty, cost, number, date)
             lines.append({"product_id": p_id, "code": code, "name": name, "unit": "buc", "qty": qty, "unit_cost": cost,
                           "value": qty * cost, "vat": round(qty * cost * 0.21, 2), "lot": ""})
@@ -129,12 +128,12 @@ async def seed_demo():
     letters = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789"
     for i, (make, model, year, eng, kw, euro, fuel) in enumerate(VEHICLES):
         owner = cids[i % len(cids)] if i < 8 else cids[[2, 4, 4][i - 8]]
-        vin = "".join(random.choice(letters) for _ in range(17))
-        doc = {"client_id": owner, "vin": vin, "plate": f"B {100 + i * 7} {random.choice(['ABC', 'XYZ', 'SRV', 'DMO'])}", "make": make,
+        vin = "".join(secrets.choice(letters) for _ in range(17))
+        doc = {"client_id": owner, "vin": vin, "plate": f"B {100 + i * 7} {secrets.choice(['ABC', 'XYZ', 'SRV', 'DMO'])}", "make": make,
                "model": model, "year": year, "engine": eng, "power_kw": kw, "euro": euro, "fuel": fuel, "mileage": 40000 + i * 17000,
-               "color": "", "itp_expiry": (t0 + timedelta(days=random.randint(-10, 200))).date().isoformat(),
-               "rca_expiry": (t0 + timedelta(days=random.randint(5, 300))).date().isoformat(), "casco_expiry": "",
-               "rovinieta_expiry": (t0 + timedelta(days=random.randint(-5, 120))).date().isoformat(), "created_at": (t0 - timedelta(days=200)).isoformat()}
+               "color": "", "itp_expiry": (t0 + timedelta(days=-10 + secrets.randbelow(211))).date().isoformat(),
+               "rca_expiry": (t0 + timedelta(days=5 + secrets.randbelow(296))).date().isoformat(), "casco_expiry": "",
+               "rovinieta_expiry": (t0 + timedelta(days=-5 + secrets.randbelow(126))).date().isoformat(), "created_at": (t0 - timedelta(days=200)).isoformat()}
         vids.append((str((await db.vehicles.insert_one(doc)).inserted_id), owner, doc["mileage"]))
 
     async def make_wo(vidx, job, created, status):
@@ -143,20 +142,20 @@ async def seed_demo():
         lines = []
         for code, q in parts:
             p_id, name, cost, price = pid[code]
-            lines.append({"id": f"{random.getrandbits(40):x}", "type": "part", "description": name, "qty": q, "unit_price": price, "discount": 0,
+            lines.append({"id": secrets.token_hex(5), "type": "part", "description": name, "qty": q, "unit_price": price, "discount": 0,
                           "vat_rate": 21, "product_id": p_id, "code": code, "unit": "buc", "unit_cost": cost, "labor_category": "", "norm_source": "", "mechanic_id": ""})
         cats = {sp: mids[i] for i, (_, sp, _) in enumerate(MECHANICS)}
         for desc, cat, hrs in labors:
-            lines.append({"id": f"{random.getrandbits(40):x}", "type": "labor", "description": desc, "qty": hrs, "unit_price": s["labor_rates"][cat],
+            lines.append({"id": secrets.token_hex(5), "type": "labor", "description": desc, "qty": hrs, "unit_price": s["labor_rates"][cat],
                           "discount": 0, "vat_rate": 21, "product_id": "", "code": "", "unit": "ore", "labor_category": cat,
-                          "norm_source": random.choice(["Autodata", "HaynesPro", "RAR"]), "mechanic_id": cats[cat]})
+                          "norm_source": secrets.choice(["Autodata", "HaynesPro", "RAR"]), "mechanic_id": cats[cat]})
         seq = await next_seq("work_order")
         number = f"CL-{created.year}-{seq:05d}"
         done = status in ("finalizata", "facturata", "inchisa")
-        finished = created + timedelta(hours=random.randint(5, 30))
+        finished = created + timedelta(hours=5 + secrets.randbelow(26))
         wo = {"number": number, "client_id": cid, "vehicle_id": vid, "status": status, "mileage_in": km, "complaint": complaint,
               "diagnosis": "Confirmat la verificare" if status != "noua" else "", "mechanic_ids": list({ln["mechanic_id"] for ln in lines if ln["mechanic_id"]}),
-              "elevator": random.choice(s["elevators"][:4]) if status in ("diagnosticare", "in_lucru", "asteapta_piese", "aprobata") else "",
+              "elevator": secrets.choice(s["elevators"][:4]) if status in ("diagnosticare", "in_lucru", "asteapta_piese", "aprobata") else "",
               "promised_date": (created + timedelta(days=2)).date().isoformat(), "advisor": "Recepție Demo",
               "reception": {"fuel_level": "1/2", "observations": "", "accessories": ["Roată rezervă", "Triunghi"], "damages": [],
                             "photos": {}, "signature": "", "at": created.isoformat(), "by": "Recepție Demo"},
@@ -186,8 +185,8 @@ async def seed_demo():
                    "created_by": "Seed", "created_at": finished.isoformat()}
             ir = await db.invoices.insert_one(inv)
             await db.work_orders.update_one({"_id": r.inserted_id}, {"$set": {"invoice_id": str(ir.inserted_id), "invoiced_at": finished.isoformat()}})
-            if random.random() < 0.85:
-                method = random.choice(["numerar", "pos", "transfer"])
+            if secrets.randbelow(100) < 85:
+                method = secrets.choice(["numerar", "pos", "transfer"])
                 dt, pre = {"numerar": ("chitanta", "CH"), "pos": ("bon_pos", "POS"), "transfer": ("ordin_plata", "OP")}[method]
                 pseq = await next_seq(f"pay_{dt}")
                 pay_date = finished + timedelta(hours=2)
@@ -199,13 +198,13 @@ async def seed_demo():
                 await db.invoices.update_one({"_id": ir.inserted_id}, {"$set": {"paid_amount": totals["gross"], "status": "paid"}})
 
     for d in range(170, t0.day, -6):
-        created = t0 - timedelta(days=d, hours=random.randint(0, 5))
-        await make_wo(random.randrange(len(vids)), random.choice(JOBS), created, "inchisa" if d > 30 else "facturata")
+        created = t0 - timedelta(days=d, hours=secrets.randbelow(6))
+        await make_wo(secrets.randbelow(len(vids)), secrets.choice(JOBS), created, "inchisa" if d > 30 else "facturata")
     for d in range(t0.day - 1, 1, -1):
         for _ in range(3):
-            created = t0 - timedelta(days=d, hours=random.randint(30, 40))
+            created = t0 - timedelta(days=d, hours=30 + secrets.randbelow(11))
             if created.month == t0.month:
-                await make_wo(random.randrange(len(vids)), random.choice(JOBS), created, "facturata")
+                await make_wo(secrets.randbelow(len(vids)), secrets.choice(JOBS), created, "facturata")
     current = [("noua", 0), ("diagnosticare", 2), ("asteapta_oferta", 1), ("aprobata", 3), ("in_lucru", 1), ("in_lucru", 3),
                ("asteapta_piese", 5), ("finalizata", 4), ("finalizata", 0)]
     for i, (st, j) in enumerate(current):
@@ -217,5 +216,5 @@ async def seed_demo():
                 await db.time_entries.insert_one({"mechanic_id": mid, "type": "attendance", "start": day.isoformat(), "end": (day + timedelta(hours=8)).isoformat()})
                 await db.time_entries.insert_one({"mechanic_id": mid, "type": "work", "work_order_id": "", "work_order_number": "",
                                                   "start": (day + timedelta(minutes=30)).isoformat(),
-                                                  "end": (day + timedelta(hours=random.uniform(5.5, 7.5))).isoformat()})
+                                                  "end": (day + timedelta(minutes=330 + secrets.randbelow(121))).isoformat()})
         day += timedelta(days=1)

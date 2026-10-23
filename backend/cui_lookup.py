@@ -41,7 +41,7 @@ async def lookup_cui(raw: str) -> dict:
         return {"cui": cui, "input_had_ro": had_ro, "anaf_found": False, "vat_payer": False, "vat_number": None}
     general = item.get("date_generale", {})
     vat = item.get("inregistrare_scop_Tva", {})
-    vat_payer = vat.get("scpTVA") is True
+    vat_payer = bool(vat.get("scpTVA"))
     return {
         "cui": cui,
         "input_had_ro": had_ro,

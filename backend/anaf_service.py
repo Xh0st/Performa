@@ -1,7 +1,6 @@
 import base64
 import io
 import os
-import random
 import re
 import secrets
 import zipfile
@@ -217,7 +216,7 @@ async def send_invoice(inv: dict):
         await log("upload", False, "; ".join(errs), str(inv["_id"]), env)
         return
     if env == "simulare":
-        idx = str(random.randint(4000000000, 4999999999))
+        idx = str(4_000_000_000 + secrets.randbelow(1_000_000_000))
         await _set_ef(inv["_id"], {"status": "pending", "upload_index": idx, "xml": xml, "errors": [], "env": env, "sent_at": iso()},
                       f"Transmis (SIMULARE) – index {idx}")
         return
@@ -253,7 +252,7 @@ async def check_status(inv: dict):
     if ef.get("status") != "pending":
         return
     if env == "simulare":
-        did = str(random.randint(3000000000, 3999999999))
+        did = str(3_000_000_000 + secrets.randbelow(1_000_000_000))
         await _set_ef(inv["_id"], {"status": "ok", "download_id": did, "checked_at": iso()}, f"Validată (SIMULARE) – recipisă {did}")
         return
     try:

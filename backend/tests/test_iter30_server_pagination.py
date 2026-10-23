@@ -12,10 +12,18 @@ ENDPOINTS = ["invoices", "work-orders", "clients", "vehicles", "products", "nirs
              "supplier-returns", "payments", "warranties", "warranty-claims"]
 
 
+def owner_credentials():
+    credentials = open("/app/memory/test_credentials.md").read()
+    line = next(item for item in credentials.splitlines() if "andrei.melek@gmail.com" in item)
+    email, password = [value.strip() for value in line.lstrip("- ").split("/")[:2]]
+    return email, password
+
+
 @pytest.fixture(scope="module")
 def s():
     ses = requests.Session()
-    r = ses.post(f"{BASE}/auth/login", json={"email": "andrei.melek@gmail.com", "password": "Admin2026!"})
+    email, password = owner_credentials()
+    r = ses.post(f"{BASE}/auth/login", json={"email": email, "password": password})
     if r.status_code != 200:
         pytest.skip("login failed")
     return ses
