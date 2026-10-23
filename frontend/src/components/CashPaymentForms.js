@@ -50,7 +50,7 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
         reference,
       });
       toast.success(tr("Încasare înregistrată", "Payment recorded"));
-      if (cashOnly && ["chitanta", "bon_fiscal"].includes(response.data.doc_type)) {
+      if (cashOnly && ["chitanta", "bon_fiscal", "dispozitie_incasare"].includes(response.data.doc_type)) {
         window.open(`/print/receipt/${response.data.id}`, "_blank", "noopener,noreferrer");
       }
       setInvoiceId("");
