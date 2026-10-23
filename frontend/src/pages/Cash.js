@@ -92,17 +92,27 @@ export default function Cash() {
               <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
                 <Kpi testid="cash-opening" label={tr("Sold inițial", "Opening")} value={money(reg.opening)} />
                 <Kpi testid="cash-in" label={tr("Încasări", "Receipts")} value={money(reg.total_in)} accent="text-emerald-500" />
-                <Kpi testid="cash-out" label={tr("Depuneri bancă", "Bank deposits")} value={money(reg.total_out)} accent="text-rose-500" />
+                <Kpi testid="cash-out" label={tr("Ieșiri numerar", "Cash outflows")} value={money(reg.total_out)} accent="text-rose-500" />
                 <Kpi testid="cash-closing" label={tr("Sold final", "Closing")} value={money(reg.closing)} />
               </div>
               <Panel>
                 {!reg.entries.length ? <Empty text={tr("Nicio operațiune în numerar.", "No cash operations.")} /> : (
-                  <table className="w-full min-w-[720px] text-sm"><tbody>
+                  <>
+                  <div className="space-y-2 md:hidden" data-testid="cash-register-mobile-entries">
+                    {reg.entries.map((entry) => (
+                      <div key={entry.id} className="grid grid-cols-[1fr_auto] gap-2 border-b border-border/50 pb-2 text-xs">
+                        <div className="min-w-0"><div className="font-mono">{entry.doc_number} · {dt(entry.date)}</div><div className="truncate text-muted-foreground">{entry.client_name}</div></div>
+                        <div className={`self-center font-mono font-semibold ${entry.direction === "out" ? "text-rose-500" : "text-emerald-500"}`}>{entry.direction === "out" ? "-" : "+"}{money(entry.amount)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[720px] text-sm" data-testid="cash-register-entries-table"><tbody>
                     {reg.entries.map((e) => (
                       <tr key={e.id} className="h-10 border-b border-border/50"><td className="font-mono text-xs">{e.doc_number}</td><td>{dt(e.date)}</td><td>{e.client_name}</td>
                         <td className="font-mono text-xs">{e.invoice_ref || e.reference}</td><td className={`text-right font-mono ${e.direction === "out" ? "text-rose-500" : "text-emerald-500"}`}>{e.direction === "out" ? "-" : "+"}{money(e.amount)}</td></tr>
                     ))}
-                  </tbody></table>
+                  </tbody></table></div>
+                  </>
                 )}
               </Panel>
               <CashDepositForm available={reg.closing} onSaved={reloadCash} />
