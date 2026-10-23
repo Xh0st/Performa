@@ -645,8 +645,9 @@ async def cash_register_report_pdf(date_from: str, date_to: str, cash_only: bool
 @router.post("/payments/{pid}/reverse")
 async def reverse_cash_payment(pid: str, body: CashReversalIn, user=Depends(require("payments"))):
     payment = await get_or_404("payments", pid)
-    if payment.get("method") != "numerar" or payment.get("doc_type") not in {"chitanta", "bon_fiscal"}:
-        raise HTTPException(400, "Se pot storna doar chitanțe și bonuri fiscale")
+    allowed_documents = {"chitanta", "bon_fiscal", "dispozitie_incasare"}
+    if payment.get("method") != "numerar" or payment.get("doc_type") not in allowed_documents:
+        raise HTTPException(400, "Se pot storna doar documente de încasare în numerar")
     if payment.get("reversed_at"):
         raise HTTPException(400, "Documentul este deja stornat")
     if not body.reason.strip():
