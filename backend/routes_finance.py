@@ -24,6 +24,7 @@ CASH_DOCUMENTS = {
     "receipt": ("chitanta", "CH"),
     "fiscal_receipt": ("bon_fiscal", "BF"),
     "collection_order": ("dispozitie_incasare", "DI"),
+    "external_receipt": ("chitanta_externa", "CE"),
 }
 
 
@@ -323,6 +324,8 @@ class PaymentIn(BaseModel):
     amount: float
     method: str
     cash_document: str = "receipt"
+    external_issuer: str = ""
+    external_number: str = ""
     reference: str = ""
 
 
@@ -424,6 +427,9 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
     if body.method == "numerar":
         if body.cash_document not in CASH_DOCUMENTS:
             raise HTTPException(400, "Document de numerar invalid")
+        if body.cash_document == "external_receipt":
+            if not body.external_issuer.strip() or not body.external_number.strip():
+                raise HTTPException(400, "Emitentul și numărul chitanței externe sunt obligatorii")
         if body.cash_document == "fiscal_receipt" and client.get("type") != "pf":
             raise HTTPException(400, "Bonul fiscal este disponibil numai pentru persoane fizice")
         cash_limit = 5_000 if client.get("type") == "pj" else 10_000
@@ -463,6 +469,8 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
         "doc_type": doc_type,
         "doc_number": f"{prefix}-{seq:06d}",
         "reference": body.reference,
+        "external_issuer": body.external_issuer.strip(),
+        "external_number": body.external_number.strip(),
         "date": iso(),
         "cashier": user["name"],
     }

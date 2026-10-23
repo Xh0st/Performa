@@ -20,6 +20,8 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState(cashOnly ? CASH_METHOD : "pos");
   const [cashDocument, setCashDocument] = useState("receipt");
+  const [externalIssuer, setExternalIssuer] = useState("");
+  const [externalNumber, setExternalNumber] = useState("");
   const [reference, setReference] = useState("");
   const [saving, setSaving] = useState(false);
   const { data: invoicesData } = useApi(
@@ -47,6 +49,8 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
         amount: Number(amount),
         method,
         cash_document: cashDocument,
+        external_issuer: externalIssuer,
+        external_number: externalNumber,
         reference,
       });
       toast.success(tr("Încasare înregistrată", "Payment recorded"));
@@ -117,8 +121,15 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
             <option value="receipt">{tr("Chitanță", "Receipt")}</option>
             {client?.type === "pf" && <option value="fiscal_receipt">{tr("Bon fiscal", "Fiscal receipt")}</option>}
             <option value="collection_order">{tr("Dispoziție de încasare", "Collection order")}</option>
+            <option value="external_receipt">{tr("Chitanță externă", "External receipt")}</option>
           </NativeSelect>
         </Field>
+      )}
+      {cashOnly && cashDocument === "external_receipt" && (
+        <>
+          <Field label={tr("Emitent chitanță", "Receipt issuer")}><Input data-testid="external-receipt-issuer-input" value={externalIssuer} onChange={(event) => setExternalIssuer(event.target.value)} /></Field>
+          <Field label={tr("Număr chitanță", "Receipt number")}><Input data-testid="external-receipt-number-input" value={externalNumber} onChange={(event) => setExternalNumber(event.target.value)} /></Field>
+        </>
       )}
       {cashOnly && client && (
         <div className="flex items-end pb-2 text-xs text-muted-foreground" data-testid="cash-payment-limit-info">
@@ -145,7 +156,7 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
       <div className="flex items-end">
         <Button
           data-testid={`payment-entry-${cashOnly ? "cash" : "cashless"}-save-button`}
-          disabled={saving || !clientId || !amount}
+          disabled={saving || !clientId || !amount || (cashDocument === "external_receipt" && (!externalIssuer || !externalNumber))}
           onClick={save}
         >
           {tr("Înregistrează", "Record")}
@@ -250,7 +261,7 @@ export function CashPayoutForm({ available, onSaved }) {
             value={beneficiary}
             onChange={(event) => setBeneficiary(event.target.value)}
           >
-            <option value="">{tr("Selectează furnizorul", "Select supplier")}</option>
+            <option value="">{tr("Selectează furnizorul (opțional)", "Select supplier (optional)")}</option>
             {(suppliers || []).map((supplier) => (
               <option key={supplier.id} value={supplier.name}>{supplier.name}</option>
             ))}

@@ -18,6 +18,7 @@ export const DOCS = {
   chitanta: ["Chitanță", "Receipt"],
   bon_fiscal: ["Bon fiscal", "Fiscal receipt"],
   dispozitie_incasare: ["Dispoziție de încasare", "Collection order"],
+  chitanta_externa: ["Chitanță externă", "External receipt"],
   bon_pos: ["Bon POS", "POS slip"],
   ordin_plata: ["Ordin de plată", "Payment order"],
   confirmare_online: ["Confirmare online", "Online confirmation"],
