@@ -90,11 +90,16 @@ export default function ClientDetail() {
         <Panel title={tr("Vehicule", "Vehicles")} actions={<Button size="sm" variant="outline" data-testid="client-add-vehicle-button" onClick={() => setAddV(true)}><Plus className="h-4 w-4" /></Button>}>
           <div className="space-y-2">
             {c.vehicles.map((v) => (
-              <div key={v.id} className="flex items-center gap-3 rounded border px-3 py-2">
+              <Link
+                key={v.id}
+                to={`/vehicles/${v.id}`}
+                data-testid={`client-vehicle-link-${v.id}`}
+                className="flex items-center gap-3 rounded border px-3 py-2 transition-colors duration-200 hover:border-primary/60 hover:bg-accent/60"
+              >
                 <Car className="h-4 w-4 text-primary" />
                 <div className="min-w-0 flex-1"><div className="text-sm font-medium">{v.make} {v.model} · {v.year}</div><div className="truncate font-mono text-[11px] text-muted-foreground">{v.vin}</div></div>
                 <span className="rounded-sm border bg-background px-2 py-0.5 font-mono text-xs">{v.plate}</span>
-              </div>
+              </Link>
             ))}
             {!c.vehicles.length && <Empty text={tr("Fără vehicule", "No vehicles")} />}
           </div>

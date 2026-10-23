@@ -12,6 +12,7 @@ import Dashboard from "@/pages/Dashboard";
 import Clients from "@/pages/Clients";
 import ClientDetail from "@/pages/ClientDetail";
 import Vehicles from "@/pages/Vehicles";
+import VehicleDetail from "@/pages/VehicleDetail";
 import Reception from "@/pages/Reception";
 import WorkOrders from "@/pages/WorkOrders";
 import WorkOrderDetail from "@/pages/WorkOrderDetail";
@@ -91,6 +92,7 @@ function App() {
               <Route path="/clients" element={g("crm", <Clients />)} />
               <Route path="/clients/:id" element={g("crm", <ClientDetail />)} />
               <Route path="/vehicles" element={g("vehicles", <Vehicles />)} />
+              <Route path="/vehicles/:id" element={g("vehicles", <VehicleDetail />)} />
               <Route path="/reception" element={g("reception", <Reception />)} />
               <Route path="/work-orders" element={g("workorders", <WorkOrders />)} />
               <Route path="/work-orders/:id" element={g("workorders", <WorkOrderDetail />)} />
