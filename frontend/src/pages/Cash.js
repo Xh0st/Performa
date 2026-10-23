@@ -54,7 +54,7 @@ export default function Cash() {
           <TabsTrigger value="register" data-testid="cash-tab-register">{tr("Registru de casă", "Cash register")}</TabsTrigger>
           <TabsTrigger value="cash" data-testid="cash-tab-cash-payments">{tr("Încasări numerar", "Cash receipts")}</TabsTrigger>
           <TabsTrigger value="cashless" data-testid="cash-tab-cashless-payments">POS / OP</TabsTrigger>
-          <TabsTrigger value="payouts" data-testid="cash-tab-payouts">{tr("Plăți & stornări", "Payouts & reversals")}</TabsTrigger>
+          <TabsTrigger value="payouts" data-testid="cash-tab-payouts">{tr("Plăți", "Payouts")}</TabsTrigger>
           <TabsTrigger value="registers" data-testid="cash-tab-registers">{tr("Registre", "Registers")}</TabsTrigger>
         </TabsList>
         </div>
