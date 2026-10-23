@@ -124,12 +124,13 @@ async def invoice_from_wo(wid: str, body: InvoiceIn, user=Depends(require("invoi
                 inv["cogs"] += await consume_fifo(ln["product_id"], ln["qty"], ref)
         inv["cogs"] = round(inv["cogs"], 2)
     credit_warning = None
-    if body.type == "fiscal" and c.get("type") == "pj" and c.get("credit_limit") is not None:
+    if body.type == "fiscal" and c.get("type") == "pj":
         position = await client_credit_position(w["client_id"])
         projected = round(position["outstanding"] + totals["gross"], 2)
-        if projected > c["credit_limit"]:
+        credit_limit = float(c.get("credit_limit") or 0)
+        if projected > credit_limit:
             credit_warning = {
-                "limit": c["credit_limit"],
+                "limit": credit_limit,
                 "outstanding": position["outstanding"],
                 "projected": projected,
             }

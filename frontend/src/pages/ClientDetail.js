@@ -76,7 +76,7 @@ export default function ClientDetail() {
             <Info label="GDPR" value={c.gdpr_consent ? tr("Acord dat", "Consented") : tr("Fără acord", "No consent")} />
             {c.is_fleet && <Info label={tr("Limită buget", "Budget limit")} value={money(c.budget_limit)} mono />}
             {c.type === "pj" && <Info label={tr("Condiție plată", "Payment condition")} value={paymentCondition} mono />}
-            {c.type === "pj" && <Info label={tr("Limită credit", "Credit limit")} value={c.credit_limit === null || c.credit_limit === undefined ? "—" : money(c.credit_limit)} mono />}
+            {c.type === "pj" && <Info label={tr("Limită credit", "Credit limit")} value={money(c.credit_limit ?? 0)} mono />}
           </div>
         </Panel>
         <Panel title={tr("Sumar financiar", "Financial summary")}>

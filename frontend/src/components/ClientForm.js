@@ -23,7 +23,7 @@ const EMPTY = {
   is_fleet: false,
   budget_limit: 0,
   payment_terms_days: null,
-  credit_limit: null,
+  credit_limit: 0,
   gdpr_consent: false,
   notes: "",
 };
@@ -85,7 +85,7 @@ export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
                 ...f,
                 type: event.target.value,
                 payment_terms_days: event.target.value === "pj" ? f.payment_terms_days : null,
-                credit_limit: event.target.value === "pj" ? f.credit_limit : null,
+                credit_limit: event.target.value === "pj" ? f.credit_limit ?? 0 : null,
               })}
             >
               <option value="pf">{tr("Persoană fizică", "Individual")}</option>
@@ -131,8 +131,8 @@ export default function ClientForm({ open, onOpenChange, initial, onSaved }) {
                   type="number"
                   min="0"
                   step="0.01"
-                  placeholder="Fără limită"
-                  value={f.credit_limit ?? ""}
+                  placeholder="0,00"
+                  value={f.credit_limit ?? 0}
                   onChange={set("credit_limit")}
                 />
               </Field>

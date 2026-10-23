@@ -28,7 +28,7 @@ class ClientIn(BaseModel):
     is_fleet: bool = False
     budget_limit: float = 0
     payment_terms_days: Optional[int] = None
-    credit_limit: Optional[float] = None
+    credit_limit: Optional[float] = 0
     gdpr_consent: bool = False
     notes: str = ""
 
@@ -79,6 +79,8 @@ def validate_client(b: ClientIn):
     if b.type == "pj" and b.payment_terms_days is not None:
         if b.payment_terms_days < 1 or b.payment_terms_days > 365:
             raise HTTPException(400, "Termenul de plată trebuie să fie între 1 și 365 zile")
+    if b.type == "pj" and b.credit_limit is None:
+        b.credit_limit = 0
     if b.type == "pj" and b.credit_limit is not None and b.credit_limit < 0:
         raise HTTPException(400, "Limita de credit nu poate fi negativă")
 
@@ -145,6 +147,8 @@ async def create_client(body: ClientIn, user=Depends(require("crm"))):
 @router.get("/clients/{cid}")
 async def get_client(cid: str, user=Depends(require("crm"))):
     c = ser(await get_or_404("clients", cid))
+    if c.get("type") == "pj" and c.get("credit_limit") is None:
+        c["credit_limit"] = 0
     c["vehicles"] = [ser(v) for v in await db.vehicles.find({"client_id": cid}).to_list(500)]
     c["work_order_count"] = await db.work_orders.count_documents({"client_id": cid})
     c["invoice_count"] = await db.invoices.count_documents({"client_id": cid, "type": "fiscal"})
