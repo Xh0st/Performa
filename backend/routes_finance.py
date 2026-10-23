@@ -518,7 +518,17 @@ async def cash_register(day: str = "", user=Depends(require("payments"))):
         for item in receipts
     ]
     entries.extend(
-        {**ser(item), "direction": "out", "label": "depunere_banca", "client_name": "Depunere bancă"}
+        {
+            **ser(item),
+            "direction": "out",
+            "label": item["kind"],
+            "client_name": {
+                "bank_deposit": "Depunere bancă",
+                "receipt_reversal": f"Stornare document {item.get('reference', '')}",
+                "expense_settlement": item.get("beneficiary", "Decont cheltuieli"),
+                "payment_order": item.get("beneficiary", "Dispoziție de plată"),
+            }.get(item["kind"], item.get("beneficiary", "Ieșire numerar")),
+        }
         for item in deposits
     )
     entries.sort(key=lambda item: item["date"])

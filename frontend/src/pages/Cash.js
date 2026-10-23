@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Printer } from "lucide-react";
-import { api, downloadFile, useApi } from "@/lib/api";
+import { api, downloadFile, errMsg, useApi } from "@/lib/api";
+import { toast } from "sonner";
 import { useLang } from "@/lib/prefs";
 import { money, dt, today } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,11 @@ import { Empty, Field, Kpi, Loading, PageHeader, Panel } from "@/components/comm
 import { METHODS, DOCS } from "@/pages/InvoiceDetail";
 import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
 import { CashDepositForm, CashPayoutForm, PaymentEntryForm } from "@/components/CashPaymentForms";
+
+const documentLabel = (translate, documentType) => {
+  const labels = DOCS[documentType] || [documentType || "Document", documentType || "Document"];
+  return translate(labels[0], labels[1]);
+};
 
 export default function Cash() {
   const { tr } = useLang();
@@ -40,10 +46,15 @@ export default function Cash() {
   };
   const reloadCashless = () => reloadCashlessPayments();
   const reverseReceipt = async () => {
-    await api.post(`/payments/${reversePayment.id}/reverse`, { reason: reverseReason });
-    setReversePayment(null);
-    setReverseReason("");
-    reloadCash();
+    try {
+      await api.post(`/payments/${reversePayment.id}/reverse`, { reason: reverseReason });
+      toast.success(tr("Document stornat", "Document reversed"));
+      setReversePayment(null);
+      setReverseReason("");
+      reloadCash();
+    } catch (error) {
+      toast.error(errMsg(error));
+    }
   };
   return (
     <div data-testid="cash-page">
@@ -97,7 +108,7 @@ export default function Cash() {
                 </tr></thead><tbody>
                   {(cashPaymentsData.items || []).map((p) => (
                     <tr key={p.id} className="h-10 border-b border-border/50">
-                      <td className="px-2"><div className="font-mono text-xs">{p.doc_number}</div><div className="text-[11px] text-muted-foreground">{tr(...(DOCS[p.doc_type] || [p.doc_type, p.doc_type]))}</div></td>
+                      <td className="px-2"><div className="font-mono text-xs">{p.doc_number}</div><div className="text-[11px] text-muted-foreground">{documentLabel(tr, p.doc_type)}</div></td>
                       <td className="px-2">{dt(p.date)}</td><td className="px-2">{tr(...METHODS[p.method])}</td><td className="px-2">{p.client_name}</td>
                       <td className="px-2"><Link className="font-mono text-xs text-primary" to={`/invoices/${p.invoice_id}`}>{p.invoice_ref}</Link></td>
                       <td className="px-2 text-right font-mono">{money(p.amount)}</td>
