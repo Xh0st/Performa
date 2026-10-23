@@ -10,23 +10,33 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader, Panel, Kpi, Loading, Empty } from "@/components/common";
 import { METHODS, DOCS } from "@/pages/InvoiceDetail";
 import { PAGE_SIZE, PaginationControls, useServerPagination } from "@/components/Pagination";
+import { CashDepositForm, PaymentEntryForm } from "@/components/CashPaymentForms";
 
 export default function Cash() {
   const { tr } = useLang();
   const [day, setDay] = useState(today());
-  const { data: reg } = useApi(`/cash-register?day=${day}`, [day]);
-  const pagination = useServerPagination("payments");
-  const { data: paymentsData } = useApi(
-    `/payments?page=${pagination.page}&page_size=${PAGE_SIZE}`,
+  const { data: reg, reload: reloadRegister } = useApi(`/cash-register?day=${day}`);
+  const cashPagination = useServerPagination("cash-payments");
+  const cashlessPagination = useServerPagination("cashless-payments");
+  const { data: cashPaymentsData, reload: reloadCashPayments } = useApi(
+    `/payments?method=numerar&page=${cashPagination.page}&page_size=${PAGE_SIZE}`,
   );
-  const pays = paymentsData?.items;
+  const { data: cashlessPaymentsData, reload: reloadCashlessPayments } = useApi(
+    `/payments?method=pos,transfer&page=${cashlessPagination.page}&page_size=${PAGE_SIZE}`,
+  );
+  const reloadCash = () => {
+    reloadRegister();
+    reloadCashPayments();
+  };
+  const reloadCashless = () => reloadCashlessPayments();
   return (
     <div data-testid="cash-page">
       <PageHeader eyebrow={tr("Numerar · POS · transfer · online", "Cash · POS · transfer · online")} title={tr("Încasări & registru de casă", "Payments & cash register")} />
       <Tabs defaultValue="register">
         <TabsList>
           <TabsTrigger value="register" data-testid="cash-tab-register">{tr("Registru de casă", "Cash register")}</TabsTrigger>
-          <TabsTrigger value="payments" data-testid="cash-tab-payments">{tr("Toate încasările", "All payments")}</TabsTrigger>
+          <TabsTrigger value="cash" data-testid="cash-tab-cash-payments">{tr("Încasări numerar", "Cash receipts")}</TabsTrigger>
+          <TabsTrigger value="cashless" data-testid="cash-tab-cashless-payments">POS / OP</TabsTrigger>
         </TabsList>
         <TabsContent value="register">
           <div className="mb-4 flex items-center gap-2">
@@ -43,43 +53,55 @@ export default function Cash() {
               </div>
               <Panel>
                 {!reg.entries.length ? <Empty text={tr("Nicio operațiune în numerar.", "No cash operations.")} /> : (
-                  <table className="w-full text-sm"><tbody>
+                  <table className="w-full min-w-[720px] text-sm"><tbody>
                     {reg.entries.map((e) => (
                       <tr key={e.id} className="h-10 border-b border-border/50"><td className="font-mono text-xs">{e.doc_number}</td><td>{dt(e.date)}</td><td>{e.client_name}</td>
-                        <td className="font-mono text-xs">{e.invoice_ref}</td><td className="text-right font-mono text-emerald-500">+{money(e.amount)}</td></tr>
+                        <td className="font-mono text-xs">{e.invoice_ref || e.reference}</td><td className={`text-right font-mono ${e.direction === "out" ? "text-rose-500" : "text-emerald-500"}`}>{e.direction === "out" ? "-" : "+"}{money(e.amount)}</td></tr>
                     ))}
                   </tbody></table>
                 )}
               </Panel>
+              <CashDepositForm available={reg.closing} onSaved={reloadCash} />
             </>
           )}
         </TabsContent>
-        <TabsContent value="payments">
+        <TabsContent value="cash">
           <Panel>
-            {!pays ? <Loading /> : (
+            <PaymentEntryForm cashOnly onSaved={reloadCash} />
+            {!cashPaymentsData ? <Loading /> : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="payments-table"><thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <table className="mt-4 w-full min-w-[760px] text-sm" data-testid="cash-payments-table"><thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-2 py-2">{tr("Document", "Document")}</th><th className="px-2">{tr("Data", "Date")}</th><th className="px-2">{tr("Metodă", "Method")}</th>
                   <th className="px-2">Client</th><th className="px-2">{tr("Factură", "Invoice")}</th><th className="px-2 text-right">{tr("Sumă", "Amount")}</th><th />
                 </tr></thead><tbody>
-                  {pays.map((p) => (
+                  {(cashPaymentsData.items || []).map((p) => (
                     <tr key={p.id} className="h-10 border-b border-border/50">
                       <td className="px-2"><div className="font-mono text-xs">{p.doc_number}</div><div className="text-[11px] text-muted-foreground">{tr(...DOCS[p.doc_type])}</div></td>
                       <td className="px-2">{dt(p.date)}</td><td className="px-2">{tr(...METHODS[p.method])}</td><td className="px-2">{p.client_name}</td>
                       <td className="px-2"><Link className="font-mono text-xs text-primary" to={`/invoices/${p.invoice_id}`}>{p.invoice_ref}</Link></td>
                       <td className="px-2 text-right font-mono">{money(p.amount)}</td>
-                      <td className="px-2 text-right"><Button variant="ghost" size="icon" onClick={() => window.open(`/print/receipt/${p.id}`, "_blank")}><Printer className="h-4 w-4" /></Button></td>
+                      <td className="px-2 text-right"><Button variant="ghost" size="icon" data-testid={`cash-payment-print-${p.id}`} onClick={() => window.open(`/print/receipt/${p.id}`, "_blank")}><Printer className="h-4 w-4" /></Button></td>
                     </tr>
                   ))}
                 </tbody></table>
               </div>
             )}
-            <PaginationControls
-              {...pagination}
-              total={paymentsData?.total || 0}
-              totalPages={paymentsData?.total_pages || 1}
-              testid="payments-pagination"
-            />
+            <PaginationControls {...cashPagination} total={cashPaymentsData?.total || 0} totalPages={cashPaymentsData?.total_pages || 1} testid="cash-payments-pagination" />
+          </Panel>
+        </TabsContent>
+        <TabsContent value="cashless">
+          <Panel>
+            <PaymentEntryForm onSaved={reloadCashless} />
+            {!cashlessPaymentsData ? <Loading /> : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm" data-testid="cashless-payments-table"><tbody>
+                  {(cashlessPaymentsData.items || []).map((p) => (
+                    <tr key={p.id} className="h-10 border-b border-border/50"><td className="font-mono text-xs">{p.doc_number}</td><td>{dt(p.date)}</td><td>{tr(...METHODS[p.method])}</td><td>{p.client_name}</td><td className="text-right font-mono">{money(p.amount)}</td></tr>
+                  ))}
+                </tbody></table>
+              </div>
+            )}
+            <PaginationControls {...cashlessPagination} total={cashlessPaymentsData?.total || 0} totalPages={cashlessPaymentsData?.total_pages || 1} testid="cashless-payments-pagination" />
           </Panel>
         </TabsContent>
       </Tabs>
