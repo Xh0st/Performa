@@ -151,7 +151,7 @@ function Invoice({ inv, settings }) {
 }
 
 function ReceiptDoc({ s, p }) {
-  const title = { chitanta: "Chitanță", bon_fiscal: "Bon fiscal", bon_pos: "Dovadă plată POS", ordin_plata: "Confirmare încasare OP", confirmare_online: "Confirmare plată online" }[p.doc_type];
+  const title = { chitanta: "Chitanță", bon_fiscal: "Bon fiscal", dispozitie_incasare: "Dispoziție de încasare", bon_pos: "Dovadă plată POS", ordin_plata: "Confirmare încasare OP", confirmare_online: "Confirmare plată online" }[p.doc_type];
   return (
     <>
       <Header s={s} title={title} number={p.doc_number} dateStr={dt(p.date)} />

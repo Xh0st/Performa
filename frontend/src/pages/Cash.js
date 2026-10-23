@@ -16,6 +16,7 @@ import { CashDepositForm, CashPayoutForm, PaymentEntryForm } from "@/components/
 export default function Cash() {
   const { tr } = useLang();
   const [day, setDay] = useState(today());
+  const [cashQuery, setCashQuery] = useState("");
   const [reportFrom, setReportFrom] = useState(`${today().slice(0, 8)}01`);
   const [reportTo, setReportTo] = useState(today());
   const [reversePayment, setReversePayment] = useState(null);
@@ -24,7 +25,7 @@ export default function Cash() {
   const cashPagination = useServerPagination("cash-payments");
   const cashlessPagination = useServerPagination("cashless-payments");
   const { data: cashPaymentsData, reload: reloadCashPayments } = useApi(
-    `/payments?method=numerar&page=${cashPagination.page}&page_size=${PAGE_SIZE}`,
+    `/payments?method=numerar&q=${encodeURIComponent(cashQuery)}&page=${cashPagination.page}&page_size=${PAGE_SIZE}`,
   );
   const { data: cashlessPaymentsData, reload: reloadCashlessPayments } = useApi(
     `/payments?method=pos,transfer,online&page=${cashlessPagination.page}&page_size=${PAGE_SIZE}`,
@@ -84,6 +85,7 @@ export default function Cash() {
         <TabsContent value="cash">
           <Panel>
             <PaymentEntryForm cashOnly onSaved={reloadCash} />
+            <div className="mt-4 max-w-md"><Input data-testid="cash-payments-search-input" placeholder={tr("Caută client, CUI, nr. chitanță sau bon fiscal…", "Search client, tax ID or receipt number…")} value={cashQuery} onChange={(event) => setCashQuery(event.target.value)} /></div>
             {!cashPaymentsData ? <Loading /> : (
               <div className="overflow-x-auto">
                 <table className="mt-4 w-full min-w-[760px] text-sm" data-testid="cash-payments-table"><thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">

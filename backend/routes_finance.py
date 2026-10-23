@@ -23,6 +23,7 @@ DOC_BY_METHOD = {
 CASH_DOCUMENTS = {
     "receipt": ("chitanta", "CH"),
     "fiscal_receipt": ("bon_fiscal", "BF"),
+    "collection_order": ("dispozitie_incasare", "DI"),
 }
 
 
@@ -455,6 +456,7 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
 async def list_payments(
     day: str = "",
     method: str = "",
+    q: str = "",
     page: int = 0,
     page_size: int = 20,
     user=Depends(require("payments")),
@@ -468,6 +470,9 @@ async def list_payments(
     if method:
         methods = [value for value in method.split(",") if value]
         flt["method"] = {"$in": methods} if len(methods) > 1 else methods[0]
+    if q.strip():
+        rx = {"$regex": re.escape(q.strip()), "$options": "i"}
+        flt["$or"] = [{"client_name": rx}, {"doc_number": rx}, {"invoice_ref": rx}]
     if not page:
         rows = await db.payments.find(flt).sort("date", -1).to_list(2000)
         return [ser(item) for item in rows]

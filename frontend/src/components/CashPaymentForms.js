@@ -116,6 +116,7 @@ export function PaymentEntryForm({ cashOnly = false, onSaved }) {
           >
             <option value="receipt">{tr("Chitanță", "Receipt")}</option>
             {client?.type === "pf" && <option value="fiscal_receipt">{tr("Bon fiscal", "Fiscal receipt")}</option>}
+            <option value="collection_order">{tr("Dispoziție de încasare", "Collection order")}</option>
           </NativeSelect>
         </Field>
       )}

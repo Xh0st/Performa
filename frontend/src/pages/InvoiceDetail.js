@@ -46,6 +46,7 @@ function PayDialog({ inv, open, onOpenChange, onSaved }) {
               <NativeSelect data-testid="payment-cash-document-select" value={f.cash_document} onChange={(e) => setF({ ...f, cash_document: e.target.value })}>
                 <option value="receipt">{tr("Chitanță", "Receipt")}</option>
                 {!inv.buyer?.cui && <option value="fiscal_receipt">{tr("Bon fiscal", "Fiscal receipt")}</option>}
+                <option value="collection_order">{tr("Dispoziție de încasare", "Collection order")}</option>
               </NativeSelect>
             </Field>
           )}
