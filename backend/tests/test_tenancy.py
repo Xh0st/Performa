@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 import requests
+from bson import ObjectId
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -213,7 +214,7 @@ def test_cross_tenant_by_id_fail_closed(q1):
               ("put", f"/appointments/{demo['appointments']}"), ("put", f"/warranty-claims/{demo['warranty_claims']}"),
               ("get", f"/payments/{demo['payments']}"), ("get", f"/nirs/{demo['nirs']}"),
               ("get", f"/warranties/invoices/{demo['invoices']}"), ("post", f"/invoices/from-work-order/{demo['work_orders']}")]
-    before = {c: run(db[c].find_one({"_id": __import__("bson").ObjectId(i)})) for c, i in demo.items()}
+    before = {c: run(db[c].find_one({"_id": ObjectId(i)})) for c, i in demo.items()}
     bad = []
     for m, p in checks:
         r = getattr(q1, m)(f"{BASE}{p}", json={} if m in ("put", "post") else None)
@@ -221,7 +222,7 @@ def test_cross_tenant_by_id_fail_closed(q1):
             bad.append((m, p, r.status_code, r.text[:80]))
         # 422 for PUT/POST is validation-before-lookup; verify data untouched below
     for c, i in demo.items():
-        after = run(db[c].find_one({"_id": __import__("bson").ObjectId(i)}))
+        after = run(db[c].find_one({"_id": ObjectId(i)}))
         assert after == before[c], f"demo {c} modified"
     assert not bad, bad
 

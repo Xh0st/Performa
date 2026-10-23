@@ -198,8 +198,8 @@ export default function WorkOrderDetail() {
           <TabsContent value="history">
             <Panel>
               <ol className="relative ml-2 border-l">
-                {[...wo.status_history].reverse().map((h, i) => (
-                  <li key={i} className="mb-4 ml-4">
+                {[...wo.status_history].reverse().map((h) => (
+                  <li key={`${h.at}-${h.status}-${h.by}-${h.note || ""}`} className="mb-4 ml-4">
                     <span className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border-2 border-primary bg-background" />
                     <div className="flex items-center gap-2"><StatusBadge status={h.status} /><span className="font-mono text-xs text-muted-foreground">{dt(h.at)}</span></div>
                     <div className="mt-1 text-sm">{h.by}{h.note ? ` — ${h.note}` : ""}</div>

@@ -32,17 +32,21 @@ export default function EfacturaSettings() {
   const { data, setData } = useApi("/efactura/config");
   const { data: logs, reload: reloadLogs } = useApi("/efactura/logs");
   const [f, setF] = useState(null);
+  const oauthState = sp.get("oauth");
   useEffect(() => {
     if (data) setF({ environment: data.environment, client_id: data.client_id, client_secret: "", redirect_uri: data.redirect_uri, auto_send: data.auto_send });
   }, [data]);
   useEffect(() => {
-    const o = sp.get("oauth");
-    if (o) {
-      o === "ok" ? toast.success(tr("Autorizare SPV reușită", "SPV authorization successful"), { id: "oauth" }) : toast.error(tr("Autorizare SPV eșuată – vezi jurnalul", "SPV authorization failed – see log"), { id: "oauth" });
+    if (oauthState) {
+      oauthState === "ok"
+        ? toast.success(tr("Autorizare SPV reușită", "SPV authorization successful"), { id: "oauth" })
+        : toast.error(
+            tr("Autorizare SPV eșuată – vezi jurnalul", "SPV authorization failed – see log"),
+            { id: "oauth" },
+          );
       setSp({});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [oauthState, setSp, tr]);
   if (!data || !f) return <Loading />;
 
   const run = async (fn, msg) => {

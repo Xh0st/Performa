@@ -56,9 +56,9 @@ export default function EfacturaPanel({ inv, setData, reload }) {
         <Button variant="outline" size="sm" data-testid="efactura-refresh-button" disabled={ef.status !== "pending"} onClick={() => act("refresh", tr("Stare interogată", "Status checked"))}><RefreshCw className="mr-1 h-4 w-4" />{tr("Verifică stare / recipisă", "Check status / receipt")}</Button>
         {ef.has_receipt && <Button variant="outline" size="sm" data-testid="efactura-receipt-button" onClick={() => dl(`/invoices/${inv.id}/efactura/receipt`, `recipisa_${inv.series}${inv.number}.zip`)}><Download className="mr-1 h-4 w-4" />{tr("Descarcă recipisa ZIP (semnătură MF)", "Download signed receipt ZIP")}</Button>}
       </div>
-      {!!ef.errors?.length && <div data-testid="efactura-errors" className="mt-3 rounded border border-rose-500/40 bg-rose-500/10 p-2 text-xs text-rose-500">{ef.errors.map((e, i) => <div key={i}>• {e}</div>)}</div>}
+      {!!ef.errors?.length && <div data-testid="efactura-errors" className="mt-3 rounded border border-rose-500/40 bg-rose-500/10 p-2 text-xs text-rose-500">{ef.errors.map((error) => <div key={error}>• {error}</div>)}</div>}
       {ef.env === "simulare" && <p className="mt-3 rounded border border-yellow-500/30 bg-yellow-500/10 p-2 text-[11px] text-yellow-600 dark:text-yellow-400">{tr("Transmis în mod SIMULARE – fără valoare fiscală. Configurați mediul în Administrare › eFactura.", "Sent in SIMULATION mode – no fiscal value. Configure in Administration › e-Invoice.")}</p>}
-      <div className="mt-3 space-y-1">{(ef.history || []).map((h, i) => <div key={i} className="text-[11px]"><span className="font-mono text-muted-foreground">{dt(h.at)}</span> · {h.event}</div>)}</div>
+      <div className="mt-3 space-y-1">{(ef.history || []).map((h) => <div key={`${h.at}-${h.event}`} className="text-[11px]"><span className="font-mono text-muted-foreground">{dt(h.at)}</span> · {h.event}</div>)}</div>
     </Panel>
   );
 }

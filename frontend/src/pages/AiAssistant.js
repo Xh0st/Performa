@@ -31,7 +31,7 @@ export default function AiAssistant() {
     try {
       const res = await fetch(`${API_URL}/ai/stream`, {
         method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("erp_token") || ""}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode, message, vehicle_id: vehicleId, lang }),
       });
       if (!res.ok) throw new Error((await res.json()).detail || res.statusText);

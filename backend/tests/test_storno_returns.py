@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import pytest
 import requests
 import fitz
+from bson import ObjectId
 
 sys.path.insert(0, "/app/backend")
 sys.path.insert(0, "/app/backend/tests")
@@ -34,7 +35,7 @@ def prod(s, pid):
 
 
 def stock(s, st, key):
-    return mdb().products.find_one({"_id": __import__("bson").ObjectId(st[key])})["stock_qty"]
+    return mdb().products.find_one({"_id": ObjectId(st[key])})["stock_qty"]
 
 
 def moves(st, key, ref):

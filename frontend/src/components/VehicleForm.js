@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ScanLine, Loader2 } from "lucide-react";
 import { api, errMsg, useApi } from "@/lib/api";
@@ -38,7 +38,7 @@ function ListSelect({ label, options, value, onChange, disabled, testid }) {
 
 function useVinDecode(f, setF, enabled) {
   const [state, setState] = useState(null);
-  const decode = async (vin) => {
+  const decode = useCallback(async (vin) => {
     setState({ loading: true });
     try {
       const { data } = await api.get(`/vin/decode/${encodeURIComponent(vin)}`);
@@ -55,11 +55,11 @@ function useVinDecode(f, setF, enabled) {
     } catch (e) {
       setState({ error: errMsg(e) });
     }
-  };
+  }, [setF]);
+
   useEffect(() => {
     if (enabled && f.vin.length === 17) decode(f.vin);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [f.vin, enabled]);
+  }, [decode, enabled, f.vin]);
   return { state, decode };
 }
 

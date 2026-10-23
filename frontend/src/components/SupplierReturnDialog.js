@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Field, NativeSelect } from "@/components/common";
 
-const EMPTY_LINE = { product_id: "", qty: 1 };
+const createFreeLine = () => ({ row_id: window.crypto.randomUUID(), product_id: "", qty: 1 });
 
 function NirLines({ nirId, qty, setQty }) {
   const { tr } = useLang();
@@ -41,7 +41,7 @@ function FreeLines({ lines, setLines }) {
   return (
     <div className="space-y-2">
       {lines.map((l, i) => (
-        <div key={i} className="grid grid-cols-12 gap-2">
+        <div key={l.row_id} className="grid grid-cols-12 gap-2">
           <NativeSelect data-testid={`return-line-${i}-product`} className="col-span-8" value={l.product_id} onChange={(e) => set(i, "product_id", e.target.value)}>
             <option value="">—</option>{(products || []).filter((p) => p.stock_qty > 0).map((p) => <option key={p.id} value={p.id}>{p.code} · {p.name} ({tr("stoc", "stock")} {num(p.stock_qty)})</option>)}
           </NativeSelect>
@@ -49,7 +49,7 @@ function FreeLines({ lines, setLines }) {
           <Button variant="ghost" size="icon" className="col-span-1" onClick={() => setLines(lines.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-rose-500" /></Button>
         </div>
       ))}
-      <Button variant="outline" size="sm" data-testid="return-add-line-button" onClick={() => setLines([...lines, EMPTY_LINE])}><Plus className="mr-1 h-3 w-3" />{tr("Linie", "Line")}</Button>
+      <Button variant="outline" size="sm" data-testid="return-add-line-button" onClick={() => setLines([...lines, createFreeLine()])}><Plus className="mr-1 h-3 w-3" />{tr("Linie", "Line")}</Button>
     </div>
   );
 }
@@ -60,14 +60,16 @@ export default function SupplierReturnDialog({ open, onOpenChange, onSaved, pres
   const { data: nirs } = useApi(open ? "/nirs" : null, [open]);
   const [f, setF] = useState({ supplier_id: preset?.supplier_id || "", nir_id: preset?.id || "", reason: "", date: today() });
   const [qty, setQty] = useState({});
-  const [lines, setLines] = useState([EMPTY_LINE]);
+  const [lines, setLines] = useState(() => [createFreeLine()]);
   const [busy, setBusy] = useState(false);
   const supNirs = (nirs || []).filter((n) => n.supplier_id === f.supplier_id);
   const save = async () => {
     setBusy(true);
     try {
       const body = f.nir_id ? Object.entries(qty).filter(([, q]) => Number(q) > 0).map(([product_id, q]) => ({ product_id, qty: Number(q) }))
-        : lines.filter((l) => l.product_id).map((l) => ({ product_id: l.product_id, qty: Number(l.qty) }));
+        : lines
+          .filter((line) => line.product_id)
+          .map(({ product_id, qty }) => ({ product_id, qty: Number(qty) }));
       const r = await api.post("/supplier-returns", { ...f, date: new Date(f.date).toISOString(), lines: body });
       toast.success(`${tr("Retur înregistrat, stoc scăzut", "Return saved, stock reduced")}: ${r.data.number}`);
       onSaved();

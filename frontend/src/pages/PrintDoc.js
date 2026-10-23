@@ -167,7 +167,7 @@ function NirDoc({ s, n }) {
       <Header s={s} title="Notă de intrare-recepție" number={n.number} dateStr={date(n.date)} />
       <div className="mb-4 text-[12px]"><b>Furnizor:</b> {n.supplier_name} · <b>Factură:</b> {n.invoice_no || "—"} · <b>Aviz:</b> {n.aviz_no || "—"} · <b>Gestiune:</b> {n.warehouse}</div>
       <table className="w-full border-collapse"><thead><tr>{["Nr.", "Cod", "Denumire", "UM", "Cant.", "Preț achiziție", "Valoare", "TVA"].map((h) => <th key={h} className={S.th}>{h}</th>)}</tr></thead>
-        <tbody>{n.lines.map((l, i) => <tr key={i}><td className={S.td}>{i + 1}</td><td className={S.td}>{l.code}</td><td className={S.td}>{l.name}</td><td className={S.td}>{l.unit}</td>
+        <tbody>{n.lines.map((l, i) => <tr key={l.id || `${l.code}-${l.name}-${l.unit}`}><td className={S.td}>{i + 1}</td><td className={S.td}>{l.code}</td><td className={S.td}>{l.name}</td><td className={S.td}>{l.unit}</td>
           <td className={S.tdr}>{num(l.qty)}</td><td className={S.tdr}>{f2(l.unit_cost)}</td><td className={S.tdr}>{f2(l.value)}</td><td className={S.tdr}>{f2(l.vat)}</td></tr>)}</tbody></table>
       <Totals t={{ net: n.total, vat: n.total_vat, gross: n.total + n.total_vat }} />
       <Sign labels={["Comisia de recepție", "Gestionar"]} />
@@ -181,7 +181,7 @@ function ReturnDoc({ s, r }) {
       <Header s={s} title="Aviz retur către furnizor" number={r.number} dateStr={date(r.date)} />
       <div className="mb-4 text-[12px]"><b>Furnizor:</b> {r.supplier_name} {r.supplier_cui && `(CUI ${r.supplier_cui})`} · <b>NIR origine:</b> {r.nir_number || "—"} · <b>Factură furnizor:</b> {r.nir_invoice_no || "—"}<br /><b>Motiv retur:</b> {r.reason}</div>
       <table className="w-full border-collapse"><thead><tr>{["Nr.", "Cod", "Denumire", "UM", "Cant.", "Preț achiziție", "Valoare", "TVA"].map((h) => <th key={h} className={S.th}>{h}</th>)}</tr></thead>
-        <tbody>{r.lines.map((l, i) => <tr key={i}><td className={S.td}>{i + 1}</td><td className={S.td}>{l.code}</td><td className={S.td}>{l.name}</td><td className={S.td}>{l.unit}</td>
+        <tbody>{r.lines.map((l, i) => <tr key={l.id || `${l.code}-${l.name}-${l.unit}`}><td className={S.td}>{i + 1}</td><td className={S.td}>{l.code}</td><td className={S.td}>{l.name}</td><td className={S.td}>{l.unit}</td>
           <td className={S.tdr}>{num(l.qty)}</td><td className={S.tdr}>{f2(l.unit_cost)}</td><td className={S.tdr}>{f2(l.value)}</td><td className={S.tdr}>{f2(l.vat)}</td></tr>)}</tbody></table>
       <Totals t={{ net: r.total, vat: r.total_vat, gross: r.total + r.total_vat }} />
       <Sign labels={["Predat — Gestionar", "Primit — Delegat furnizor"]} />

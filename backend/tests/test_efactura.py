@@ -3,6 +3,7 @@
 import os
 import time
 import copy
+import secrets
 from urllib.parse import urlparse, parse_qs
 import pytest
 import requests
@@ -16,12 +17,22 @@ BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 CRON = os.environ["WEBHOOK_CRON_SECRET"]
 INV_A = "6ad3d750afe314ce5bd6dfa2"  # SRV 000068 (legacy in_processing)
 INV_B = "6ad3e0ca352d37604d8ab2e4"  # SRV 000069 (legacy in_processing)
+TEST_CLIENT_ID = "test-client-id"
+TEST_CLIENT_SECRET = secrets.token_urlsafe(24)
+
+
+def owner_credentials():
+    credentials = open("/app/memory/test_credentials.md").read()
+    line = next(line for line in credentials.splitlines() if "andrei.melek@gmail.com" in line)
+    email, password = [value.strip() for value in line.lstrip("- ").split("/")[:2]]
+    return email, password
 
 
 @pytest.fixture(scope="module")
 def s():
     ss = requests.Session()
-    r = ss.post(f"{BASE}/auth/login", json={"email": "andrei.melek@gmail.com", "password": "Admin2026!"})
+    email, password = owner_credentials()
+    r = ss.post(f"{BASE}/auth/login", json={"email": email, "password": password})
     if r.status_code != 200:
         pytest.skip("login failed")
     ss.headers["Authorization"] = f"Bearer {r.json()['token']}"
@@ -74,31 +85,31 @@ class TestConfig:
         assert d["api_base"] == "—"
 
     def test_test_env_and_secret_hidden(self, s):
-        d = put_cfg(s, "test", client_id="TEST_CLIENT_ID", client_secret="TEST_SECRET").json()
+        d = put_cfg(s, "test", client_id=TEST_CLIENT_ID, client_secret=TEST_CLIENT_SECRET).json()
         assert d["api_base"] == "https://api.anaf.ro/test/FCTEL/rest"
         assert d["status_text"].startswith("Neconectat - Test (ANAF Sandbox)")
         assert d["has_secret"] is True and "client_secret" not in d
-        assert "TEST_SECRET" not in str(d)
+        assert TEST_CLIENT_SECRET not in str(d)
         g = s.get(f"{BASE}/efactura/config").json()
-        assert g["client_id"] == "TEST_CLIENT_ID" and g["has_secret"] is True
+        assert g["client_id"] == TEST_CLIENT_ID and g["has_secret"] is True
 
     def test_secret_kept_when_null(self, s):
-        d = put_cfg(s, "test", client_id="TEST_CLIENT_ID").json()
+        d = put_cfg(s, "test", client_id=TEST_CLIENT_ID).json()
         assert d["has_secret"] is True
 
     def test_prod_base(self, s):
-        d = put_cfg(s, "prod", client_id="TEST_CLIENT_ID").json()
+        d = put_cfg(s, "prod", client_id=TEST_CLIENT_ID).json()
         assert d["api_base"] == "https://api.anaf.ro/prod/FCTEL/rest"
         assert "Producție" in d["status_text"]
 
     def test_oauth_start_url(self, s):
-        put_cfg(s, "test", client_id="TEST_CLIENT_ID")
+        put_cfg(s, "test", client_id=TEST_CLIENT_ID)
         r = s.post(f"{BASE}/efactura/oauth/start")
         assert r.status_code == 200
         u = urlparse(r.json()["url"])
         q = parse_qs(u.query)
         assert u.netloc == "logincert.anaf.ro" and u.path == "/anaf-oauth2/v1/authorize"
-        assert q["client_id"] == ["TEST_CLIENT_ID"] and q["response_type"] == ["code"]
+        assert q["client_id"] == [TEST_CLIENT_ID] and q["response_type"] == ["code"]
         assert q["redirect_uri"][0].endswith("/api/efactura/oauth/callback")
         assert len(q["state"][0]) > 20
 
@@ -114,7 +125,7 @@ class TestConfig:
 class TestOutgoing:
     def test_test_env_without_oauth_error(self, s, mdb):
         mdb.invoices.update_one({"_id": ObjectId(INV_A)}, {"$set": {"efactura.status": "error"}})  # make re-runnable
-        put_cfg(s, "test", client_id="TEST_CLIENT_ID")
+        put_cfg(s, "test", client_id=TEST_CLIENT_ID)
         r = s.post(f"{BASE}/invoices/{INV_A}/efactura/submit")
         assert r.status_code == 200
         ef = r.json()["efactura"]

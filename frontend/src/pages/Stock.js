@@ -16,6 +16,8 @@ import NirEfacturaView from "@/components/NirEfacturaView";
 import { PaginationControls, usePagination } from "@/components/Pagination";
 
 const P_EMPTY = { code: "", name: "", oe_code: "", aftermarket_code: "", brand: "", category: "piese", unit: "buc", location: "", warehouse: "Depozit Central", sale_price: 0, min_stock: 0, vat_rate: 21, warranty_months: 24 };
+const createRowId = () => window.crypto.randomUUID();
+const createNirLine = () => ({ row_id: createRowId(), product_id: "", qty: 1, unit_cost: 0, lot: "" });
 
 function ProductDialog({ open, onOpenChange, initial, onSaved }) {
   const { tr } = useLang();
@@ -65,12 +67,22 @@ function NirDialog({ open, onOpenChange, onSaved }) {
   const { tr } = useLang();
   const { data: suppliers } = useApi(open ? "/suppliers" : null, [open]);
   const { data: products } = useApi(open ? "/products" : null, [open]);
-  const [f, setF] = useState({ supplier_id: "", invoice_no: "", aviz_no: "", date: today(), lines: [{ product_id: "", qty: 1, unit_cost: 0, lot: "" }] });
+  const [f, setF] = useState({ supplier_id: "", invoice_no: "", aviz_no: "", date: today(), lines: [createNirLine()] });
   const setLine = (i, k, v) => setF({ ...f, lines: f.lines.map((l, j) => (j === i ? { ...l, [k]: v } : l)) });
   const total = f.lines.reduce((s, l) => s + Number(l.qty) * Number(l.unit_cost), 0);
   const save = async () => {
     try {
-      await api.post("/nirs", { ...f, date: new Date(f.date).toISOString(), lines: f.lines.filter((l) => l.product_id).map((l) => ({ ...l, qty: Number(l.qty), unit_cost: Number(l.unit_cost) })) });
+      await api.post("/nirs", {
+        ...f,
+        date: new Date(f.date).toISOString(),
+        lines: f.lines
+          .filter((line) => line.product_id)
+          .map(({ row_id, ...line }) => ({
+            ...line,
+            qty: Number(line.qty),
+            unit_cost: Number(line.unit_cost),
+          })),
+      });
       toast.success(tr("NIR înregistrat, stoc actualizat", "GRN saved, stock updated"));
       onSaved();
       onOpenChange(false);
@@ -94,7 +106,7 @@ function NirDialog({ open, onOpenChange, onSaved }) {
         </div>
         <div className="max-h-[40vh] space-y-2 overflow-y-auto">
           {f.lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2">
+            <div key={l.row_id} className="grid grid-cols-12 gap-2">
               <NativeSelect data-testid={`nir-line-${i}-product`} className="col-span-6" value={l.product_id} onChange={(e) => setLine(i, "product_id", e.target.value)}>
                 <option value="">—</option>{(products || []).map((p) => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}
               </NativeSelect>
@@ -106,7 +118,7 @@ function NirDialog({ open, onOpenChange, onSaved }) {
           ))}
         </div>
         <div className="flex items-center justify-between">
-          <Button variant="outline" size="sm" data-testid="nir-add-line-button" onClick={() => setF({ ...f, lines: [...f.lines, { product_id: "", qty: 1, unit_cost: 0, lot: "" }] })}><Plus className="mr-1 h-3 w-3" />{tr("Linie", "Line")}</Button>
+          <Button variant="outline" size="sm" data-testid="nir-add-line-button" onClick={() => setF({ ...f, lines: [...f.lines, createNirLine()] })}><Plus className="mr-1 h-3 w-3" />{tr("Linie", "Line")}</Button>
           <span className="font-mono text-sm">{tr("Total fără TVA", "Net total")}: {money(total)}</span>
         </div>
         <DialogFooter><Button data-testid="nir-save-button" disabled={!f.supplier_id} onClick={save}>{tr("Înregistrează NIR", "Save GRN")}</Button></DialogFooter>

@@ -2,6 +2,7 @@
 # Run serially: pytest /app/backend/tests/test_rar_autopass.py -n 0  (saves/restores rar_autopass_config, cleans all TEST data)
 import sys
 import secrets
+from pathlib import Path
 import pytest
 import requests
 from bson import ObjectId
@@ -9,7 +10,17 @@ from bson import ObjectId
 sys.path.insert(0, "/app/backend/tests")
 from storno_fixtures import BASE, session, mdb, iso  # noqa: E402
 
-TOKEN = "TEST_RAR_SECRET_TOKEN_" + secrets.token_hex(4)
+TOKEN = f"test-rar-token-{secrets.token_urlsafe(24)}"
+
+
+def demo_password():
+    credentials = Path("/app/memory/test_credentials.md").read_text()
+    prefix = "Demo users (password for all: "
+    password_line = next((line for line in credentials.splitlines() if line.startswith(prefix)), "")
+    password = password_line.removeprefix(prefix).split(")", 1)[0]
+    if not password:
+        pytest.skip("Lipsește parola utilizatorilor demo pentru testele RAR")
+    return password
 
 
 @pytest.fixture(scope="module")
@@ -52,7 +63,7 @@ def guard():
 
 
 def login(email):
-    r = requests.post(f"{BASE}/auth/login", json={"email": email, "password": "Demo2026!"})
+    r = requests.post(f"{BASE}/auth/login", json={"email": email, "password": demo_password()})
     if r.status_code != 200:
         pytest.skip(f"{email} login failed")
     return {"Authorization": f"Bearer {r.json()['token']}"}

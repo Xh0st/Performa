@@ -20,8 +20,8 @@ function NirSummary({ id }) {
       <table className="w-full text-xs"><thead><tr className="border-b text-left uppercase tracking-wider text-muted-foreground">
         <th className="py-1">Cod</th><th>{tr("Denumire", "Name")}</th><th className="text-right">{tr("Cant.", "Qty")}</th><th className="text-right">{tr("Valoare", "Value")}</th>
       </tr></thead><tbody>
-        {n.lines.map((l, i) => (
-          <tr key={i} className="h-8 border-b border-border/50"><td className="font-mono">{l.code}</td><td>{l.name}</td>
+        {n.lines.map((l) => (
+          <tr key={l.id || `${l.code}-${l.name}-${l.unit || ""}`} className="h-8 border-b border-border/50"><td className="font-mono">{l.code}</td><td>{l.name}</td>
             <td className="text-right font-mono">{num(l.qty)}{l.returned_qty ? <span className="text-rose-500"> (−{num(l.returned_qty)})</span> : ""}</td><td className="text-right font-mono">{money(l.value)}</td></tr>
         ))}
       </tbody></table>

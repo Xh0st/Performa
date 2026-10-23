@@ -5,24 +5,22 @@ export const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export const api = axios.create({ baseURL: API_URL, withCredentials: true });
 
-api.interceptors.request.use((cfg) => {
-  const tok = localStorage.getItem("erp_token");
-  if (tok) cfg.headers.Authorization = `Bearer ${tok}`;
-  return cfg;
-});
-
 api.interceptors.response.use(
   (r) => r,
   async (err) => {
     const cfg = err.config;
-    if (err.response?.status === 401 && cfg && !cfg._retry && !cfg.url.includes("/auth/")) {
+    if (
+      err.response?.status === 401 &&
+      cfg &&
+      !cfg._retry &&
+      !cfg.url?.includes("/auth/")
+    ) {
       cfg._retry = true;
       try {
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-        localStorage.setItem("erp_token", data.token);
+        await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
         return api(cfg);
       } catch {
-        localStorage.removeItem("erp_token");
+        // The protected route redirects unauthenticated users after refresh failure.
       }
     }
     return Promise.reject(err);
@@ -37,7 +35,7 @@ export function errMsg(e) {
   return d.msg || String(d);
 }
 
-export function useApi(path, deps = []) {
+export function useApi(path) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,8 +51,7 @@ export function useApi(path, deps = []) {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, ...deps]);
+  }, [path]);
   useEffect(() => {
     reload();
   }, [reload]);

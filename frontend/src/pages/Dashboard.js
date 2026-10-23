@@ -17,8 +17,11 @@ function Expirations() {
   return (
     <Panel title={tr("Expirări 30 zile", "Expiring in 30 days")} testid="dashboard-expirations">
       <div className="max-h-64 space-y-1 overflow-y-auto">
-        {(data || []).map((e, i) => (
-          <div key={i} className="flex items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent">
+        {(data || []).map((e) => (
+          <div
+            key={`${e.vehicle_id || e.plate}-${e.kind}-${e.date}`}
+            className="flex items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+          >
             <span className="font-mono text-xs">{e.plate}</span>
             <span className="truncate px-2 text-muted-foreground">{e.client_name}</span>
             <span className={`font-mono text-xs ${e.date < new Date().toISOString().slice(0, 10) ? "text-rose-500" : "text-yellow-500"}`}>{label[e.kind]} · {date(e.date)}</span>
