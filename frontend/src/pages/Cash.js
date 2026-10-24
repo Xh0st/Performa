@@ -132,7 +132,7 @@ export default function Cash() {
                   {(cashPaymentsData.items || []).map((p) => (
                     <tr key={p.id} className="h-10 border-b border-border/50">
                       <td className="px-2"><div className="font-mono text-xs">{p.doc_number}</div><div className="text-[11px] text-muted-foreground">{documentLabel(tr, p.doc_type)}</div></td>
-                      <td className="px-2">{dt(p.date)}</td><td className="px-2">{tr(...METHODS[p.method])}</td><td className="px-2">{p.client_name}</td>
+                      <td className="px-2">{dt(p.document_issue_date || p.date)}</td><td className="px-2">{tr(...METHODS[p.method])}</td><td className="px-2">{p.client_name}</td>
                       <td className="px-2"><Link className="font-mono text-xs text-primary" to={`/invoices/${p.invoice_id}`}>{p.invoice_ref}</Link></td>
                       <td className="px-2 text-right font-mono">{money(p.amount)}</td>
                       <td className="px-2 text-right"><Button variant="ghost" size="icon" data-testid={`cash-payment-print-${p.id}`} onClick={() => window.open(`/print/receipt/${p.id}`, "_blank")}><Printer className="h-4 w-4" /></Button><Button variant="destructive" size="sm" data-testid={`cash-payment-reverse-${p.id}`} disabled={!!p.reversed_at} onClick={() => setReversePayment(p)}>{p.reversed_at ? tr("Stornată", "Reversed") : tr("Stornează", "Reverse")}</Button></td>

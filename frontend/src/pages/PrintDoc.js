@@ -151,10 +151,10 @@ function Invoice({ inv, settings }) {
 }
 
 function ReceiptDoc({ s, p }) {
-  const title = { chitanta: "Chitanță", bon_fiscal: "Bon fiscal", dispozitie_incasare: "Dispoziție de încasare", bon_pos: "Dovadă plată POS", ordin_plata: "Confirmare încasare OP", confirmare_online: "Confirmare plată online" }[p.doc_type];
+  const title = { chitanta: "Chitanță", bon_fiscal: "Bon fiscal", dispozitie_incasare: "Dispoziție de încasare", chitanta_externa: "Chitanță externă", bon_pos: "Dovadă plată POS", ordin_plata: "Confirmare încasare OP", confirmare_online: "Confirmare plată online" }[p.doc_type];
   return (
     <>
-      <Header s={s} title={title} number={p.doc_number} dateStr={dt(p.date)} />
+      <Header s={s} title={title} number={p.doc_number} dateStr={dt(p.document_issue_date || p.date)} />
       <p className="text-[13px] leading-7">Am primit de la <b>{p.client_name}</b> suma de <b className="font-mono">{money(p.amount)}</b>, reprezentând contravaloarea {p.allocations?.length > 1 ? "facturilor" : "facturii"} <b>{p.invoice_ref}</b>.{p.reference && ` Referință: ${p.reference}.`}</p>
       <Sign labels={["Casier", "Client"]} />
     </>

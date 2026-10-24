@@ -324,6 +324,7 @@ class PaymentIn(BaseModel):
     amount: float
     method: str
     cash_document: str = "receipt"
+    document_issue_date: str = ""
     external_issuer: str = ""
     external_number: str = ""
     reference: str = ""
@@ -433,6 +434,15 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
                 raise HTTPException(400, "Emitentul și numărul chitanței externe sunt obligatorii")
         if body.cash_document == "fiscal_receipt" and client.get("type") != "pf":
             raise HTTPException(400, "Bonul fiscal este disponibil numai pentru persoane fizice")
+        if body.cash_document == "fiscal_receipt" and body.document_issue_date:
+            try:
+                receipt_issue_date = date.fromisoformat(body.document_issue_date)
+            except ValueError as exc:
+                raise HTTPException(400, "Data bonului fiscal trebuie să fie YYYY-MM-DD") from exc
+            if receipt_issue_date > now().date():
+                raise HTTPException(400, "Data bonului fiscal nu poate fi în viitor")
+        else:
+            receipt_issue_date = now().date()
         cash_limit = 5_000 if client.get("type") == "pj" else 10_000
         payment_day = now().date().isoformat()
         daily_cash = await db.payments.aggregate([
@@ -460,11 +470,14 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
         if not body.reference.strip().isdigit():
             raise HTTPException(400, "Introduceți numărul numeric al documentului de încasare")
         doc_number = f"{prefix}-{int(body.reference):06d}"
-        document_day = now().date().isoformat()
+        document_day = receipt_issue_date.isoformat() if doc_type == "bon_fiscal" else now().date().isoformat()
         duplicate = await db.payments.find_one({
             "doc_type": doc_type,
             "doc_number": doc_number,
-            "date": {"$regex": f"^{document_day}"},
+            "$or": [
+                {"document_issue_date": document_day},
+                {"document_issue_date": {"$exists": False}, "date": {"$regex": f"^{document_day}"}},
+            ],
         })
         if duplicate:
             raise HTTPException(400, "Numărul documentului este deja înregistrat în această zi")
@@ -487,6 +500,7 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
         "reference": body.reference,
         "external_issuer": body.external_issuer.strip(),
         "external_number": body.external_number.strip(),
+        "document_issue_date": receipt_issue_date.isoformat() if doc_type == "bon_fiscal" else "",
         "date": iso(),
         "cashier": user["name"],
     }

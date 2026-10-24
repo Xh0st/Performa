@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { api, errMsg, useApi } from "@/lib/api";
 import { useLang } from "@/lib/prefs";
+import { today } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, NativeSelect } from "@/components/common";
@@ -17,6 +18,7 @@ export function PaymentEntryForm({ cashOnly = false, externalReceiptOnly = false
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState(cashOnly ? CASH_METHOD : "pos");
   const [cashDocument, setCashDocument] = useState(externalReceiptOnly ? "external_receipt" : "receipt");
+  const [fiscalReceiptDate, setFiscalReceiptDate] = useState(today());
   const [externalIssuer, setExternalIssuer] = useState("");
   const [externalNumber, setExternalNumber] = useState("");
   const [reference, setReference] = useState("");
@@ -55,6 +57,7 @@ export function PaymentEntryForm({ cashOnly = false, externalReceiptOnly = false
         amount: Number(amount),
         method,
         cash_document: cashDocument,
+        document_issue_date: cashDocument === "fiscal_receipt" ? fiscalReceiptDate : "",
         external_issuer: externalIssuer,
         external_number: externalNumber,
         reference,
@@ -122,12 +125,26 @@ export function PaymentEntryForm({ cashOnly = false, externalReceiptOnly = false
           <NativeSelect
             data-testid="payment-entry-cash-document-select"
             value={cashDocument}
-            onChange={(event) => setCashDocument(event.target.value)}
+            onChange={(event) => {
+              setCashDocument(event.target.value);
+              if (event.target.value === "fiscal_receipt") setFiscalReceiptDate(today());
+            }}
           >
             <option value="receipt">{tr("Chitanță", "Receipt")}</option>
             {client?.type === "pf" && <option value="fiscal_receipt">{tr("Bon fiscal", "Fiscal receipt")}</option>}
             <option value="collection_order">{tr("Dispoziție de încasare", "Collection order")}</option>
           </NativeSelect>
+        </Field>
+      )}
+      {cashOnly && cashDocument === "fiscal_receipt" && (
+        <Field label={tr("Data bonului fiscal", "Fiscal receipt date")}>
+          <Input
+            data-testid="payment-entry-fiscal-receipt-date-input"
+            type="date"
+            max={today()}
+            value={fiscalReceiptDate}
+            onChange={(event) => setFiscalReceiptDate(event.target.value)}
+          />
         </Field>
       )}
       {cashOnly && cashDocument === "external_receipt" && (

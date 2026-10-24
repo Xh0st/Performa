@@ -83,6 +83,53 @@ def cash_pay(ctx, amount, invoice_id, doc="receipt"):
     return r.json()
 
 
+class TestDailyDocumentNumbers:
+    def test_fiscal_receipt_number_is_unique_per_issue_date(self, ctx):
+        s = ctx["s"]
+        number = str(100_000 + int(TAG, 16) % 800_000)
+        previous_day = (date.today() - timedelta(days=1)).isoformat()
+        current_day = date.today().isoformat()
+        previous_invoice = ctx["make_invoice"](50.0, "BF_PREVIOUS")
+        previous = s.post(f"{BASE}/payments", json={
+            "client_id": ctx["pf"]["id"],
+            "invoice_id": previous_invoice,
+            "amount": 50.0,
+            "method": "numerar",
+            "cash_document": "fiscal_receipt",
+            "reference": number,
+            "document_issue_date": previous_day,
+        })
+        assert previous.status_code == 200, previous.text
+        assert previous.json()["doc_number"] == f"BF-{int(number):06d}"
+        assert previous.json()["document_issue_date"] == previous_day
+
+        duplicate_invoice = ctx["make_invoice"](50.0, "BF_DUPLICATE")
+        duplicate = s.post(f"{BASE}/payments", json={
+            "client_id": ctx["pf"]["id"],
+            "invoice_id": duplicate_invoice,
+            "amount": 50.0,
+            "method": "numerar",
+            "cash_document": "fiscal_receipt",
+            "reference": number,
+            "document_issue_date": previous_day,
+        })
+        assert duplicate.status_code == 400, duplicate.text
+
+        current_invoice = ctx["make_invoice"](50.0, "BF_CURRENT")
+        current = s.post(f"{BASE}/payments", json={
+            "client_id": ctx["pf"]["id"],
+            "invoice_id": current_invoice,
+            "amount": 50.0,
+            "method": "numerar",
+            "cash_document": "fiscal_receipt",
+            "reference": number,
+            "document_issue_date": current_day,
+        })
+        assert current.status_code == 200, current.text
+        assert current.json()["doc_number"] == f"BF-{int(number):06d}"
+        assert current.json()["document_issue_date"] == current_day
+
+
 class TestPayouts:
     # Payout validation + effect on cash balance
     def test_payout_validation(self, ctx):
