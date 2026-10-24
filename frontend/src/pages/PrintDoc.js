@@ -1,7 +1,7 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { Printer } from "lucide-react";
 import { useApi } from "@/lib/api";
-import { money, num, date, dt } from "@/lib/format";
+import { money, num, date, dateOnly, dt } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 
 const f2 = (v) => money(v, "").trim();
@@ -154,7 +154,7 @@ function ReceiptDoc({ s, p }) {
   const title = { chitanta: "Chitanță", bon_fiscal: "Bon fiscal", dispozitie_incasare: "Dispoziție de încasare", chitanta_externa: "Chitanță externă", bon_pos: "Dovadă plată POS", ordin_plata: "Confirmare încasare OP", confirmare_online: "Confirmare plată online" }[p.doc_type];
   return (
     <>
-      <Header s={s} title={title} number={p.doc_number} dateStr={dt(p.document_issue_date || p.date)} />
+      <Header s={s} title={title} number={p.doc_number} dateStr={p.document_issue_date ? dateOnly(p.document_issue_date) : dt(p.date)} />
       <p className="text-[13px] leading-7">Am primit de la <b>{p.client_name}</b> suma de <b className="font-mono">{money(p.amount)}</b>, reprezentând contravaloarea {p.allocations?.length > 1 ? "facturilor" : "facturii"} <b>{p.invoice_ref}</b>.{p.reference && ` Referință: ${p.reference}.`}</p>
       <Sign labels={["Casier", "Client"]} />
     </>

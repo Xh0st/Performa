@@ -69,6 +69,7 @@ export function PaymentEntryForm({ cashOnly = false, externalReceiptOnly = false
       setInvoiceId("");
       setAmount("");
       setReference("");
+      setFiscalReceiptDate(today());
       onSaved();
     } catch (error) {
       toast.error(errMsg(error));

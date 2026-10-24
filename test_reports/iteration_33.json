@@ -1,0 +1,45 @@
+{
+  "summary": "Tested the new document numbering rules (BF/DI/DP), the fiscal receipt date and the daily cash limit, on both backend and frontend. Backend: the regression suite test_iter32 passes 13/13. The new suite test_iter33_document_numbering.py passes 12/13. What works: BF 45 becomes BF-000045, and when no date is sent the receipt date defaults to today. A future date or a wrong date format is rejected with 400. A non-numeric number ('', 'abc', 'BF-45') is rejected with 400. Bon fiscal is rejected for a PJ client. The same BF is rejected on the same issue date X and accepted on a different date Y. The daily cash limit is checked on the closing date (today): a 9000 RON BF dated 2 days ago plus 1500 RON today (chitanță or BF dated yesterday) is rejected, while 1000 RON is accepted. DP 3 becomes DP-000003. A second DP 3 or DP '003' on the same day is rejected. DC keeps its automatic numbering. BF-000003 and DI-000003 can exist on the same day. FAILED: a duplicate DI on the same day is ACCEPTED (2x DI-000003 via the API, 2x DI-987654 via the UI). Frontend on desktop and at 390px: the receipt date field appears only for Bon fiscal and only for PF clients, its default is today and max is today. A past date saves and opens the print view with 'Data: <receipt date>'. The Încasări numerar list shows the receipt date. A duplicate shows the toast 'deja înregistrat în această zi', and the same number on a different date saves. A future date typed in shows the toast 'nu poate fi în viitor'. The DP form at 390px has no overflow (scrollWidth 390), saves DP-000003 and rejects the duplicate with a toast. All temporary data was removed.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/payments (cash_document=collection_order)", "issue": "Same-day duplicate check for DI never matches. New DI records are saved with document_issue_date='' (line 503). The duplicate $or looks for {document_issue_date: today} or {document_issue_date: {$exists: false}, date: ^today}, and neither matches '' because the field exists. Reproduced: DI-000003 was created twice on 2026-10-24 (API test), and DI-987654 twice from the UI.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/payments + /cash-register/payouts", "issue": "Uniqueness is only checked with find_one before insert, and there is no unique index on (tenant_id, branch_id, doc_type, doc_number, document_issue_date). Two concurrent requests can both create the same number."},
+      {"endpoint": "POST /api/payments", "issue": "A reversed (stornat) BF/DI still blocks its number for that day. Check whether this is intended."},
+      {"endpoint": "GET /api/cash-register/report(.pdf)", "issue": "The range register and its PDF show p['date'] (closing date) for BF rows, not document_issue_date. Only the receipt print and the list use the receipt date. Check whether the register should also show the BF date."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Cash.js list + PrintDoc ReceiptDoc", "issue": "document_issue_date ('YYYY-MM-DD') is formatted with dt(), so it shows a fake time ('23.10.2026, 00:00'). new Date('YYYY-MM-DD') is parsed as UTC, so in Romania it shows 03:00, and in UTC-negative timezones it would show the previous day. Use date() or a local date-only parse for document_issue_date.", "selector": "[data-testid='cash-payments-table'], [data-testid='print-doc-receipt']", "priority": "MEDIUM"},
+      {"component": "PaymentEntryForm", "issue": "fiscalReceiptDate is not reset to today after a successful save while Bon fiscal stays selected, so the next bon can silently keep the earlier historical date.", "selector": "[data-testid='payment-entry-fiscal-receipt-date-input']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "DI duplicate in UI", "issue": "Duplicate DI is accepted (backend bug above). There is no error toast and the list shows 2 identical DI rows.", "affected_selectors": ["[data-testid='payment-entry-cash-save-button']"]}
+    ],
+    "design_issues": [
+      {"screen": "Plăți tab list", "issues": ["The kind column shows the raw value 'payment_order' / 'expense_settlement' instead of the Romanian label", "The DP form uses the native date picker and number inputs; the native input type=date is used instead of the shadcn calendar"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter33_document_numbering.py", "/app/backend/tests/iter33_ui_fixture.py", "/app/backend/tests/test_iter32_cash_payouts_registers.py", "/app/test_reports/pytest/pytest_iter33.xml"],
+  "action_items": [
+    "Fix the DI duplicate check in create_payment. Option 1: store document_issue_date=now().date() for dispozitie_incasare too. Option 2: change the $or to match document_issue_date in ['', missing] together with date ^document_day.",
+    "Add a unique index on (tenant_id, branch_id, doc_type, doc_number, document_issue_date) for payments, and on (kind, doc_number, day) for payment_order movements, to prevent race conditions",
+    "Render document_issue_date with date() and a local date-only parse, not dt(), in Cash.js and PrintDoc.js",
+    "Reset fiscalReceiptDate to today() after a successful save",
+    "Optional: show the BF receipt date in the range register and PDF, and translate the kind labels in the Plăți table"
+  ],
+  "critical_code_review_comments": [
+    "routes_finance.py has 774 lines, over the 700 limit. Move the cash code (payments, cash register, payouts, reversal, reports) to routes_cash.py",
+    "receipt_issue_date is only assigned inside the numerar branch. This works today because non-cash doc types skip the numbered path, but it is fragile. Initialise it before the branch.",
+    "The duplicate-check logic for BF/DI and DP is written twice in slightly different ways. Extract one helper keyed by (doc_type, doc_number, document_day)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter33_document_numbering.py", "/app/backend/tests/iter33_ui_fixture.py"],
+  "success_rate": {"backend": "92% (12/13 new, 13/13 iter32 regression)", "frontend": "90%"},
+  "seed_data_creation": "None persisted. All pytest and UI fixture data (TEST_ clients, TSTN/TSTU invoices, BF/DI/CH payments, DP/DC movements, audit logs) was deleted and counters restored. Verified 0 remaining. The 9 older 'TEST_Client XXXXXX' clients predate this run and were left in place.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_iter33_document_numbering.py tests/test_iter32_cash_payouts_registers.py -n 0 -v. test_di_duplicate_same_day_rejected should pass after the fix. UI fixture: python tests/iter33_ui_fixture.py setup|teardown (PF client 'TEST_UI33 Bon' + 3 invoices). Testids: payment-entry-cash-{client-select|invoice-select|document-select|amount-input|reference-input|save-button}, payment-entry-fiscal-receipt-date-input, cash-payout-{kind-select|document-number-input|beneficiary-input|amount-input|save-button}, cash-payments-table, cash-payouts-table, print-doc-receipt. Server date/time is UTC (2026-10-24). Real data has DI-000001/2/5 and BF-000001 from 2026-10-23 without a document_issue_date field.",
+  "rca of the issue": "create_payment saves 'document_issue_date': '' for non-BF documents. The duplicate query's legacy fallback branch requires {document_issue_date: {$exists: false}}, so DI records created after this change (field present but empty) match neither branch, and duplicates go through. Repro: POST /api/payments twice with method=numerar, cash_document=collection_order, reference='3' on the same day; both return 200 with DI-000003."
+}

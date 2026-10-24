@@ -78,6 +78,18 @@ async def startup():
     await db.work_orders.create_index("quotes.token")
     await db.time_entries.create_index([("mechanic_id", 1), ("start", -1)])
     await db.payments.create_index("date")
+    await raw_db.payments.create_index(
+        [("tenant_id", 1), ("branch_id", 1), ("doc_type", 1), ("doc_number", 1), ("document_issue_date", 1)],
+        name="daily_cash_document_number",
+        unique=True,
+        partialFilterExpression={"document_issue_date": {"$gt": ""}},
+    )
+    await raw_db.cash_movements.create_index(
+        [("tenant_id", 1), ("branch_id", 1), ("kind", 1), ("doc_number", 1), ("document_issue_date", 1)],
+        name="daily_payment_order_number",
+        unique=True,
+        partialFilterExpression={"document_issue_date": {"$gt": ""}},
+    )
     await db.efactura_inbox.create_index([("tenant_id", 1), ("branch_id", 1), ("message_id", 1)], unique=True, partialFilterExpression={"message_id": {"$type": "string"}})
     await db.efactura_logs.create_index("at")
     await db.rar_autopass_outbox.create_index([("tenant_id", 1), ("branch_id", 1), ("idempotency_key", 1)], unique=True)

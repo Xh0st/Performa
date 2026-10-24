@@ -411,6 +411,14 @@ async def apply_payment_plan(allocations: list[dict]):
         raise
 
 
+async def rollback_payment_plan(allocations: list[dict]):
+    for allocation in reversed(allocations):
+        await db.invoices.update_one(
+            {"_id": oid(allocation["invoice_id"]), "paid_amount": allocation["paid"]},
+            {"$set": {"paid_amount": allocation["previous_paid"], "status": allocation["previous_status"]}},
+        )
+
+
 @router.post("/payments")
 async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
     if body.method not in {"numerar", *DOC_BY_METHOD}:
@@ -500,11 +508,15 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
         "reference": body.reference,
         "external_issuer": body.external_issuer.strip(),
         "external_number": body.external_number.strip(),
-        "document_issue_date": receipt_issue_date.isoformat() if doc_type == "bon_fiscal" else "",
+        "document_issue_date": document_day if doc_type in numbered_cash_documents else "",
         "date": iso(),
         "cashier": user["name"],
     }
-    r = await db.payments.insert_one(p)
+    try:
+        r = await db.payments.insert_one(p)
+    except Exception:
+        await rollback_payment_plan(allocations)
+        raise
     await audit(user, "create", "payment", str(r.inserted_id), p["doc_number"])
     return ser(await db.payments.find_one({"_id": r.inserted_id}))
 
@@ -646,6 +658,7 @@ async def create_cash_payout(body: CashPayoutIn, user=Depends(require("payments"
         "amount": round(body.amount, 2),
         "doc_number": doc_number,
         "document_number_input": body.document_number.strip(),
+        "document_issue_date": document_day if body.kind == "payment_order" else "",
         "beneficiary": body.beneficiary.strip(),
         "reference": body.reference,
         "notes": body.notes,
@@ -686,9 +699,16 @@ async def cash_register_rows(date_from: str, date_to: str, cash_only: bool) -> d
         {"date": {"$gte": date_from, "$lte": f"{date_to}T23:59:59"}},
     ).sort("date", 1).to_list(5000)
     opening_movements = await db.cash_movements.find({"date": {"$lt": date_from}}).to_list(5000)
-    rows = [{"date": p["date"], "document": p["doc_number"], "label": p.get("client_name", ""), "in": p["amount"], "out": 0} for p in payments]
-    rows.extend({"date": m["date"], "document": m["doc_number"], "label": m.get("beneficiary", "Depunere bancă"), "in": 0, "out": m["amount"]} for m in movements)
-    rows.sort(key=lambda row: (row["date"], row["document"]))
+    rows = [{
+        "date": p.get("document_issue_date") or p["date"],
+        "sort_date": p["date"],
+        "document": p["doc_number"],
+        "label": p.get("client_name", ""),
+        "in": p["amount"],
+        "out": 0,
+    } for p in payments]
+    rows.extend({"date": m["date"], "sort_date": m["date"], "document": m["doc_number"], "label": m.get("beneficiary", "Depunere bancă"), "in": 0, "out": m["amount"]} for m in movements)
+    rows.sort(key=lambda row: (row["sort_date"], row["document"]))
     opening = round(
         sum(item["amount"] for item in opening_payments)
         - sum(item["amount"] for item in opening_movements),
