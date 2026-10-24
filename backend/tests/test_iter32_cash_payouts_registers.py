@@ -76,8 +76,9 @@ def closing(s):
 
 
 def cash_pay(ctx, amount, invoice_id, doc="receipt"):
+    reference = "45" if doc in {"fiscal_receipt", "collection_order"} else f"TEST_{TAG}"
     r = ctx["s"].post(f"{BASE}/payments", json={"client_id": ctx["pf"]["id"], "invoice_id": invoice_id, "amount": amount,
-                                                 "method": "numerar", "cash_document": doc, "reference": f"TEST_{TAG}"})
+                                                 "method": "numerar", "cash_document": doc, "reference": reference})
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -111,9 +112,9 @@ class TestPayouts:
         assert r1.status_code == 200, r1.text
         assert r1.json()["doc_number"].startswith("DC-") and r1.json()["kind"] == "expense_settlement"
         r2 = s.post(f"{BASE}/cash-register/payouts", json={"kind": "payment_order", "beneficiary": "TEST_Disp",
-                                                          "amount": 30, "reference": f"TEST_{TAG}"})
+                                                          "amount": 30, "document_number": "3", "reference": f"TEST_{TAG}"})
         assert r2.status_code == 200, r2.text
-        assert r2.json()["doc_number"].startswith("DP-")
+        assert r2.json()["doc_number"] == "DP-000003"
         after = closing(s)
         ctx["payouts_ok"] = True
         assert round(before - after, 2) == 80.0, f"daily cash register closing did not drop by payouts: before={before} after={after}"
@@ -124,7 +125,7 @@ class TestPayouts:
         rep = s.get(f"{BASE}/cash-register/report", params={"date_from": "2000-01-01", "date_to": TODAY, "cash_only": True}).json()
         real = rep["closing"]
         r = s.post(f"{BASE}/cash-register/payouts", json={"kind": "payment_order", "beneficiary": "TEST_Over",
-                                                         "amount": round(real + 10, 2), "reference": f"TEST_{TAG}"})
+                                                         "amount": round(real + 10, 2), "document_number": "4", "reference": f"TEST_{TAG}"})
         if r.status_code == 200:
             ctx["db"].cash_movements.delete_one({"_id": ObjectId(r.json()["id"])})
         assert r.status_code == 400, f"payout {real + 10} accepted although real cash balance is {real}"

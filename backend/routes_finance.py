@@ -339,6 +339,7 @@ class CashPayoutIn(BaseModel):
     kind: str
     beneficiary: str
     amount: float
+    document_number: str = ""
     reference: str = ""
     notes: str = ""
 
@@ -459,8 +460,14 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
         if not body.reference.strip().isdigit():
             raise HTTPException(400, "Introduceți numărul numeric al documentului de încasare")
         doc_number = f"{prefix}-{int(body.reference):06d}"
-        if await db.payments.find_one({"doc_number": doc_number}):
-            raise HTTPException(400, "Numărul documentului este deja înregistrat")
+        document_day = now().date().isoformat()
+        duplicate = await db.payments.find_one({
+            "doc_type": doc_type,
+            "doc_number": doc_number,
+            "date": {"$regex": f"^{document_day}"},
+        })
+        if duplicate:
+            raise HTTPException(400, "Numărul documentului este deja înregistrat în această zi")
     else:
         sequence = await next_seq(f"pay_{doc_type}")
         doc_number = f"{prefix}-{sequence:06d}"
@@ -605,11 +612,26 @@ async def create_cash_payout(body: CashPayoutIn, user=Depends(require("payments"
     if body.amount > register["closing"] + 0.001:
         raise HTTPException(400, "Plata depășește numerarul disponibil în casă")
     prefix = "DC" if body.kind == "expense_settlement" else "DP"
-    sequence = await next_seq(f"cash_{body.kind}")
+    document_day = now().date().isoformat()
+    if body.kind == "payment_order":
+        if not body.document_number.strip().isdigit():
+            raise HTTPException(400, "Introduceți numărul numeric al dispoziției de plată")
+        doc_number = f"DP-{int(body.document_number):06d}"
+        duplicate = await db.cash_movements.find_one({
+            "kind": "payment_order",
+            "doc_number": doc_number,
+            "date": {"$regex": f"^{document_day}"},
+        })
+        if duplicate:
+            raise HTTPException(400, "Numărul dispoziției de plată este deja înregistrat în această zi")
+    else:
+        sequence = await next_seq(f"cash_{body.kind}")
+        doc_number = f"{prefix}-{sequence:06d}"
     movement = {
         "kind": body.kind,
         "amount": round(body.amount, 2),
-        "doc_number": f"{prefix}-{sequence:06d}",
+        "doc_number": doc_number,
+        "document_number_input": body.document_number.strip(),
         "beneficiary": body.beneficiary.strip(),
         "reference": body.reference,
         "notes": body.notes,

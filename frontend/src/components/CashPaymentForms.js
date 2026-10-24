@@ -9,9 +9,6 @@ import { Field, NativeSelect } from "@/components/common";
 
 
 const CASH_METHOD = "numerar";
-const CASHLESS_METHODS = ["pos", "transfer"];
-
-
 export function PaymentEntryForm({ cashOnly = false, externalReceiptOnly = false, onSaved }) {
   const { tr } = useLang();
   const { data: clients } = useApi("/clients");
@@ -234,6 +231,7 @@ export function CashPayoutForm({ available, onSaved }) {
   const [kind, setKind] = useState("expense_settlement");
   const [beneficiary, setBeneficiary] = useState("");
   const [amount, setAmount] = useState("");
+  const [documentNumber, setDocumentNumber] = useState("");
   const [reference, setReference] = useState("");
 
   const save = async () => {
@@ -242,11 +240,13 @@ export function CashPayoutForm({ available, onSaved }) {
         kind,
         beneficiary,
         amount: Number(amount),
+        document_number: documentNumber,
         reference,
       });
       toast.success(tr("Plată înregistrată", "Payout recorded"));
       setBeneficiary("");
       setAmount("");
+      setDocumentNumber("");
       setReference("");
       onSaved();
     } catch (error) {
@@ -276,10 +276,22 @@ export function CashPayoutForm({ available, onSaved }) {
           </NativeSelect>
         </Field>
       )}
+      {kind === "payment_order" && (
+        <Field label={tr("Nr. dispoziție de plată", "Payment order no.")}>
+          <Input
+            data-testid="cash-payout-document-number-input"
+            type="number"
+            min="1"
+            placeholder="3"
+            value={documentNumber}
+            onChange={(event) => setDocumentNumber(event.target.value)}
+          />
+        </Field>
+      )}
       <Field label={tr("Beneficiar", "Beneficiary")}><Input data-testid="cash-payout-beneficiary-input" value={beneficiary} onChange={(event) => setBeneficiary(event.target.value)} /></Field>
       <Field label={tr("Sumă (RON)", "Amount (RON)")}><Input data-testid="cash-payout-amount-input" type="number" min="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
       <Field label={tr("Referință", "Reference")}><Input data-testid="cash-payout-reference-input" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
-      <div className="flex items-end"><Button data-testid="cash-payout-save-button" disabled={!beneficiary || !amount || Number(amount) > available} onClick={save}>{tr("Înregistrează", "Record")}</Button></div>
+      <div className="flex items-end"><Button data-testid="cash-payout-save-button" disabled={!beneficiary || !amount || Number(amount) > available || (kind === "payment_order" && !documentNumber)} onClick={save}>{tr("Înregistrează", "Record")}</Button></div>
     </div>
   );
 }
