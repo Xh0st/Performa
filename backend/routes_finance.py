@@ -637,28 +637,26 @@ async def create_cash_payout(body: CashPayoutIn, user=Depends(require("payments"
     register = await cash_register(user=user)
     if body.amount > register["closing"] + 0.001:
         raise HTTPException(400, "Plata depășește numerarul disponibil în casă")
-    prefix = "DC" if body.kind == "expense_settlement" else "DP"
     document_day = now().date().isoformat()
-    if body.kind == "payment_order":
+    if body.kind in {"expense_settlement", "payment_order"}:
+        document_label = "decontului de cheltuieli" if body.kind == "expense_settlement" else "dispoziției de plată"
+        prefix = "DC" if body.kind == "expense_settlement" else "DP"
         if not body.document_number.strip().isdigit():
-            raise HTTPException(400, "Introduceți numărul numeric al dispoziției de plată")
-        doc_number = f"DP-{int(body.document_number):06d}"
+            raise HTTPException(400, f"Introduceți numărul numeric al {document_label}")
+        doc_number = f"{prefix}-{int(body.document_number):06d}"
         duplicate = await db.cash_movements.find_one({
-            "kind": "payment_order",
+            "kind": body.kind,
             "doc_number": doc_number,
             "date": {"$regex": f"^{document_day}"},
         })
         if duplicate:
-            raise HTTPException(400, "Numărul dispoziției de plată este deja înregistrat în această zi")
-    else:
-        sequence = await next_seq(f"cash_{body.kind}")
-        doc_number = f"{prefix}-{sequence:06d}"
+            raise HTTPException(400, f"Numărul {document_label} este deja înregistrat în această zi")
     movement = {
         "kind": body.kind,
         "amount": round(body.amount, 2),
         "doc_number": doc_number,
         "document_number_input": body.document_number.strip(),
-        "document_issue_date": document_day if body.kind == "payment_order" else "",
+        "document_issue_date": document_day,
         "beneficiary": body.beneficiary.strip(),
         "reference": body.reference,
         "notes": body.notes,

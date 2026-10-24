@@ -185,8 +185,11 @@ class TestPaymentOrder:
                                                            "amount": 5, "document_number": "x"})
         assert bad.status_code == 400
 
-    def test_decont_unaffected_by_dp_number(self, ctx):
+    def test_dc_3_is_separate_from_dp_and_rejects_duplicate(self, ctx):
         r = ctx["s"].post(f"{BASE}/cash-register/payouts", json={"kind": "expense_settlement", "beneficiary": f"TEST_DC {TAG}",
                                                                  "amount": 1, "document_number": "3"})
         assert r.status_code == 200, r.text
-        assert r.json()["doc_number"].startswith("DC-")
+        assert r.json()["doc_number"] == "DC-000003"
+        duplicate = ctx["s"].post(f"{BASE}/cash-register/payouts", json={"kind": "expense_settlement", "beneficiary": f"TEST_DC {TAG}",
+                                                                            "amount": 1, "document_number": "003"})
+        assert duplicate.status_code == 400, duplicate.text

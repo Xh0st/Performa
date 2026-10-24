@@ -294,8 +294,7 @@ export function CashPayoutForm({ available, onSaved }) {
           </NativeSelect>
         </Field>
       )}
-      {kind === "payment_order" && (
-        <Field label={tr("Nr. dispoziție de plată", "Payment order no.")}>
+      <Field label={kind === "payment_order" ? tr("Nr. dispoziție de plată", "Payment order no.") : tr("Nr. decont cheltuieli", "Expense settlement no.")}>
           <Input
             data-testid="cash-payout-document-number-input"
             type="number"
@@ -304,12 +303,11 @@ export function CashPayoutForm({ available, onSaved }) {
             value={documentNumber}
             onChange={(event) => setDocumentNumber(event.target.value)}
           />
-        </Field>
-      )}
+      </Field>
       <Field label={tr("Beneficiar", "Beneficiary")}><Input data-testid="cash-payout-beneficiary-input" value={beneficiary} onChange={(event) => setBeneficiary(event.target.value)} /></Field>
       <Field label={tr("Sumă (RON)", "Amount (RON)")}><Input data-testid="cash-payout-amount-input" type="number" min="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
       <Field label={tr("Referință", "Reference")}><Input data-testid="cash-payout-reference-input" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
-      <div className="flex items-end"><Button data-testid="cash-payout-save-button" disabled={!beneficiary || !amount || Number(amount) > available || (kind === "payment_order" && !documentNumber)} onClick={save}>{tr("Înregistrează", "Record")}</Button></div>
+      <div className="flex items-end"><Button data-testid="cash-payout-save-button" disabled={!beneficiary || !amount || Number(amount) > available || !documentNumber} onClick={save}>{tr("Înregistrează", "Record")}</Button></div>
     </div>
   );
 }

@@ -154,10 +154,11 @@ class TestPayouts:
         inv = ctx["make_invoice"](300.0, "P1")
         cash_pay(ctx, 300.0, inv)
         before = closing(s)
+        dc_number = str(100_000 + int(TAG, 16) % 800_000)
         r1 = s.post(f"{BASE}/cash-register/payouts", json={"kind": "expense_settlement", "beneficiary": "TEST_Decont",
-                                                          "amount": 50, "reference": f"TEST_{TAG}"})
+                                                          "amount": 50, "document_number": dc_number, "reference": f"TEST_{TAG}"})
         assert r1.status_code == 200, r1.text
-        assert r1.json()["doc_number"].startswith("DC-") and r1.json()["kind"] == "expense_settlement"
+        assert r1.json()["doc_number"] == f"DC-{int(dc_number):06d}" and r1.json()["kind"] == "expense_settlement"
         r2 = s.post(f"{BASE}/cash-register/payouts", json={"kind": "payment_order", "beneficiary": "TEST_Disp",
                                                           "amount": 30, "document_number": "3", "reference": f"TEST_{TAG}"})
         assert r2.status_code == 200, r2.text
