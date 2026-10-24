@@ -1,0 +1,38 @@
+{
+  "summary": "Iter34: daily operator-entered numbers BF/DI/DP/DC. Regression: test_iter32 + test_iter33 = 26/26 PASS (13/13 iter33 now including DI duplicate fix), run twice. New suite test_iter34_daily_doc_numbers.py: 17/20 PASS. Verified: all four types format to 6 digits (BF-/DI-/DP-/DC-0000NN); same-day duplicates rejected incl. '0N', '00000N', '00000000N' variants for every type; BF same number on another (selectable) date allowed, '0'-variant on that date rejected; DI ignores client-sent date (stays today); DC-000003 and DP-000003 coexist same day, each 003/0003 duplicate rejected; DC number required at API ('', ' ', 'abc', '-3', '3.0', 'DC-3', missing field -> 400). Mongo indexes daily_cash_document_number (payments: tenant_id,branch_id,doc_type,doc_number,document_issue_date) and daily_payment_order_number (cash_movements: tenant_id,branch_id,kind,doc_number,document_issue_date) exist, unique, partial {document_issue_date: {$gt: ''}}; raw insert duplicate -> DuplicateKeyError, same doc in other branch/tenant allowed, empty-date docs excluded. 8-way concurrent DP same number -> 1x200, 7x400. FAILED: Unicode digits like '³' pass str.isdigit() but int() raises -> 500 on both /cash-register/payouts and /payments. UI 390px: 'Nr. decont cheltuieli' field visible, Save disabled until number entered, DC-000917 saved, '0917' duplicate shows toast 'Numărul decontului de cheltuieli este deja înregistrat în această zi', switching to DP shows 'Nr. dispoziție de plată', DP-000917 saved alongside DC-000917; scrollWidth 390 (no overflow). All temp data removed (verified 0 leftovers), counters restored.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/cash-register/payouts, POST /api/payments (BF/DI)", "issue": "document_number/reference '³' or '²³' passes .isdigit() but int() raises ValueError -> 500 Internal Server Error. Use .isdecimal() + ASCII check (re.fullmatch(r'[0-9]+', v)) or try/except int(). Payments path fails before allocation so no invoice corruption."},
+      {"endpoint": "POST /api/payments, POST /api/cash-register/payouts", "issue": "insert_one is not wrapped for DuplicateKeyError; if a real race hits the new unique index the user gets 500 instead of the friendly 400 'deja înregistrat'. (Payments path does rollback allocations before re-raising.) Not reproduced with 8 concurrent requests, code-review finding."},
+      {"endpoint": "POST /api/payments", "issue": "Very large numbers (e.g. '0000000009' or 7+ digits) are accepted and formatted without upper bound (e.g. DP-1234567); consider a max of 999999 if 6 digits must be strict."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Cash > Plăți (390px)", "issues": ["Number input placeholder '3' looks like a pre-filled value; use a hint like 'ex. 3' or lighter placeholder", "No visual required marker (*) on 'Nr. decont cheltuieli' / 'Nr. dispoziție de plată'; mandatory only enforced via disabled Save button with no explanation", "Tabs row is horizontally clipped ('stru de casă') - scrollable but first tab label cut at load"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter34_daily_doc_numbers.py", "/app/backend/tests/iter34_race_probe.py", "/app/backend/tests/iter34_cleanup.py", "/app/test_reports/pytest/pytest_iter34.xml", "/app/test_reports/pytest/pytest_iter34_regression.xml"],
+  "action_items": [
+    "Replace .isdigit() with strict ASCII digit validation (re.fullmatch(r'[0-9]{1,6}', v)) in create_payment and create_cash_payout to avoid 500 on Unicode digits",
+    "Catch pymongo DuplicateKeyError on insert in create_payment (after rollback) and create_cash_payout and return 400 with the same 'deja înregistrat în această zi' message",
+    "Optional: add required marker and better placeholder on payout number field"
+  ],
+  "critical_code_review_comments": [
+    "routes_finance.py is 793 lines (>700) - split cash/payout routes into routes_cash.py",
+    "In create_cash_payout the inner `if body.kind in {...}` is always true after the earlier guard - redundant branch; doc_number would be unbound if kinds are ever extended",
+    "Duplicate-check logic for payments and payouts is duplicated; extract helper (collection, type_field, doc_type, doc_number, day)",
+    "Reversed (stornat) documents still block their number for the day - confirm intended"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter34_daily_doc_numbers.py", "/app/backend/tests/iter34_race_probe.py", "/app/backend/tests/iter34_cleanup.py"],
+  "success_rate": {"backend": "93% (43/46: 26/26 regression, 17/20 new; 3 failures = same Unicode-digit 500 bug)", "frontend": "100%"},
+  "test_credentials": "andrei.melek@gmail.com (admin owner) from /app/memory/test_credentials.md",
+  "seed_data_creation": "None persisted. Pytest fixtures (TEST_PF34 client, TSTQ invoices, payments, cash_movements, raw index-probe docs, audit logs) and UI-created DC-000917/DP-000917 deleted; counters restored; verified 0 leftovers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_iter32_cash_payouts_registers.py tests/test_iter33_document_numbering.py tests/test_iter34_daily_doc_numbers.py -n 0 -v; then python tests/iter34_cleanup.py to confirm no leftovers. The 3 test_unicode_superscript_* tests should pass after the strict-digit fix. Server date is UTC 2026-10-24. Payout testids: cash-tab-payouts, cash-payout-{kind-select|document-number-input|beneficiary-input|amount-input|save-button}.",
+  "rca of the issue": "Python str.isdigit() returns True for superscript/other Unicode digit characters (e.g. '³'), but int('³') raises ValueError; the unhandled exception in create_cash_payout (line ~646) and create_payment (line ~480) surfaces as HTTP 500. Repro: POST /api/cash-register/payouts {kind: expense_settlement, beneficiary: 'x', amount: 1, document_number: '³'} -> 500."
+}

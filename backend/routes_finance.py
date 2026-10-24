@@ -6,6 +6,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from pymongo.errors import DuplicateKeyError
 from fastapi.responses import Response
 from pydantic import BaseModel
 from core import db, ser, oid, iso, now, require, audit, get_or_404, next_seq, get_settings, calc_totals
@@ -26,6 +27,22 @@ CASH_DOCUMENTS = {
     "collection_order": ("dispozitie_incasare", "DI"),
     "external_receipt": ("chitanta_externa", "CE"),
 }
+
+
+def daily_document_number(value: str, document_label: str) -> int:
+    normalized = value.strip()
+    if not re.fullmatch(r"[0-9]+", normalized):
+        raise HTTPException(
+            400,
+            f"Introduceți numărul numeric al {document_label}, între 1 și 999999",
+        )
+    number = int(normalized)
+    if number < 1 or number > 999_999:
+        raise HTTPException(
+            400,
+            f"Introduceți numărul numeric al {document_label}, între 1 și 999999",
+        )
+    return number
 
 
 class InvoiceIn(BaseModel):
@@ -475,9 +492,8 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
         doc_type, prefix = DOC_BY_METHOD[body.method]
     numbered_cash_documents = {"bon_fiscal", "dispozitie_incasare"}
     if doc_type in numbered_cash_documents:
-        if not body.reference.strip().isdigit():
-            raise HTTPException(400, "Introduceți numărul numeric al documentului de încasare")
-        doc_number = f"{prefix}-{int(body.reference):06d}"
+        document_label = "bonului fiscal" if doc_type == "bon_fiscal" else "dispoziției de încasare"
+        doc_number = f"{prefix}-{daily_document_number(body.reference, document_label):06d}"
         document_day = receipt_issue_date.isoformat() if doc_type == "bon_fiscal" else now().date().isoformat()
         duplicate = await db.payments.find_one({
             "doc_type": doc_type,
@@ -514,6 +530,9 @@ async def create_payment(body: PaymentIn, user=Depends(require("payments"))):
     }
     try:
         r = await db.payments.insert_one(p)
+    except DuplicateKeyError as exc:
+        await rollback_payment_plan(allocations)
+        raise HTTPException(400, "Numărul documentului este deja înregistrat în această zi") from exc
     except Exception:
         await rollback_payment_plan(allocations)
         raise
@@ -638,19 +657,16 @@ async def create_cash_payout(body: CashPayoutIn, user=Depends(require("payments"
     if body.amount > register["closing"] + 0.001:
         raise HTTPException(400, "Plata depășește numerarul disponibil în casă")
     document_day = now().date().isoformat()
-    if body.kind in {"expense_settlement", "payment_order"}:
-        document_label = "decontului de cheltuieli" if body.kind == "expense_settlement" else "dispoziției de plată"
-        prefix = "DC" if body.kind == "expense_settlement" else "DP"
-        if not body.document_number.strip().isdigit():
-            raise HTTPException(400, f"Introduceți numărul numeric al {document_label}")
-        doc_number = f"{prefix}-{int(body.document_number):06d}"
-        duplicate = await db.cash_movements.find_one({
-            "kind": body.kind,
-            "doc_number": doc_number,
-            "date": {"$regex": f"^{document_day}"},
-        })
-        if duplicate:
-            raise HTTPException(400, f"Numărul {document_label} este deja înregistrat în această zi")
+    document_label = "decontului de cheltuieli" if body.kind == "expense_settlement" else "dispoziției de plată"
+    prefix = "DC" if body.kind == "expense_settlement" else "DP"
+    doc_number = f"{prefix}-{daily_document_number(body.document_number, document_label):06d}"
+    duplicate = await db.cash_movements.find_one({
+        "kind": body.kind,
+        "doc_number": doc_number,
+        "date": {"$regex": f"^{document_day}"},
+    })
+    if duplicate:
+        raise HTTPException(400, f"Numărul {document_label} este deja înregistrat în această zi")
     movement = {
         "kind": body.kind,
         "amount": round(body.amount, 2),
@@ -663,7 +679,10 @@ async def create_cash_payout(body: CashPayoutIn, user=Depends(require("payments"
         "date": iso(),
         "created_by": user["name"],
     }
-    result = await db.cash_movements.insert_one(movement)
+    try:
+        result = await db.cash_movements.insert_one(movement)
+    except DuplicateKeyError as exc:
+        raise HTTPException(400, f"Numărul {document_label} este deja înregistrat în această zi") from exc
     await audit(user, "create", body.kind, str(result.inserted_id), movement["doc_number"])
     return ser(await db.cash_movements.find_one({"_id": result.inserted_id}))
 

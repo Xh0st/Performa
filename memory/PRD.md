@@ -268,13 +268,17 @@ Administrator, Director, Șef service, Consilier service, Recepționer, Magazion
   de tipărire. Operatorul poate astfel tipări imediat documentul emis.
 - Operatorul introduce numerele reale de document. Bonul fiscal `45` devine `BF-000045`,
   Dispoziția de încasare `3` devine `DI-000003`, iar Dispoziția de plată `3` devine `DP-000003`.
-  Numerotarea este unică separat pentru tip și ziua emiterii, astfel încât poate reporni de la 1
-  în fiecare zi. Indexurile Mongo izolate pe tenant/sucursală protejează dublurile concurente.
+  Decontul cheltuieli urmează aceeași regulă: `3` devine `DC-000003`. Numerotarea este unică
+  separat pentru tip și ziua emiterii, astfel încât poate reporni de la 1 în fiecare zi.
+  Indexurile Mongo izolate pe tenant/sucursală protejează dublurile concurente.
 - Bonul fiscal are `Data bonului` implicit azi și permite închiderea ulterioară a unui bon emis
   anterior. Data emisă apare în lista de încasări, documentul tipărit și registru; plafonul de
   numerar se aplică totuși la data închiderii în aplicație, conform deciziei utilizatorului.
-- Verificare: 18/18 teste de regresie financiară trecute după corecția atomică a alocării FIFO,
-  controlului bonului fiscal PJ/PF, filtrelor, listelor și depunerilor. Build frontend reușit.
+- Validarea acceptă doar cifre ASCII, normalizează zero-urile inițiale și permite valori între 1
+  și 999999. Dublurile concurente sunt traduse în mesaje 400, cu rollback al alocărilor facturilor
+  dacă inserarea plății eșuează.
+- Verificare extinsă: 46/46 teste financiare pentru BF/DI/DP/DC, date emise, dubluri pe zi,
+  izolare tenant/sucursală, concurență, limite și fluxuri de casă; build frontend reușit.
 
 ## MOCKED
 - Trimiterea devizelor pe email/SMS/WhatsApp

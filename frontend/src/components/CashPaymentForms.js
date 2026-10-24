@@ -294,12 +294,12 @@ export function CashPayoutForm({ available, onSaved }) {
           </NativeSelect>
         </Field>
       )}
-      <Field label={kind === "payment_order" ? tr("Nr. dispoziție de plată", "Payment order no.") : tr("Nr. decont cheltuieli", "Expense settlement no.")}>
+      <Field label={kind === "payment_order" ? tr("Nr. dispoziție de plată *", "Payment order no. *") : tr("Nr. decont cheltuieli *", "Expense settlement no. *")}>
           <Input
             data-testid="cash-payout-document-number-input"
             type="number"
             min="1"
-            placeholder="3"
+            placeholder={tr("ex. 3", "e.g. 3")}
             value={documentNumber}
             onChange={(event) => setDocumentNumber(event.target.value)}
           />

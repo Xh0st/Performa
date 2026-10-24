@@ -19,6 +19,16 @@ const documentLabel = (translate, documentType) => {
   return translate(labels[0], labels[1]);
 };
 
+const cashMovementLabel = (translate, kind) => {
+  const labels = {
+    expense_settlement: ["Decont cheltuieli", "Expense settlement"],
+    payment_order: ["Dispoziție de plată", "Payment order"],
+    receipt_reversal: ["Stornare încasare", "Receipt reversal"],
+  };
+  const label = labels[kind] || [kind || "Document", kind || "Document"];
+  return translate(label[0], label[1]);
+};
+
 export default function Cash() {
   const { tr } = useLang();
   const [day, setDay] = useState(today());
@@ -74,7 +84,7 @@ export default function Cash() {
       <PageHeader eyebrow={tr("Numerar · POS · transfer · online", "Cash · POS · transfer · online")} title={tr("Încasări & registru de casă", "Payments & cash register")} />
       <Tabs defaultValue="register">
         <div className="mb-2 max-w-full overflow-x-auto pb-1">
-        <TabsList className="w-max min-w-max whitespace-nowrap">
+        <TabsList className="w-max min-w-max whitespace-nowrap px-1">
           <TabsTrigger value="register" data-testid="cash-tab-register">{tr("Registru de casă", "Cash register")}</TabsTrigger>
           <TabsTrigger value="cash" data-testid="cash-tab-cash-payments">{tr("Încasări numerar", "Cash receipts")}</TabsTrigger>
           <TabsTrigger value="cashless" data-testid="cash-tab-cashless-payments">POS / OP</TabsTrigger>
@@ -168,7 +178,7 @@ export default function Cash() {
               <PaymentEntryForm cashOnly externalReceiptOnly onSaved={reloadCash} />
             </div>
             <Input data-testid="cash-payouts-search-input" className="mt-4 max-w-md" placeholder={tr("Caută beneficiar sau document…", "Search beneficiary or document…")} value={payoutQuery} onChange={(event) => setPayoutQuery(event.target.value)} />
-            <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-sm" data-testid="cash-payouts-table"><tbody>{(payoutsData?.items || []).map((movement) => <tr key={movement.id} className="h-10 border-b border-border/50"><td className="font-mono">{movement.doc_number}</td><td>{dt(movement.date)}</td><td>{movement.beneficiary}</td><td>{movement.kind}</td><td className="text-right font-mono">{money(movement.amount)}</td></tr>)}</tbody></table></div>
+            <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-sm" data-testid="cash-payouts-table"><tbody>{(payoutsData?.items || []).map((movement) => <tr key={movement.id} className="h-10 border-b border-border/50"><td className="font-mono">{movement.doc_number}</td><td>{dt(movement.date)}</td><td>{movement.beneficiary}</td><td>{cashMovementLabel(tr, movement.kind)}</td><td className="text-right font-mono">{money(movement.amount)}</td></tr>)}</tbody></table></div>
             <PaginationControls {...payoutPagination} total={payoutsData?.total || 0} totalPages={payoutsData?.total_pages || 1} testid="cash-payouts-pagination" />
           </Panel>
         </TabsContent>
